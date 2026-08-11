@@ -1,1 +1,23 @@
-{"success":true,"path":"src/router-hooks.ts","content":"/**\n * Router Hooks — hook exports only\n *\n * Separated from router.ts to satisfy Vite Fast Refresh rules:\n * a module must export only hooks OR only non-hooks, not both.\n */\n\nimport { useNavigate as useRouterNavigate, useParams as useRouterParams } from 'react-router-dom';\nimport { Path, Params } from './routes';\n\n// Export hooks with type safety\nexport const useNavigate = () => {\n  const navigate = useRouterNavigate();\n  return (to: Path | number, options?: { replace?: boolean; state?: any }) => {\n    if (typeof to === 'number') {\n      navigate(to);\n    } else {\n      navigate(to, options);\n    }\n  };\n};\n\nexport const useParams = useRouterParams<Params>;\n","totalLines":24,"truncated":false}
+/**
+ * Router Hooks — hook exports only
+ *
+ * Separated from router.ts to satisfy Vite Fast Refresh rules:
+ * a module must export only hooks OR only non-hooks, not both.
+ */
+
+import { useNavigate as useRouterNavigate, useParams as useRouterParams } from 'react-router-dom';
+import { Path, Params } from './routes';
+
+// Export hooks with type safety
+export const useNavigate = () => {
+  const navigate = useRouterNavigate();
+  return (to: Path | number, options?: { replace?: boolean; state?: any }) => {
+    if (typeof to === 'number') {
+      navigate(to);
+    } else {
+      navigate(to, options);
+    }
+  };
+};
+
+export const useParams = useRouterParams<Params>;

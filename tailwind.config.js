@@ -1,1 +1,138 @@
-{"success":true,"path":"tailwind.config.js","content":"/** @type {import('tailwindcss').Config} */\nimport tailwindcssAnimate from 'tailwindcss-animate'\n\nexport default {\n  content: [\n    './index.html',\n    './src/**/*.{ts,tsx,js,jsx}',\n    './dev-tools/src/**/*.{ts,tsx,js,jsx}',\n  ],\n  theme: {\n  \tcontainer: {\n  \t\tcenter: true,\n  \t\tpadding: '2rem',\n  \t\tscreens: {\n  \t\t\t'2xl': '1400px'\n  \t\t}\n  \t},\n  \textend: {\n  \t\tcolors: {\n  \t\t\tborder: 'hsl(var(--border))',\n  \t\t\tinput: 'hsl(var(--input))',\n  \t\t\tring: 'hsl(var(--ring))',\n  \t\t\tbackground: 'hsl(var(--background))',\n  \t\t\tforeground: 'hsl(var(--foreground))',\n  \t\t\tprimary: {\n  \t\t\t\tDEFAULT: 'hsl(var(--primary))',\n  \t\t\t\tforeground: 'hsl(var(--primary-foreground))'\n  \t\t\t},\n  \t\t\tsecondary: {\n  \t\t\t\tDEFAULT: 'hsl(var(--secondary))',\n  \t\t\t\tforeground: 'hsl(var(--secondary-foreground))'\n  \t\t\t},\n  \t\t\tdestructive: {\n  \t\t\t\tDEFAULT: 'hsl(var(--destructive))',\n  \t\t\t\tforeground: 'hsl(var(--destructive-foreground))'\n  \t\t\t},\n  \t\t\tmuted: {\n  \t\t\t\tDEFAULT: 'hsl(var(--muted))',\n  \t\t\t\tforeground: 'hsl(var(--muted-foreground))'\n  \t\t\t},\n  \t\t\taccent: {\n  \t\t\t\tDEFAULT: 'hsl(var(--accent))',\n  \t\t\t\tforeground: 'hsl(var(--accent-foreground))'\n  \t\t\t},\n  \t\t\tpopover: {\n  \t\t\t\tDEFAULT: 'hsl(var(--popover))',\n  \t\t\t\tforeground: 'hsl(var(--popover-foreground))'\n  \t\t\t},\n  \t\t\tcard: {\n  \t\t\t\tDEFAULT: 'hsl(var(--card))',\n  \t\t\t\tforeground: 'hsl(var(--card-foreground))'\n  \t\t\t}\n  \t\t},\n  \t\tborderRadius: {\n  \t\t\tlg: 'var(--radius)',\n  \t\t\tmd: 'calc(var(--radius) - 2px)',\n  \t\t\tsm: 'calc(var(--radius) - 4px)'\n  \t\t},\n\t\tfontFamily: {\n\t\t\tsans: ['var(--font-sans)'],\n\t\t\theading: ['var(--font-heading)'],\n\t\t\tserif: ['var(--font-serif)'],\n\t\t\tmono: ['var(--font-mono)']\n\t\t},\n  \t\tkeyframes: {\n  \t\t\t'accordion-down': {\n  \t\t\t\tfrom: {\n  \t\t\t\t\theight: '0'\n  \t\t\t\t},\n  \t\t\t\tto: {\n  \t\t\t\t\theight: 'var(--radix-accordion-content-height)'\n  \t\t\t\t}\n  \t\t\t},\n  \t\t\t'accordion-up': {\n  \t\t\t\tfrom: {\n  \t\t\t\t\theight: 'var(--radix-accordion-content-height)'\n  \t\t\t\t},\n  \t\t\t\tto: {\n  \t\t\t\t\theight: '0'\n  \t\t\t\t}\n  \t\t\t},\n  \t\t\tfloat: {\n  \t\t\t\t'0%, 100%': {\n  \t\t\t\t\ttransform: 'translateY(0px)'\n  \t\t\t\t},\n  \t\t\t\t'50%': {\n  \t\t\t\t\ttransform: 'translateY(-10px)'\n  \t\t\t\t}\n  \t\t\t},\n  \t\t\t'rotate-clockwise': {\n  \t\t\t\t'0%': {\n  \t\t\t\t\ttransform: 'rotate(0deg)'\n  \t\t\t\t},\n  \t\t\t\t'100%': {\n  \t\t\t\t\ttransform: 'rotate(360deg)'\n  \t\t\t\t}\n  \t\t\t},\n  \t\t\t'rotate-counter': {\n  \t\t\t\t'0%': {\n  \t\t\t\t\ttransform: 'rotate(0deg)'\n  \t\t\t\t},\n  \t\t\t\t'100%': {\n  \t\t\t\t\ttransform: 'rotate(-360deg)'\n  \t\t\t\t}\n  \t\t\t},\n  \t\t\t'accordion-down': {\n  \t\t\t\tfrom: {\n  \t\t\t\t\theight: '0'\n  \t\t\t\t},\n  \t\t\t\tto: {\n  \t\t\t\t\theight: 'var(--radix-accordion-content-height)'\n  \t\t\t\t}\n  \t\t\t},\n  \t\t\t'accordion-up': {\n  \t\t\t\tfrom: {\n  \t\t\t\t\theight: 'var(--radix-accordion-content-height)'\n  \t\t\t\t},\n  \t\t\t\tto: {\n  \t\t\t\t\theight: '0'\n  \t\t\t\t}\n  \t\t\t}\n  \t\t},\n  \t\tanimation: {\n  \t\t\t'accordion-down': 'accordion-down 0.2s ease-out',\n  \t\t\t'accordion-up': 'accordion-up 0.2s ease-out',\n  \t\t\t'spin-slow': 'spin 3s linear infinite',\n  \t\t\t'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',\n  \t\t\t'bounce-gentle': 'bounce 2s infinite',\n  \t\t\tfloat: 'float 3s ease-in-out infinite',\n  \t\t\t'rotate-clockwise': 'rotate-clockwise 4s linear infinite',\n  \t\t\t'rotate-counter': 'rotate-counter 3s linear infinite',\n  \t\t\t'accordion-down': 'accordion-down 0.2s ease-out',\n  \t\t\t'accordion-up': 'accordion-up 0.2s ease-out'\n  \t\t}\n  \t}\n  },\n  plugins: [tailwindcssAnimate],\n}\n","totalLines":139,"truncated":false}
+/** @type {import('tailwindcss').Config} */
+import tailwindcssAnimate from 'tailwindcss-animate'
+
+export default {
+  content: [
+    './index.html',
+    './src/**/*.{ts,tsx,js,jsx}',
+    './dev-tools/src/**/*.{ts,tsx,js,jsx}',
+  ],
+  theme: {
+  	container: {
+  		center: true,
+  		padding: '2rem',
+  		screens: {
+  			'2xl': '1400px'
+  		}
+  	},
+  	extend: {
+  		colors: {
+  			border: 'hsl(var(--border))',
+  			input: 'hsl(var(--input))',
+  			ring: 'hsl(var(--ring))',
+  			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
+  			primary: {
+  				DEFAULT: 'hsl(var(--primary))',
+  				foreground: 'hsl(var(--primary-foreground))'
+  			},
+  			secondary: {
+  				DEFAULT: 'hsl(var(--secondary))',
+  				foreground: 'hsl(var(--secondary-foreground))'
+  			},
+  			destructive: {
+  				DEFAULT: 'hsl(var(--destructive))',
+  				foreground: 'hsl(var(--destructive-foreground))'
+  			},
+  			muted: {
+  				DEFAULT: 'hsl(var(--muted))',
+  				foreground: 'hsl(var(--muted-foreground))'
+  			},
+  			accent: {
+  				DEFAULT: 'hsl(var(--accent))',
+  				foreground: 'hsl(var(--accent-foreground))'
+  			},
+  			popover: {
+  				DEFAULT: 'hsl(var(--popover))',
+  				foreground: 'hsl(var(--popover-foreground))'
+  			},
+  			card: {
+  				DEFAULT: 'hsl(var(--card))',
+  				foreground: 'hsl(var(--card-foreground))'
+  			}
+  		},
+  		borderRadius: {
+  			lg: 'var(--radius)',
+  			md: 'calc(var(--radius) - 2px)',
+  			sm: 'calc(var(--radius) - 4px)'
+  		},
+		fontFamily: {
+			sans: ['var(--font-sans)'],
+			heading: ['var(--font-heading)'],
+			serif: ['var(--font-serif)'],
+			mono: ['var(--font-mono)']
+		},
+  		keyframes: {
+  			'accordion-down': {
+  				from: {
+  					height: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-accordion-content-height)'
+  				}
+  			},
+  			'accordion-up': {
+  				from: {
+  					height: 'var(--radix-accordion-content-height)'
+  				},
+  				to: {
+  					height: '0'
+  				}
+  			},
+  			float: {
+  				'0%, 100%': {
+  					transform: 'translateY(0px)'
+  				},
+  				'50%': {
+  					transform: 'translateY(-10px)'
+  				}
+  			},
+  			'rotate-clockwise': {
+  				'0%': {
+  					transform: 'rotate(0deg)'
+  				},
+  				'100%': {
+  					transform: 'rotate(360deg)'
+  				}
+  			},
+  			'rotate-counter': {
+  				'0%': {
+  					transform: 'rotate(0deg)'
+  				},
+  				'100%': {
+  					transform: 'rotate(-360deg)'
+  				}
+  			},
+  			'accordion-down': {
+  				from: {
+  					height: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-accordion-content-height)'
+  				}
+  			},
+  			'accordion-up': {
+  				from: {
+  					height: 'var(--radix-accordion-content-height)'
+  				},
+  				to: {
+  					height: '0'
+  				}
+  			}
+  		},
+  		animation: {
+  			'accordion-down': 'accordion-down 0.2s ease-out',
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'spin-slow': 'spin 3s linear infinite',
+  			'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+  			'bounce-gentle': 'bounce 2s infinite',
+  			float: 'float 3s ease-in-out infinite',
+  			'rotate-clockwise': 'rotate-clockwise 4s linear infinite',
+  			'rotate-counter': 'rotate-counter 3s linear infinite',
+  			'accordion-down': 'accordion-down 0.2s ease-out',
+  			'accordion-up': 'accordion-up 0.2s ease-out'
+  		}
+  	}
+  },
+  plugins: [tailwindcssAnimate],
+}

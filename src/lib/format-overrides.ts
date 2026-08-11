@@ -1,1 +1,176 @@
-{"success":true,"path":"src/lib/format-overrides.ts","content":"import type { CSSProperties } from 'react'\n\nexport type FormatOverrideSourceKind = 'bound-expression' | 'content-key' | 'content-key-template'\n\nexport interface FormatOverrideTarget {\n  file: string\n  tagName: string\n  sourceKind: FormatOverrideSourceKind\n  contentKey?: string | null\n  contentKeyTemplate?: string | null\n  expressionHash?: string | null\n}\n\nexport interface FormatOverrideMarks {\n  bold?: boolean\n  italic?: boolean\n  color?: string | null\n}\n\nexport interface FormatOverrideEntry {\n  target: FormatOverrideTarget\n  marks: FormatOverrideMarks\n  updatedAt: string\n}\n\nexport interface FormatOverrideSidecar {\n  version: 1\n  overrides: Record<string, FormatOverrideEntry>\n}\n\nexport interface FormatOverrideBundle {\n  version: 1\n  scopes: Record<string, FormatOverrideSidecar>\n}\n\nexport interface FormatOverrideScope {\n  key: string\n  filePath: string\n}\n\nexport type FormatOverrideLookupResult =\n  | { status: 'missing' }\n  | { status: 'applicable'; marks: FormatOverrideMarks }\n  | { status: 'guard-mismatch'; expected: FormatOverrideTarget; actual: FormatOverrideTarget }\n\nexport const EMPTY_FORMAT_OVERRIDE_SIDECAR: FormatOverrideSidecar = {\n  version: 1,\n  overrides: {},\n}\n\nexport const EMPTY_FORMAT_OVERRIDE_BUNDLE: FormatOverrideBundle = {\n  version: 1,\n  scopes: {},\n}\n\nfunction isRecord(value: unknown): value is Record<string, unknown> {\n  return !!value && typeof value === 'object' && !Array.isArray(value)\n}\n\nfunction isFormatOverrideSourceKind(value: unknown): value is FormatOverrideSourceKind {\n  return value === 'bound-expression' || value === 'content-key' || value === 'content-key-template'\n}\n\nfunction isFormatOverrideTarget(value: unknown): value is FormatOverrideTarget {\n  if (!isRecord(value)) return false\n  return (\n    typeof value.file === 'string' &&\n    typeof value.tagName === 'string' &&\n    isFormatOverrideSourceKind(value.sourceKind) &&\n    (value.contentKey === undefined || value.contentKey === null || typeof value.contentKey === 'string') &&\n    (\n      value.contentKeyTemplate === undefined ||\n      value.contentKeyTemplate === null ||\n      typeof value.contentKeyTemplate === 'string'\n    ) &&\n    (value.expressionHash === undefined || value.expressionHash === null || typeof value.expressionHash === 'string')\n  )\n}\n\nfunction isFormatOverrideMarks(value: unknown): value is FormatOverrideMarks {\n  if (!isRecord(value)) return false\n  return (\n    (value.bold === undefined || typeof value.bold === 'boolean') &&\n    (value.italic === undefined || typeof value.italic === 'boolean') &&\n    (value.color === undefined || value.color === null || typeof value.color === 'string')\n  )\n}\n\nfunction isFormatOverrideEntry(value: unknown): value is FormatOverrideEntry {\n  if (!isRecord(value)) return false\n  return (\n    isFormatOverrideTarget(value.target) &&\n    isFormatOverrideMarks(value.marks) &&\n    typeof value.updatedAt === 'string'\n  )\n}\n\nfunction warnMalformedFormatOverrideEntry(scope: string, devId: string): void {\n  if (import.meta.env.DEV) {\n    console.warn('[format-overrides] Ignoring malformed override entry.', { scope, devId })\n  }\n}\n\nfunction normalizeNullable(value: string | null | undefined): string | null {\n  return value ?? null\n}\n\nfunction normalizeSourceFile(file: string): string {\n  const normalized = file.replace(/\\\\/g, '/')\n  const srcIndex = normalized.indexOf('/src/')\n  if (srcIndex !== -1) return normalized.slice(srcIndex + 1)\n  return normalized.replace(/^\\/+/, '')\n}\n\nfunction toSafePagePath(rawPagePath: string): string | null {\n  const segments = rawPagePath.split('/')\n  if (segments.some((segment) => !/^[a-zA-Z0-9_-]+$/.test(segment))) return null\n\n  return segments.map((segment) => segment.toLowerCase()).join('/')\n}\n\nexport function deriveFormatOverrideScope(file: string): FormatOverrideScope {\n  // Keep this scope derivation in sync with agents/src/services/FormatOverrideService.ts.\n  // The server writes by target.file and the runtime reads by the same derived scope key.\n  const normalized = normalizeSourceFile(file)\n  const pageMatch = /^src\\/pages\\/(.+)\\.[jt]sx?$/.exec(normalized)\n  if (!pageMatch?.[1]) {\n    return { key: 'shared', filePath: 'format-overrides/shared.json' }\n  }\n\n  const pagePath = toSafePagePath(pageMatch[1])\n  if (!pagePath) {\n    return { key: 'shared', filePath: 'format-overrides/shared.json' }\n  }\n\n  return {\n    key: `pages/${pagePath}`,\n    filePath: `format-overrides/pages/${pagePath}.json`,\n  }\n}\n\nexport function targetsMatch(expected: FormatOverrideTarget, actual: FormatOverrideTarget): boolean {\n  return expected.file === actual.file &&\n    expected.tagName === actual.tagName &&\n    expected.sourceKind === actual.sourceKind &&\n    normalizeNullable(expected.contentKey) === normalizeNullable(actual.contentKey) &&\n    normalizeNullable(expected.contentKeyTemplate) === normalizeNullable(actual.contentKeyTemplate) &&\n    normalizeNullable(expected.expressionHash) === normalizeNullable(actual.expressionHash)\n}\n\nexport function findApplicableFormatOverride(\n  bundle: FormatOverrideBundle,\n  devId: string,\n  actual: FormatOverrideTarget,\n): FormatOverrideLookupResult {\n  const scope = deriveFormatOverrideScope(actual.file)\n  const sidecar = bundle.scopes[scope.key] ?? EMPTY_FORMAT_OVERRIDE_SIDECAR\n  const entry = sidecar.overrides[devId]\n  if (!entry) return { status: 'missing' }\n  if (!isFormatOverrideEntry(entry)) {\n    warnMalformedFormatOverrideEntry(scope.key, devId)\n    return { status: 'missing' }\n  }\n  if (!targetsMatch(entry.target, actual)) {\n    return { status: 'guard-mismatch', expected: entry.target, actual }\n  }\n  return { status: 'applicable', marks: entry.marks }\n}\n\nexport function buildFormatOverrideStyle(marks: FormatOverrideMarks): CSSProperties {\n  return {\n    ...(marks.bold ? { fontWeight: 700 } : {}),\n    ...(marks.italic ? { fontStyle: 'italic' } : {}),\n    ...(marks.color ? { color: marks.color } : {}),\n  }\n}\n","totalLines":177,"truncated":false}
+import type { CSSProperties } from 'react'
+
+export type FormatOverrideSourceKind = 'bound-expression' | 'content-key' | 'content-key-template'
+
+export interface FormatOverrideTarget {
+  file: string
+  tagName: string
+  sourceKind: FormatOverrideSourceKind
+  contentKey?: string | null
+  contentKeyTemplate?: string | null
+  expressionHash?: string | null
+}
+
+export interface FormatOverrideMarks {
+  bold?: boolean
+  italic?: boolean
+  color?: string | null
+}
+
+export interface FormatOverrideEntry {
+  target: FormatOverrideTarget
+  marks: FormatOverrideMarks
+  updatedAt: string
+}
+
+export interface FormatOverrideSidecar {
+  version: 1
+  overrides: Record<string, FormatOverrideEntry>
+}
+
+export interface FormatOverrideBundle {
+  version: 1
+  scopes: Record<string, FormatOverrideSidecar>
+}
+
+export interface FormatOverrideScope {
+  key: string
+  filePath: string
+}
+
+export type FormatOverrideLookupResult =
+  | { status: 'missing' }
+  | { status: 'applicable'; marks: FormatOverrideMarks }
+  | { status: 'guard-mismatch'; expected: FormatOverrideTarget; actual: FormatOverrideTarget }
+
+export const EMPTY_FORMAT_OVERRIDE_SIDECAR: FormatOverrideSidecar = {
+  version: 1,
+  overrides: {},
+}
+
+export const EMPTY_FORMAT_OVERRIDE_BUNDLE: FormatOverrideBundle = {
+  version: 1,
+  scopes: {},
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isFormatOverrideSourceKind(value: unknown): value is FormatOverrideSourceKind {
+  return value === 'bound-expression' || value === 'content-key' || value === 'content-key-template'
+}
+
+function isFormatOverrideTarget(value: unknown): value is FormatOverrideTarget {
+  if (!isRecord(value)) return false
+  return (
+    typeof value.file === 'string' &&
+    typeof value.tagName === 'string' &&
+    isFormatOverrideSourceKind(value.sourceKind) &&
+    (value.contentKey === undefined || value.contentKey === null || typeof value.contentKey === 'string') &&
+    (
+      value.contentKeyTemplate === undefined ||
+      value.contentKeyTemplate === null ||
+      typeof value.contentKeyTemplate === 'string'
+    ) &&
+    (value.expressionHash === undefined || value.expressionHash === null || typeof value.expressionHash === 'string')
+  )
+}
+
+function isFormatOverrideMarks(value: unknown): value is FormatOverrideMarks {
+  if (!isRecord(value)) return false
+  return (
+    (value.bold === undefined || typeof value.bold === 'boolean') &&
+    (value.italic === undefined || typeof value.italic === 'boolean') &&
+    (value.color === undefined || value.color === null || typeof value.color === 'string')
+  )
+}
+
+function isFormatOverrideEntry(value: unknown): value is FormatOverrideEntry {
+  if (!isRecord(value)) return false
+  return (
+    isFormatOverrideTarget(value.target) &&
+    isFormatOverrideMarks(value.marks) &&
+    typeof value.updatedAt === 'string'
+  )
+}
+
+function warnMalformedFormatOverrideEntry(scope: string, devId: string): void {
+  if (import.meta.env.DEV) {
+    console.warn('[format-overrides] Ignoring malformed override entry.', { scope, devId })
+  }
+}
+
+function normalizeNullable(value: string | null | undefined): string | null {
+  return value ?? null
+}
+
+function normalizeSourceFile(file: string): string {
+  const normalized = file.replace(/\\/g, '/')
+  const srcIndex = normalized.indexOf('/src/')
+  if (srcIndex !== -1) return normalized.slice(srcIndex + 1)
+  return normalized.replace(/^\/+/, '')
+}
+
+function toSafePagePath(rawPagePath: string): string | null {
+  const segments = rawPagePath.split('/')
+  if (segments.some((segment) => !/^[a-zA-Z0-9_-]+$/.test(segment))) return null
+
+  return segments.map((segment) => segment.toLowerCase()).join('/')
+}
+
+export function deriveFormatOverrideScope(file: string): FormatOverrideScope {
+  // Keep this scope derivation in sync with agents/src/services/FormatOverrideService.ts.
+  // The server writes by target.file and the runtime reads by the same derived scope key.
+  const normalized = normalizeSourceFile(file)
+  const pageMatch = /^src\/pages\/(.+)\.[jt]sx?$/.exec(normalized)
+  if (!pageMatch?.[1]) {
+    return { key: 'shared', filePath: 'format-overrides/shared.json' }
+  }
+
+  const pagePath = toSafePagePath(pageMatch[1])
+  if (!pagePath) {
+    return { key: 'shared', filePath: 'format-overrides/shared.json' }
+  }
+
+  return {
+    key: `pages/${pagePath}`,
+    filePath: `format-overrides/pages/${pagePath}.json`,
+  }
+}
+
+export function targetsMatch(expected: FormatOverrideTarget, actual: FormatOverrideTarget): boolean {
+  return expected.file === actual.file &&
+    expected.tagName === actual.tagName &&
+    expected.sourceKind === actual.sourceKind &&
+    normalizeNullable(expected.contentKey) === normalizeNullable(actual.contentKey) &&
+    normalizeNullable(expected.contentKeyTemplate) === normalizeNullable(actual.contentKeyTemplate) &&
+    normalizeNullable(expected.expressionHash) === normalizeNullable(actual.expressionHash)
+}
+
+export function findApplicableFormatOverride(
+  bundle: FormatOverrideBundle,
+  devId: string,
+  actual: FormatOverrideTarget,
+): FormatOverrideLookupResult {
+  const scope = deriveFormatOverrideScope(actual.file)
+  const sidecar = bundle.scopes[scope.key] ?? EMPTY_FORMAT_OVERRIDE_SIDECAR
+  const entry = sidecar.overrides[devId]
+  if (!entry) return { status: 'missing' }
+  if (!isFormatOverrideEntry(entry)) {
+    warnMalformedFormatOverrideEntry(scope.key, devId)
+    return { status: 'missing' }
+  }
+  if (!targetsMatch(entry.target, actual)) {
+    return { status: 'guard-mismatch', expected: entry.target, actual }
+  }
+  return { status: 'applicable', marks: entry.marks }
+}
+
+export function buildFormatOverrideStyle(marks: FormatOverrideMarks): CSSProperties {
+  return {
+    ...(marks.bold ? { fontWeight: 700 } : {}),
+    ...(marks.italic ? { fontStyle: 'italic' } : {}),
+    ...(marks.color ? { color: marks.color } : {}),
+  }
+}

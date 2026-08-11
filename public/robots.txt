@@ -1,1 +1,2 @@
-{"success":true,"path":"public/robots.txt","content":"User-agent: *\nDisallow: /\n","totalLines":3,"truncated":false}
+User-agent: *
+Disallow: /

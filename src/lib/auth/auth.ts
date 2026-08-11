@@ -1,1 +1,128 @@
-{"success":true,"path":"src/lib/auth/auth.ts","content":"/**\n * BetterAuth Server Configuration\n *\n * Supports both Email/Password and OAuth authentication.\n * Enable/disable methods by uncommenting the relevant sections.\n *\n * Secrets (via getSecret from #airo/secrets):\n * - BETTER_AUTH_SECRET: Session encryption key (auto-generated during install)\n * - OAuth credentials (GOOGLE_CLIENT_ID, etc.) for social login\n *\n * CORS/Trusted Origins:\n * - Only trusts origins matching the server's hostname\n */\n\nimport { betterAuth } from 'better-auth';\nimport { drizzleAdapter } from 'better-auth/adapters/drizzle';\n\nimport { db } from '@/server/db/client';\nimport { user, session, account, verification } from '@/server/db/schema';\nimport { getSecret } from '#airo/secrets';\n\n// Lazy singleton — betterAuth() must NOT run at module init time.\n//\n// The BETTER_AUTH_SECRET is loaded from the alloc config at runtime, so the\n// auth instance must be constructed after the secrets are available (i.e. on\n// the first HTTP request, not at import time).\n//\n// Pattern mirrors how db/client.ts defers the actual MySQL connection — the\n// pool object is safe to create at init, but anything that reads schema state\n// or secrets must be deferred to request time.\nlet _auth: ReturnType<typeof betterAuth> | null = null;\n\nexport function getAuth() {\n  if (_auth) return _auth;\n\n  const authSecret = getSecret('BETTER_AUTH_SECRET');\n  if (!authSecret || typeof authSecret !== 'string') {\n    throw new Error('BETTER_AUTH_SECRET is not set or invalid — run requestSecrets() first');\n  }\n\n  if (!db) {\n    throw new Error('Database not configured. Install the database skill first, then configure auth.');\n  }\n\n  const auth = betterAuth({\n    baseURL: process.env.BETTER_AUTH_URL,\n\n    // Schema passed explicitly — avoids BetterAuth's runtime schema inference.\n    database: drizzleAdapter(db, {\n      provider: 'mysql',\n      schema: { user, session, account, verification },\n    }),\n\n    secret: authSecret,\n\n    // Protect admin status field from user input\n    user: {\n      additionalFields: {\n        isAdmin: {\n          type: 'boolean',\n          defaultValue: false,\n          input: false,  // Prevent clients from writing this field\n          returned: true,\n        },\n      },\n    },\n\n    // CORS: Trusts .airoapp.ai subdomains and localhost by default.\n    // If your app has a custom domain, add it here or set BETTER_AUTH_TRUSTED_ORIGINS.\n    trustedOrigins: (request?: Request) => {\n      if (!request) return [];\n\n      const origin = request.headers.get('origin');\n      if (!origin) return [];\n\n      try {\n        const originUrl = new URL(origin);\n        const hostname = originUrl.hostname;\n\n        // Trust all airoapp.ai subdomains\n        if (hostname.endsWith('.airoapp.ai') || hostname.endsWith('.test-airoapp.ai')) {\n          return [origin];\n        }\n\n        // Trust localhost for development\n        if (hostname === 'localhost' || hostname === '127.0.0.1') {\n          return [origin];\n        }\n\n        return [];\n      } catch {\n        return [];\n      }\n    },\n\n    // In preview mode the site runs in an iframe embedded by the builder on a different\n    // origin, so cookies need SameSite=None + Secure + Partitioned (CHIPS) for cross-site\n    // access. In publish mode (standalone) we use the safer SameSite=Lax default.\n    ...(process.env.AIRO_PREVIEW === 'true' && {\n      advanced: {\n        defaultCookieAttributes: {\n          sameSite: 'none' as const,\n          secure: true,\n          partitioned: true,\n        },\n      },\n    }),\n\n    emailAndPassword: { enabled: true },\n\n    // socialProviders: {\n    //   google: {\n    //     clientId: getSecret('GOOGLE_CLIENT_ID') as string,\n    //     clientSecret: getSecret('GOOGLE_CLIENT_SECRET') as string,\n    //   },\n    //   github: {\n    //     clientId: getSecret('GITHUB_CLIENT_ID') as string,\n    //     clientSecret: getSecret('GITHUB_CLIENT_SECRET') as string,\n    //   },\n    // },\n  });\n\n  _auth = auth as unknown as ReturnType<typeof betterAuth>;\n  return auth;\n}\n\nexport type Session = ReturnType<typeof getAuth>['$Infer']['Session'];\nexport type User = ReturnType<typeof getAuth>['$Infer']['Session']['user'];\n","totalLines":129,"truncated":false}
+/**
+ * BetterAuth Server Configuration
+ *
+ * Supports both Email/Password and OAuth authentication.
+ * Enable/disable methods by uncommenting the relevant sections.
+ *
+ * Secrets (via getSecret from #airo/secrets):
+ * - BETTER_AUTH_SECRET: Session encryption key (auto-generated during install)
+ * - OAuth credentials (GOOGLE_CLIENT_ID, etc.) for social login
+ *
+ * CORS/Trusted Origins:
+ * - Only trusts origins matching the server's hostname
+ */
+
+import { betterAuth } from 'better-auth';
+import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+
+import { db } from '@/server/db/client';
+import { user, session, account, verification } from '@/server/db/schema';
+import { getSecret } from '#airo/secrets';
+
+// Lazy singleton — betterAuth() must NOT run at module init time.
+//
+// The BETTER_AUTH_SECRET is loaded from the alloc config at runtime, so the
+// auth instance must be constructed after the secrets are available (i.e. on
+// the first HTTP request, not at import time).
+//
+// Pattern mirrors how db/client.ts defers the actual MySQL connection — the
+// pool object is safe to create at init, but anything that reads schema state
+// or secrets must be deferred to request time.
+let _auth: ReturnType<typeof betterAuth> | null = null;
+
+export function getAuth() {
+  if (_auth) return _auth;
+
+  const authSecret = getSecret('BETTER_AUTH_SECRET');
+  if (!authSecret || typeof authSecret !== 'string') {
+    throw new Error('BETTER_AUTH_SECRET is not set or invalid — run requestSecrets() first');
+  }
+
+  if (!db) {
+    throw new Error('Database not configured. Install the database skill first, then configure auth.');
+  }
+
+  const auth = betterAuth({
+    baseURL: process.env.BETTER_AUTH_URL,
+
+    // Schema passed explicitly — avoids BetterAuth's runtime schema inference.
+    database: drizzleAdapter(db, {
+      provider: 'mysql',
+      schema: { user, session, account, verification },
+    }),
+
+    secret: authSecret,
+
+    // Protect admin status field from user input
+    user: {
+      additionalFields: {
+        isAdmin: {
+          type: 'boolean',
+          defaultValue: false,
+          input: false,  // Prevent clients from writing this field
+          returned: true,
+        },
+      },
+    },
+
+    // CORS: Trusts .airoapp.ai subdomains and localhost by default.
+    // If your app has a custom domain, add it here or set BETTER_AUTH_TRUSTED_ORIGINS.
+    trustedOrigins: (request?: Request) => {
+      if (!request) return [];
+
+      const origin = request.headers.get('origin');
+      if (!origin) return [];
+
+      try {
+        const originUrl = new URL(origin);
+        const hostname = originUrl.hostname;
+
+        // Trust all airoapp.ai subdomains
+        if (hostname.endsWith('.airoapp.ai') || hostname.endsWith('.test-airoapp.ai')) {
+          return [origin];
+        }
+
+        // Trust localhost for development
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+          return [origin];
+        }
+
+        return [];
+      } catch {
+        return [];
+      }
+    },
+
+    // In preview mode the site runs in an iframe embedded by the builder on a different
+    // origin, so cookies need SameSite=None + Secure + Partitioned (CHIPS) for cross-site
+    // access. In publish mode (standalone) we use the safer SameSite=Lax default.
+    ...(process.env.AIRO_PREVIEW === 'true' && {
+      advanced: {
+        defaultCookieAttributes: {
+          sameSite: 'none' as const,
+          secure: true,
+          partitioned: true,
+        },
+      },
+    }),
+
+    emailAndPassword: { enabled: true },
+
+    // socialProviders: {
+    //   google: {
+    //     clientId: getSecret('GOOGLE_CLIENT_ID') as string,
+    //     clientSecret: getSecret('GOOGLE_CLIENT_SECRET') as string,
+    //   },
+    //   github: {
+    //     clientId: getSecret('GITHUB_CLIENT_ID') as string,
+    //     clientSecret: getSecret('GITHUB_CLIENT_SECRET') as string,
+    //   },
+    // },
+  });
+
+  _auth = auth as unknown as ReturnType<typeof betterAuth>;
+  return auth;
+}
+
+export type Session = ReturnType<typeof getAuth>['$Infer']['Session'];
+export type User = ReturnType<typeof getAuth>['$Infer']['Session']['user'];

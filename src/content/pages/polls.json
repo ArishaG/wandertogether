@@ -1,1 +1,150 @@
-{"success":true,"path":"src/content/pages/polls.json","content":"{\n  \"meta\": {\n    \"title\": \"Polls & Voting — Wander.\",\n    \"description\": \"Vote together on the places, stays, and plans that make your trip.\"\n  },\n  \"header\": {\n    \"eyebrow\": \"Kyoto, Japan · Aug 18–25, 2026\",\n    \"title\": \"Polls & Voting\",\n    \"subtitle\": \"Make decisions together, without the group-chat chaos.\",\n    \"newPoll\": \"New poll\"\n  },\n  \"stats\": [\n    {\n      \"label\": \"Active polls\",\n      \"value\": \"3\",\n      \"id\": \"1BYwK3HrgHVrznifJXX4g\"\n    },\n    {\n      \"label\": \"Votes cast\",\n      \"value\": \"18\",\n      \"id\": \"dvaFr7kISBBpDCyux5qe-\"\n    },\n    {\n      \"label\": \"Decisions made\",\n      \"value\": \"5\",\n      \"id\": \"wmLT7VkIhkGxIUpqd7v3u\"\n    }\n  ],\n  \"filters\": {\n    \"all\": \"All polls\",\n    \"active\": \"Active\",\n    \"closed\": \"Closed\"\n  },\n  \"polls\": [\n    {\n      \"question\": \"Where should we stay in Kyoto?\",\n      \"category\": \"Lodging\",\n      \"deadline\": \"Closes in 2 days\",\n      \"status\": \"Active\",\n      \"totalVotes\": \"4 votes\",\n      \"options\": [\n        {\n          \"name\": \"Machiya townhouse in Gion\",\n          \"detail\": \"Traditional home · 4 bedrooms · ¥48,000/night\",\n          \"votes\": \"3\",\n          \"percent\": \"75%\",\n          \"id\": \"XMAkCCgm07takfT_shDWL\"\n        },\n        {\n          \"name\": \"Hotel near Kyoto Station\",\n          \"detail\": \"Modern hotel · easy transit · ¥36,000/night\",\n          \"votes\": \"1\",\n          \"percent\": \"25%\",\n          \"id\": \"D-i7uy7JVO9a4AdfmgUPF\"\n        },\n        {\n          \"name\": \"Ryokan in Arashiyama\",\n          \"detail\": \"Riverside stay · breakfast included · ¥52,000/night\",\n          \"votes\": \"0\",\n          \"percent\": \"0%\",\n          \"id\": \"m5zWCUcI0C5tr8gGxtkvN\"\n        }\n      ],\n      \"id\": \"N6mwwja7r-l40dNlOQagT\"\n    },\n    {\n      \"question\": \"Which day should we visit Fushimi Inari?\",\n      \"category\": \"Itinerary\",\n      \"deadline\": \"Closes tomorrow\",\n      \"status\": \"Active\",\n      \"totalVotes\": \"4 votes\",\n      \"options\": [\n        {\n          \"name\": \"Tuesday at sunrise\",\n          \"detail\": \"Quieter trails · early start\",\n          \"votes\": \"3\",\n          \"percent\": \"75%\",\n          \"id\": \"uAr-7LnSqnQc9ALFQZ00v\"\n        },\n        {\n          \"name\": \"Wednesday afternoon\",\n          \"detail\": \"Fits after Nishiki Market\",\n          \"votes\": \"1\",\n          \"percent\": \"25%\",\n          \"id\": \"sQiLEhKUqSEaLo812d8Q3\"\n        },\n        {\n          \"name\": \"Thursday evening\",\n          \"detail\": \"Lanterns and sunset views\",\n          \"votes\": \"0\",\n          \"percent\": \"0%\",\n          \"id\": \"vtFvRGq8doroITfMlEedQ\"\n        }\n      ],\n      \"id\": \"p6SU4f1mbmI60vRK4oyRU\"\n    },\n    {\n      \"question\": \"Dinner plan for our first night\",\n      \"category\": \"Food\",\n      \"deadline\": \"Closed Aug 8\",\n      \"status\": \"Closed\",\n      \"totalVotes\": \"4 votes\",\n      \"options\": [\n        {\n          \"name\": \"Izakaya crawl in Pontocho\",\n          \"detail\": \"Small plates · casual · central\",\n          \"votes\": \"4\",\n          \"percent\": \"100%\",\n          \"id\": \"foM6_U1E9kmklMJlGWEuj\"\n        },\n        {\n          \"name\": \"Kaiseki tasting menu\",\n          \"detail\": \"Seasonal multi-course dinner\",\n          \"votes\": \"0\",\n          \"percent\": \"0%\",\n          \"id\": \"y59zxFnk2Nh9xFAQjH077\"\n        },\n        {\n          \"name\": \"Cook together at the townhouse\",\n          \"detail\": \"Market run + shared meal\",\n          \"votes\": \"0\",\n          \"percent\": \"0%\",\n          \"id\": \"Auigb0MVfmvCONHPqG6d6\"\n        }\n      ],\n      \"id\": \"qLXblbwLYR2AlhDolWFxW\"\n    }\n  ],\n  \"sidebar\": {\n    \"title\": \"How voting works\",\n    \"items\": [\n      {\n        \"title\": \"Vote once\",\n        \"description\": \"Pick the option that works best for you.\",\n        \"id\": \"r5AmuwD-fX4MHRLz9mY67\"\n      },\n      {\n        \"title\": \"See the tally\",\n        \"description\": \"Everyone can follow the decision in real time.\",\n        \"id\": \"AvrncD9CtOxQiM2E83xDm\"\n      },\n      {\n        \"title\": \"Lock it in\",\n        \"description\": \"When a poll closes, add the winner to your plan.\",\n        \"id\": \"WnELcs8y_GBUJcCWJ45tJ\"\n      }\n    ],\n    \"tip\": \"Tip: Set a deadline so decisions keep moving.\"\n  }\n}\n","totalLines":151,"truncated":false}
+{
+  "meta": {
+    "title": "Polls & Voting — Wander.",
+    "description": "Vote together on the places, stays, and plans that make your trip."
+  },
+  "header": {
+    "eyebrow": "Kyoto, Japan · Aug 18–25, 2026",
+    "title": "Polls & Voting",
+    "subtitle": "Make decisions together, without the group-chat chaos.",
+    "newPoll": "New poll"
+  },
+  "stats": [
+    {
+      "label": "Active polls",
+      "value": "3",
+      "id": "1BYwK3HrgHVrznifJXX4g"
+    },
+    {
+      "label": "Votes cast",
+      "value": "18",
+      "id": "dvaFr7kISBBpDCyux5qe-"
+    },
+    {
+      "label": "Decisions made",
+      "value": "5",
+      "id": "wmLT7VkIhkGxIUpqd7v3u"
+    }
+  ],
+  "filters": {
+    "all": "All polls",
+    "active": "Active",
+    "closed": "Closed"
+  },
+  "polls": [
+    {
+      "question": "Where should we stay in Kyoto?",
+      "category": "Lodging",
+      "deadline": "Closes in 2 days",
+      "status": "Active",
+      "totalVotes": "4 votes",
+      "options": [
+        {
+          "name": "Machiya townhouse in Gion",
+          "detail": "Traditional home · 4 bedrooms · ¥48,000/night",
+          "votes": "3",
+          "percent": "75%",
+          "id": "XMAkCCgm07takfT_shDWL"
+        },
+        {
+          "name": "Hotel near Kyoto Station",
+          "detail": "Modern hotel · easy transit · ¥36,000/night",
+          "votes": "1",
+          "percent": "25%",
+          "id": "D-i7uy7JVO9a4AdfmgUPF"
+        },
+        {
+          "name": "Ryokan in Arashiyama",
+          "detail": "Riverside stay · breakfast included · ¥52,000/night",
+          "votes": "0",
+          "percent": "0%",
+          "id": "m5zWCUcI0C5tr8gGxtkvN"
+        }
+      ],
+      "id": "N6mwwja7r-l40dNlOQagT"
+    },
+    {
+      "question": "Which day should we visit Fushimi Inari?",
+      "category": "Itinerary",
+      "deadline": "Closes tomorrow",
+      "status": "Active",
+      "totalVotes": "4 votes",
+      "options": [
+        {
+          "name": "Tuesday at sunrise",
+          "detail": "Quieter trails · early start",
+          "votes": "3",
+          "percent": "75%",
+          "id": "uAr-7LnSqnQc9ALFQZ00v"
+        },
+        {
+          "name": "Wednesday afternoon",
+          "detail": "Fits after Nishiki Market",
+          "votes": "1",
+          "percent": "25%",
+          "id": "sQiLEhKUqSEaLo812d8Q3"
+        },
+        {
+          "name": "Thursday evening",
+          "detail": "Lanterns and sunset views",
+          "votes": "0",
+          "percent": "0%",
+          "id": "vtFvRGq8doroITfMlEedQ"
+        }
+      ],
+      "id": "p6SU4f1mbmI60vRK4oyRU"
+    },
+    {
+      "question": "Dinner plan for our first night",
+      "category": "Food",
+      "deadline": "Closed Aug 8",
+      "status": "Closed",
+      "totalVotes": "4 votes",
+      "options": [
+        {
+          "name": "Izakaya crawl in Pontocho",
+          "detail": "Small plates · casual · central",
+          "votes": "4",
+          "percent": "100%",
+          "id": "foM6_U1E9kmklMJlGWEuj"
+        },
+        {
+          "name": "Kaiseki tasting menu",
+          "detail": "Seasonal multi-course dinner",
+          "votes": "0",
+          "percent": "0%",
+          "id": "y59zxFnk2Nh9xFAQjH077"
+        },
+        {
+          "name": "Cook together at the townhouse",
+          "detail": "Market run + shared meal",
+          "votes": "0",
+          "percent": "0%",
+          "id": "Auigb0MVfmvCONHPqG6d6"
+        }
+      ],
+      "id": "qLXblbwLYR2AlhDolWFxW"
+    }
+  ],
+  "sidebar": {
+    "title": "How voting works",
+    "items": [
+      {
+        "title": "Vote once",
+        "description": "Pick the option that works best for you.",
+        "id": "r5AmuwD-fX4MHRLz9mY67"
+      },
+      {
+        "title": "See the tally",
+        "description": "Everyone can follow the decision in real time.",
+        "id": "AvrncD9CtOxQiM2E83xDm"
+      },
+      {
+        "title": "Lock it in",
+        "description": "When a poll closes, add the winner to your plan.",
+        "id": "WnELcs8y_GBUJcCWJ45tJ"
+      }
+    ],
+    "tip": "Tip: Set a deadline so decisions keep moving."
+  }
+}

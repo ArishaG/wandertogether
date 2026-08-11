@@ -1,1 +1,115 @@
-{"success":true,"path":"src/server/llms-txt.ts","content":"import type { Request, Response } from \"express\";\nimport type { SeoRoute } from \"../lib/seo-routes\";\nimport { seoRoutes } from \"../lib/seo-routes\";\nimport { siteMeta } from \"../lib/site-meta\";\nimport { isSystemHost } from \"./seo-host\";\n\n/**\n * Convert an SEO route path into a human-readable link label.\n *\n * Rule:\n *  - \"/\"            -> \"Home\" (special case)\n *  - otherwise      -> last path segment, split on \"-\"/\"_\", title-cased.\n *    e.g. \"/about\" -> \"About\", \"/contact-us\" -> \"Contact Us\",\n *    \"/blog/my-post\" -> \"My Post\".\n * seoRoutes paths are static route paths (no query strings/fragments), so\n * those are not handled.\n */\nexport function humanizeLabel(path: string): string {\n\tif (path === \"/\") return \"Home\";\n\tconst segment = path.replace(/^\\/+|\\/+$/g, \"\").split(\"/\").pop() ?? \"\";\n\treturn segment\n\t\t.split(/[-_]/)\n\t\t.filter(Boolean)\n\t\t.map((word) => word.charAt(0).toUpperCase() + word.slice(1))\n\t\t.join(\" \");\n}\n\n/**\n * Make agent/customer-authored text safe to interpolate into markdown.\n * name/summary ultimately trace to customer-supplied business details, so\n * they may contain markdown-structural characters or newlines that would\n * break the H1, blockquote, or link syntax. We collapse newlines/whitespace\n * to single spaces (keeping H1 and blockquote single-line) and backslash-\n * escape the characters that break inline constructs (`\\`, backtick, `[`,\n * `]`). Other characters (#, >, *, etc.) are not structural mid-line, so we\n * leave them to avoid mangling ordinary business names.\n */\nexport function sanitizeMarkdown(text: string): string {\n\treturn text\n\t\t.replace(/[\\r\\n\\t]+/g, \" \")\n\t\t.replace(/[\\\\`[\\]]/g, (c) => `\\\\${c}`)\n\t\t.replace(/ {2,}/g, \" \")\n\t\t.trim();\n}\n\nexport interface RenderLlmsTxtOptions {\n\t/** Absolute origin, e.g. \"https://acme.com\". */\n\tbaseUrl: string;\n\t/** Bare hostname, e.g. \"acme.com\" — used for the H1 fallback. */\n\thostname: string;\n\t/** Business name (may be empty when unseeded). */\n\tname: string;\n\t/** Business summary (may be empty when unseeded). */\n\tsummary: string;\n\t/** Crawlable routes; the page list is built from these. */\n\troutes: SeoRoute[];\n}\n\n/**\n * Render the /llms.txt body. Pure: no request, no I/O. Always returns a\n * well-formed, single-trailing-newline markdown document.\n */\nexport function renderLlmsTxt(opts: RenderLlmsTxtOptions): string {\n\tconst name = sanitizeMarkdown(opts.name);\n\tconst summary = sanitizeMarkdown(opts.summary);\n\n\tconst lines: string[] = [`# ${name || opts.hostname}`];\n\n\tif (summary) {\n\t\tlines.push(\"\", `> ${summary}`);\n\t}\n\n\tconst pageLinks = opts.routes\n\t\t.filter((r) => typeof r.path === \"string\" && r.path.startsWith(\"/\"))\n\t\t.map(\n\t\t\t(r) =>\n\t\t\t\t`- [${sanitizeMarkdown(humanizeLabel(r.path))}](${opts.baseUrl}${r.path})`,\n\t\t);\n\n\tif (pageLinks.length > 0) {\n\t\tlines.push(\"\", \"## Pages\", ...pageLinks);\n\t}\n\n\treturn `${lines.join(\"\\n\")}\\n`;\n}\n\n/**\n * Express handler for GET /llms.txt. Host-gated like robots.txt / sitemap.xml:\n * system/preview hosts get a 404 (no real published site to describe);\n * customer-attached domains get the rendered file. Headers mirror the other\n * SEO routes so CDN behaviour is identical (per-host via `Vary: Host`).\n */\nexport function llmsTxtHandler(req: Request, res: Response): void {\n\tif (isSystemHost(req)) {\n\t\tres\n\t\t\t.status(404)\n\t\t\t.type(\"text/plain\")\n\t\t\t.set(\"Cache-Control\", \"public, max-age=60, must-revalidate\")\n\t\t\t.set(\"Vary\", \"Host\")\n\t\t\t.send(\"Not found\\n\");\n\t\treturn;\n\t}\n\tconst body = renderLlmsTxt({\n\t\tbaseUrl: `${req.protocol}://${req.hostname}`,\n\t\thostname: req.hostname,\n\t\tname: siteMeta.name,\n\t\tsummary: siteMeta.summary,\n\t\troutes: seoRoutes,\n\t});\n\tres\n\t\t.type(\"text/plain\")\n\t\t.set(\"Cache-Control\", \"public, max-age=60, must-revalidate\")\n\t\t.set(\"Vary\", \"Host\")\n\t\t.send(body);\n}\n","totalLines":116,"truncated":false}
+import type { Request, Response } from "express";
+import type { SeoRoute } from "../lib/seo-routes";
+import { seoRoutes } from "../lib/seo-routes";
+import { siteMeta } from "../lib/site-meta";
+import { isSystemHost } from "./seo-host";
+
+/**
+ * Convert an SEO route path into a human-readable link label.
+ *
+ * Rule:
+ *  - "/"            -> "Home" (special case)
+ *  - otherwise      -> last path segment, split on "-"/"_", title-cased.
+ *    e.g. "/about" -> "About", "/contact-us" -> "Contact Us",
+ *    "/blog/my-post" -> "My Post".
+ * seoRoutes paths are static route paths (no query strings/fragments), so
+ * those are not handled.
+ */
+export function humanizeLabel(path: string): string {
+	if (path === "/") return "Home";
+	const segment = path.replace(/^\/+|\/+$/g, "").split("/").pop() ?? "";
+	return segment
+		.split(/[-_]/)
+		.filter(Boolean)
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+		.join(" ");
+}
+
+/**
+ * Make agent/customer-authored text safe to interpolate into markdown.
+ * name/summary ultimately trace to customer-supplied business details, so
+ * they may contain markdown-structural characters or newlines that would
+ * break the H1, blockquote, or link syntax. We collapse newlines/whitespace
+ * to single spaces (keeping H1 and blockquote single-line) and backslash-
+ * escape the characters that break inline constructs (`\`, backtick, `[`,
+ * `]`). Other characters (#, >, *, etc.) are not structural mid-line, so we
+ * leave them to avoid mangling ordinary business names.
+ */
+export function sanitizeMarkdown(text: string): string {
+	return text
+		.replace(/[\r\n\t]+/g, " ")
+		.replace(/[\\`[\]]/g, (c) => `\\${c}`)
+		.replace(/ {2,}/g, " ")
+		.trim();
+}
+
+export interface RenderLlmsTxtOptions {
+	/** Absolute origin, e.g. "https://acme.com". */
+	baseUrl: string;
+	/** Bare hostname, e.g. "acme.com" — used for the H1 fallback. */
+	hostname: string;
+	/** Business name (may be empty when unseeded). */
+	name: string;
+	/** Business summary (may be empty when unseeded). */
+	summary: string;
+	/** Crawlable routes; the page list is built from these. */
+	routes: SeoRoute[];
+}
+
+/**
+ * Render the /llms.txt body. Pure: no request, no I/O. Always returns a
+ * well-formed, single-trailing-newline markdown document.
+ */
+export function renderLlmsTxt(opts: RenderLlmsTxtOptions): string {
+	const name = sanitizeMarkdown(opts.name);
+	const summary = sanitizeMarkdown(opts.summary);
+
+	const lines: string[] = [`# ${name || opts.hostname}`];
+
+	if (summary) {
+		lines.push("", `> ${summary}`);
+	}
+
+	const pageLinks = opts.routes
+		.filter((r) => typeof r.path === "string" && r.path.startsWith("/"))
+		.map(
+			(r) =>
+				`- [${sanitizeMarkdown(humanizeLabel(r.path))}](${opts.baseUrl}${r.path})`,
+		);
+
+	if (pageLinks.length > 0) {
+		lines.push("", "## Pages", ...pageLinks);
+	}
+
+	return `${lines.join("\n")}\n`;
+}
+
+/**
+ * Express handler for GET /llms.txt. Host-gated like robots.txt / sitemap.xml:
+ * system/preview hosts get a 404 (no real published site to describe);
+ * customer-attached domains get the rendered file. Headers mirror the other
+ * SEO routes so CDN behaviour is identical (per-host via `Vary: Host`).
+ */
+export function llmsTxtHandler(req: Request, res: Response): void {
+	if (isSystemHost(req)) {
+		res
+			.status(404)
+			.type("text/plain")
+			.set("Cache-Control", "public, max-age=60, must-revalidate")
+			.set("Vary", "Host")
+			.send("Not found\n");
+		return;
+	}
+	const body = renderLlmsTxt({
+		baseUrl: `${req.protocol}://${req.hostname}`,
+		hostname: req.hostname,
+		name: siteMeta.name,
+		summary: siteMeta.summary,
+		routes: seoRoutes,
+	});
+	res
+		.type("text/plain")
+		.set("Cache-Control", "public, max-age=60, must-revalidate")
+		.set("Vary", "Host")
+		.send(body);
+}

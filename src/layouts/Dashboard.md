@@ -1,1 +1,501 @@
-{"success":true,"path":"src/layouts/Dashboard.md","content":"# Dashboard Layout Documentation\n\n## Overview\nThe Dashboard layout provides a complete application shell with sidebar navigation, header with search and user menu, and main content area. Perfect for admin panels, SaaS applications, and internal tools.\n\n## CRITICAL: Required Usage Pattern\n\n**ALL DASHBOARD PAGES MUST USE THIS LAYOUT** - Never create dashboard pages with their own navigation or layout structure.\n\n### Correct Implementation ✅\n```tsx\nimport Dashboard from '@/layouts/Dashboard';\nimport { Home, Users, Settings, BarChart } from 'lucide-react';\n\nexport default function DashboardPage() {\n  return (\n    <Dashboard config={{\n      sidebar: {\n        logo: { text: 'My App' },\n        navigation: {\n          main: [\n            { title: 'Dashboard', href: '/', icon: Home, active: true },\n            { title: 'Users', href: '/users', icon: Users, badge: 12 },\n            { title: 'Analytics', href: '/analytics', icon: BarChart },\n            { title: 'Settings', href: '/settings', icon: Settings }\n          ]\n        }\n      },\n      header: {\n        user: {\n          name: 'John Doe',\n          email: 'john@example.com',\n          initials: 'JD'\n        }\n      }\n    }}>\n      {/* Dashboard content goes here */}\n      <div className=\"space-y-6\">\n        <h1 className=\"text-3xl font-bold\">Dashboard</h1>\n        {/* Your dashboard components */}\n      </div>\n    </Dashboard>\n  );\n}\n```\n\n### Incorrect Implementation ❌\n```tsx\n// DON'T DO THIS - Creating your own dashboard structure\nexport default function DashboardPage() {\n  return (\n    <div className=\"flex h-screen\">\n      <aside>...</aside>\n      <main>...</main>\n    </div>\n  );\n}\n```\n\n## Configuration Options\n\n### Sidebar Configuration\n\n```typescript\ninterface SidebarConfig {\n  logo?: {\n    text?: string;           // Logo text\n    image?: string;          // Logo image URL\n    href?: string;           // Logo link\n  };\n  navigation?: {\n    main?: Array<{           // Primary navigation items\n      title: string;\n      href: string;\n      icon?: React.ComponentType;\n      active?: boolean;\n      badge?: string | number;\n    }>;\n    secondary?: Array<{      // Secondary navigation items\n      title: string;\n      href: string;\n      icon?: React.ComponentType;\n    }>;\n  };\n  footer?: React.ReactNode;  // Sidebar footer content\n  className?: string;        // Additional CSS classes\n}\n```\n\n### Header Configuration\n\n```typescript\ninterface HeaderConfig {\n  search?: {\n    enabled?: boolean;       // Show search box (default: true)\n    placeholder?: string;    // Search placeholder text\n  };\n  notifications?: {\n    enabled?: boolean;       // Show notifications bell (default: true)\n    count?: number;         // Notification count\n  };\n  user?: {\n    name?: string;          // User display name\n    email?: string;         // User email\n    avatar?: string;        // Avatar image URL\n    initials?: string;      // Fallback initials\n  };\n  actions?: React.ReactNode; // Additional header actions\n  className?: string;       // Additional CSS classes\n}\n```\n\n### Main Content Configuration\n\n```typescript\ninterface MainConfig {\n  maxWidth?: \"sm\" | \"md\" | \"lg\" | \"xl\" | \"2xl\" | \"full\"; // Content max width\n  padding?: boolean;        // Add padding (default: true)\n  className?: string;       // Additional CSS classes\n}\n```\n\n## Complete Examples\n\n### Full-Featured Dashboard\n\n```tsx\nimport Dashboard from '@/layouts/Dashboard';\nimport { \n  Home, \n  Users, \n  FileText, \n  BarChart3, \n  Settings,\n  CreditCard,\n  HelpCircle,\n  LogOut\n} from 'lucide-react';\nimport { Button } from '@/components/ui/button';\n\nexport default function AdminDashboard() {\n  return (\n    <Dashboard config={{\n      sidebar: {\n        logo: {\n          text: 'AdminPanel',\n          image: '/logo.svg',\n          href: '/'\n        },\n        navigation: {\n          main: [\n            { \n              title: 'Dashboard', \n              href: '/', \n              icon: Home, \n              active: true \n            },\n            { \n              title: 'Users', \n              href: '/users', \n              icon: Users,\n              badge: 128\n            },\n            { \n              title: 'Documents', \n              href: '/documents', \n              icon: FileText,\n              badge: 'New'\n            },\n            { \n              title: 'Analytics', \n              href: '/analytics', \n              icon: BarChart3 \n            },\n            { \n              title: 'Billing', \n              href: '/billing', \n              icon: CreditCard \n            }\n          ],\n          secondary: [\n            { \n              title: 'Settings', \n              href: '/settings', \n              icon: Settings \n            },\n            { \n              title: 'Help', \n              href: '/help', \n              icon: HelpCircle \n            }\n          ]\n        },\n        footer: (\n          <div className=\"space-y-2\">\n            <div className=\"text-xs text-gray-500\">Free Plan</div>\n            <Button size=\"sm\" className=\"w-full\">\n              Upgrade to Pro\n            </Button>\n          </div>\n        )\n      },\n      header: {\n        search: {\n          enabled: true,\n          placeholder: 'Search users, documents...'\n        },\n        notifications: {\n          enabled: true,\n          count: 3\n        },\n        user: {\n          name: 'John Doe',\n          email: 'john@example.com',\n          avatar: '/avatar.jpg',\n          initials: 'JD'\n        },\n        actions: (\n          <Button variant=\"outline\" size=\"sm\">\n            Quick Action\n          </Button>\n        )\n      },\n      main: {\n        maxWidth: '2xl',\n        padding: true\n      }\n    }}>\n      {/* Dashboard Content */}\n      <div className=\"space-y-6\">\n        {/* Page Header */}\n        <div>\n          <h1 className=\"text-3xl font-bold\">Dashboard</h1>\n          <p className=\"text-gray-500\">Welcome back, John!</p>\n        </div>\n\n        {/* Stats Cards */}\n        <div className=\"grid gap-4 md:grid-cols-2 lg:grid-cols-4\">\n          <Card>\n            <CardHeader className=\"flex flex-row items-center justify-between space-y-0 pb-2\">\n              <CardTitle className=\"text-sm font-medium\">Total Revenue</CardTitle>\n              <DollarSign className=\"h-4 w-4 text-muted-foreground\" />\n            </CardHeader>\n            <CardContent>\n              <div className=\"text-2xl font-bold\">$45,231.89</div>\n              <p className=\"text-xs text-muted-foreground\">\n                +20.1% from last month\n              </p>\n            </CardContent>\n          </Card>\n          {/* More stats cards... */}\n        </div>\n\n        {/* Main Content */}\n        <div className=\"grid gap-4 md:grid-cols-2 lg:grid-cols-7\">\n          <Card className=\"col-span-4\">\n            <CardHeader>\n              <CardTitle>Overview</CardTitle>\n            </CardHeader>\n            <CardContent>\n              {/* Chart or content */}\n            </CardContent>\n          </Card>\n          <Card className=\"col-span-3\">\n            <CardHeader>\n              <CardTitle>Recent Activity</CardTitle>\n            </CardHeader>\n            <CardContent>\n              {/* Activity list */}\n            </CardContent>\n          </Card>\n        </div>\n      </div>\n    </Dashboard>\n  );\n}\n```\n\n### Minimal Dashboard\n\n```tsx\nimport Dashboard from '@/layouts/Dashboard';\nimport { Home, Settings } from 'lucide-react';\n\nexport default function SimpleDashboard() {\n  return (\n    <Dashboard config={{\n      sidebar: {\n        logo: { text: 'MyApp' },\n        navigation: {\n          main: [\n            { title: 'Home', href: '/', icon: Home, active: true },\n            { title: 'Settings', href: '/settings', icon: Settings }\n          ]\n        }\n      },\n      header: {\n        search: { enabled: false },\n        notifications: { enabled: false },\n        user: { name: 'User', initials: 'U' }\n      }\n    }}>\n      <div>\n        <h1 className=\"text-2xl font-bold mb-4\">Welcome</h1>\n        <p>Your content here</p>\n      </div>\n    </Dashboard>\n  );\n}\n```\n\n### Analytics Dashboard\n\n```tsx\nimport Dashboard from '@/layouts/Dashboard';\nimport { \n  BarChart3, \n  PieChart, \n  TrendingUp, \n  Calendar,\n  Download,\n  Filter\n} from 'lucide-react';\nimport { Button } from '@/components/ui/button';\n\nexport default function AnalyticsDashboard() {\n  return (\n    <Dashboard config={{\n      sidebar: {\n        logo: { text: 'Analytics' },\n        navigation: {\n          main: [\n            { title: 'Overview', href: '/', icon: BarChart3, active: true },\n            { title: 'Reports', href: '/reports', icon: PieChart },\n            { title: 'Trends', href: '/trends', icon: TrendingUp },\n            { title: 'Schedule', href: '/schedule', icon: Calendar }\n          ]\n        }\n      },\n      header: {\n        actions: (\n          <>\n            <Button variant=\"outline\" size=\"sm\">\n              <Filter className=\"h-4 w-4 mr-2\" />\n              Filter\n            </Button>\n            <Button variant=\"outline\" size=\"sm\">\n              <Download className=\"h-4 w-4 mr-2\" />\n              Export\n            </Button>\n          </>\n        )\n      }\n    }}>\n      <div className=\"space-y-4\">\n        {/* Date Range Selector */}\n        <div className=\"flex items-center justify-between\">\n          <h1 className=\"text-2xl font-bold\">Analytics Overview</h1>\n          <div className=\"flex gap-2\">\n            <Button variant=\"outline\" size=\"sm\">Today</Button>\n            <Button variant=\"outline\" size=\"sm\">Week</Button>\n            <Button variant=\"outline\" size=\"sm\">Month</Button>\n            <Button variant=\"outline\" size=\"sm\">Year</Button>\n          </div>\n        </div>\n\n        {/* Charts Grid */}\n        <div className=\"grid gap-4 md:grid-cols-2\">\n          {/* Chart components */}\n        </div>\n      </div>\n    </Dashboard>\n  );\n}\n```\n\n## Mobile Responsiveness\n\nThe Dashboard layout is fully responsive:\n- **Sidebar**: Becomes a slide-out drawer on mobile with hamburger menu\n- **Search**: Adapts width on smaller screens\n- **User Menu**: Simplified on mobile, showing only avatar\n- **Content**: Adjusts padding and spacing for mobile\n\n## Navigation Patterns\n\n### Active State Management\n```tsx\n// Determine active state from the current route.\n// SSR-safe: use React Router's useLocation() inside the component.\n// NEVER use window.location.pathname — window is undefined during server render and crashes it.\nimport { useLocation } from 'react-router-dom';\nconst { pathname } = useLocation();\n\nnavigation: {\n  main: [\n    { \n      title: 'Dashboard', \n      href: '/', \n      icon: Home, \n      active: pathname === '/'\n    },\n    { \n      title: 'Users', \n      href: '/users', \n      icon: Users,\n      active: pathname.startsWith('/users')\n    }\n  ]\n}\n```\n\n### Badge Usage\n```tsx\n// Numeric badges for counts\n{ title: 'Messages', href: '/messages', badge: 24 }\n\n// Text badges for status\n{ title: 'Updates', href: '/updates', badge: 'New' }\n```\n\n## Best Practices\n\n1. **Consistent Navigation**: Keep navigation items consistent across all dashboard pages\n2. **Active States**: Always indicate the current active page in navigation\n3. **User Information**: Display user name and avatar for personalization\n4. **Responsive Design**: Test on mobile devices to ensure drawer works properly\n5. **Loading States**: Add loading indicators for async content\n6. **Error Boundaries**: Wrap content in error boundaries for resilience\n\n## Common Patterns\n\n### Dashboard with Tabs\n```tsx\n<Dashboard config={dashboardConfig}>\n  <div className=\"space-y-4\">\n    <Tabs defaultValue=\"overview\">\n      <TabsList>\n        <TabsTrigger value=\"overview\">Overview</TabsTrigger>\n        <TabsTrigger value=\"analytics\">Analytics</TabsTrigger>\n        <TabsTrigger value=\"reports\">Reports</TabsTrigger>\n      </TabsList>\n      <TabsContent value=\"overview\">\n        {/* Overview content */}\n      </TabsContent>\n      <TabsContent value=\"analytics\">\n        {/* Analytics content */}\n      </TabsContent>\n      <TabsContent value=\"reports\">\n        {/* Reports content */}\n      </TabsContent>\n    </Tabs>\n  </div>\n</Dashboard>\n```\n\n### Dashboard with Breadcrumbs\n```tsx\n<Dashboard config={dashboardConfig}>\n  <div className=\"space-y-4\">\n    {/* Breadcrumbs */}\n    <nav className=\"flex\" aria-label=\"Breadcrumb\">\n      <ol className=\"inline-flex items-center space-x-1\">\n        <li>\n          <a href=\"/\" className=\"text-gray-500 hover:text-gray-700\">\n            Dashboard\n          </a>\n        </li>\n        <li>\n          <span className=\"mx-2 text-gray-400\">/</span>\n          <a href=\"/users\" className=\"text-gray-500 hover:text-gray-700\">\n            Users\n          </a>\n        </li>\n        <li>\n          <span className=\"mx-2 text-gray-400\">/</span>\n          <span className=\"text-gray-700\">Profile</span>\n        </li>\n      </ol>\n    </nav>\n\n    {/* Page content */}\n    <div>\n      <h1 className=\"text-2xl font-bold\">User Profile</h1>\n      {/* Profile content */}\n    </div>\n  </div>\n</Dashboard>\n```\n\n## Anti-Patterns to Avoid\n\n❌ **Don't create multiple dashboard layouts**\n❌ **Don't implement custom navigation systems**\n❌ **Don't forget to set active states**\n❌ **Don't hardcode user information**\n❌ **Don't skip mobile testing**\n\n## Integration with Other Components\n\nThe Dashboard layout works seamlessly with all shadcn/ui components from `@/components/ui/` — drop in `Card`, `Table`, `Tabs`, `Dialog`, and the rest directly inside the dashboard content area.\n","totalLines":502,"truncated":false}
+# Dashboard Layout Documentation
+
+## Overview
+The Dashboard layout provides a complete application shell with sidebar navigation, header with search and user menu, and main content area. Perfect for admin panels, SaaS applications, and internal tools.
+
+## CRITICAL: Required Usage Pattern
+
+**ALL DASHBOARD PAGES MUST USE THIS LAYOUT** - Never create dashboard pages with their own navigation or layout structure.
+
+### Correct Implementation ✅
+```tsx
+import Dashboard from '@/layouts/Dashboard';
+import { Home, Users, Settings, BarChart } from 'lucide-react';
+
+export default function DashboardPage() {
+  return (
+    <Dashboard config={{
+      sidebar: {
+        logo: { text: 'My App' },
+        navigation: {
+          main: [
+            { title: 'Dashboard', href: '/', icon: Home, active: true },
+            { title: 'Users', href: '/users', icon: Users, badge: 12 },
+            { title: 'Analytics', href: '/analytics', icon: BarChart },
+            { title: 'Settings', href: '/settings', icon: Settings }
+          ]
+        }
+      },
+      header: {
+        user: {
+          name: 'John Doe',
+          email: 'john@example.com',
+          initials: 'JD'
+        }
+      }
+    }}>
+      {/* Dashboard content goes here */}
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        {/* Your dashboard components */}
+      </div>
+    </Dashboard>
+  );
+}
+```
+
+### Incorrect Implementation ❌
+```tsx
+// DON'T DO THIS - Creating your own dashboard structure
+export default function DashboardPage() {
+  return (
+    <div className="flex h-screen">
+      <aside>...</aside>
+      <main>...</main>
+    </div>
+  );
+}
+```
+
+## Configuration Options
+
+### Sidebar Configuration
+
+```typescript
+interface SidebarConfig {
+  logo?: {
+    text?: string;           // Logo text
+    image?: string;          // Logo image URL
+    href?: string;           // Logo link
+  };
+  navigation?: {
+    main?: Array<{           // Primary navigation items
+      title: string;
+      href: string;
+      icon?: React.ComponentType;
+      active?: boolean;
+      badge?: string | number;
+    }>;
+    secondary?: Array<{      // Secondary navigation items
+      title: string;
+      href: string;
+      icon?: React.ComponentType;
+    }>;
+  };
+  footer?: React.ReactNode;  // Sidebar footer content
+  className?: string;        // Additional CSS classes
+}
+```
+
+### Header Configuration
+
+```typescript
+interface HeaderConfig {
+  search?: {
+    enabled?: boolean;       // Show search box (default: true)
+    placeholder?: string;    // Search placeholder text
+  };
+  notifications?: {
+    enabled?: boolean;       // Show notifications bell (default: true)
+    count?: number;         // Notification count
+  };
+  user?: {
+    name?: string;          // User display name
+    email?: string;         // User email
+    avatar?: string;        // Avatar image URL
+    initials?: string;      // Fallback initials
+  };
+  actions?: React.ReactNode; // Additional header actions
+  className?: string;       // Additional CSS classes
+}
+```
+
+### Main Content Configuration
+
+```typescript
+interface MainConfig {
+  maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "full"; // Content max width
+  padding?: boolean;        // Add padding (default: true)
+  className?: string;       // Additional CSS classes
+}
+```
+
+## Complete Examples
+
+### Full-Featured Dashboard
+
+```tsx
+import Dashboard from '@/layouts/Dashboard';
+import { 
+  Home, 
+  Users, 
+  FileText, 
+  BarChart3, 
+  Settings,
+  CreditCard,
+  HelpCircle,
+  LogOut
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+export default function AdminDashboard() {
+  return (
+    <Dashboard config={{
+      sidebar: {
+        logo: {
+          text: 'AdminPanel',
+          image: '/logo.svg',
+          href: '/'
+        },
+        navigation: {
+          main: [
+            { 
+              title: 'Dashboard', 
+              href: '/', 
+              icon: Home, 
+              active: true 
+            },
+            { 
+              title: 'Users', 
+              href: '/users', 
+              icon: Users,
+              badge: 128
+            },
+            { 
+              title: 'Documents', 
+              href: '/documents', 
+              icon: FileText,
+              badge: 'New'
+            },
+            { 
+              title: 'Analytics', 
+              href: '/analytics', 
+              icon: BarChart3 
+            },
+            { 
+              title: 'Billing', 
+              href: '/billing', 
+              icon: CreditCard 
+            }
+          ],
+          secondary: [
+            { 
+              title: 'Settings', 
+              href: '/settings', 
+              icon: Settings 
+            },
+            { 
+              title: 'Help', 
+              href: '/help', 
+              icon: HelpCircle 
+            }
+          ]
+        },
+        footer: (
+          <div className="space-y-2">
+            <div className="text-xs text-gray-500">Free Plan</div>
+            <Button size="sm" className="w-full">
+              Upgrade to Pro
+            </Button>
+          </div>
+        )
+      },
+      header: {
+        search: {
+          enabled: true,
+          placeholder: 'Search users, documents...'
+        },
+        notifications: {
+          enabled: true,
+          count: 3
+        },
+        user: {
+          name: 'John Doe',
+          email: 'john@example.com',
+          avatar: '/avatar.jpg',
+          initials: 'JD'
+        },
+        actions: (
+          <Button variant="outline" size="sm">
+            Quick Action
+          </Button>
+        )
+      },
+      main: {
+        maxWidth: '2xl',
+        padding: true
+      }
+    }}>
+      {/* Dashboard Content */}
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-gray-500">Welcome back, John!</p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">$45,231.89</div>
+              <p className="text-xs text-muted-foreground">
+                +20.1% from last month
+              </p>
+            </CardContent>
+          </Card>
+          {/* More stats cards... */}
+        </div>
+
+        {/* Main Content */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+          <Card className="col-span-4">
+            <CardHeader>
+              <CardTitle>Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Chart or content */}
+            </CardContent>
+          </Card>
+          <Card className="col-span-3">
+            <CardHeader>
+              <CardTitle>Recent Activity</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Activity list */}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </Dashboard>
+  );
+}
+```
+
+### Minimal Dashboard
+
+```tsx
+import Dashboard from '@/layouts/Dashboard';
+import { Home, Settings } from 'lucide-react';
+
+export default function SimpleDashboard() {
+  return (
+    <Dashboard config={{
+      sidebar: {
+        logo: { text: 'MyApp' },
+        navigation: {
+          main: [
+            { title: 'Home', href: '/', icon: Home, active: true },
+            { title: 'Settings', href: '/settings', icon: Settings }
+          ]
+        }
+      },
+      header: {
+        search: { enabled: false },
+        notifications: { enabled: false },
+        user: { name: 'User', initials: 'U' }
+      }
+    }}>
+      <div>
+        <h1 className="text-2xl font-bold mb-4">Welcome</h1>
+        <p>Your content here</p>
+      </div>
+    </Dashboard>
+  );
+}
+```
+
+### Analytics Dashboard
+
+```tsx
+import Dashboard from '@/layouts/Dashboard';
+import { 
+  BarChart3, 
+  PieChart, 
+  TrendingUp, 
+  Calendar,
+  Download,
+  Filter
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+export default function AnalyticsDashboard() {
+  return (
+    <Dashboard config={{
+      sidebar: {
+        logo: { text: 'Analytics' },
+        navigation: {
+          main: [
+            { title: 'Overview', href: '/', icon: BarChart3, active: true },
+            { title: 'Reports', href: '/reports', icon: PieChart },
+            { title: 'Trends', href: '/trends', icon: TrendingUp },
+            { title: 'Schedule', href: '/schedule', icon: Calendar }
+          ]
+        }
+      },
+      header: {
+        actions: (
+          <>
+            <Button variant="outline" size="sm">
+              <Filter className="h-4 w-4 mr-2" />
+              Filter
+            </Button>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+          </>
+        )
+      }
+    }}>
+      <div className="space-y-4">
+        {/* Date Range Selector */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Analytics Overview</h1>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">Today</Button>
+            <Button variant="outline" size="sm">Week</Button>
+            <Button variant="outline" size="sm">Month</Button>
+            <Button variant="outline" size="sm">Year</Button>
+          </div>
+        </div>
+
+        {/* Charts Grid */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Chart components */}
+        </div>
+      </div>
+    </Dashboard>
+  );
+}
+```
+
+## Mobile Responsiveness
+
+The Dashboard layout is fully responsive:
+- **Sidebar**: Becomes a slide-out drawer on mobile with hamburger menu
+- **Search**: Adapts width on smaller screens
+- **User Menu**: Simplified on mobile, showing only avatar
+- **Content**: Adjusts padding and spacing for mobile
+
+## Navigation Patterns
+
+### Active State Management
+```tsx
+// Determine active state from the current route.
+// SSR-safe: use React Router's useLocation() inside the component.
+// NEVER use window.location.pathname — window is undefined during server render and crashes it.
+import { useLocation } from 'react-router-dom';
+const { pathname } = useLocation();
+
+navigation: {
+  main: [
+    { 
+      title: 'Dashboard', 
+      href: '/', 
+      icon: Home, 
+      active: pathname === '/'
+    },
+    { 
+      title: 'Users', 
+      href: '/users', 
+      icon: Users,
+      active: pathname.startsWith('/users')
+    }
+  ]
+}
+```
+
+### Badge Usage
+```tsx
+// Numeric badges for counts
+{ title: 'Messages', href: '/messages', badge: 24 }
+
+// Text badges for status
+{ title: 'Updates', href: '/updates', badge: 'New' }
+```
+
+## Best Practices
+
+1. **Consistent Navigation**: Keep navigation items consistent across all dashboard pages
+2. **Active States**: Always indicate the current active page in navigation
+3. **User Information**: Display user name and avatar for personalization
+4. **Responsive Design**: Test on mobile devices to ensure drawer works properly
+5. **Loading States**: Add loading indicators for async content
+6. **Error Boundaries**: Wrap content in error boundaries for resilience
+
+## Common Patterns
+
+### Dashboard with Tabs
+```tsx
+<Dashboard config={dashboardConfig}>
+  <div className="space-y-4">
+    <Tabs defaultValue="overview">
+      <TabsList>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        <TabsTrigger value="reports">Reports</TabsTrigger>
+      </TabsList>
+      <TabsContent value="overview">
+        {/* Overview content */}
+      </TabsContent>
+      <TabsContent value="analytics">
+        {/* Analytics content */}
+      </TabsContent>
+      <TabsContent value="reports">
+        {/* Reports content */}
+      </TabsContent>
+    </Tabs>
+  </div>
+</Dashboard>
+```
+
+### Dashboard with Breadcrumbs
+```tsx
+<Dashboard config={dashboardConfig}>
+  <div className="space-y-4">
+    {/* Breadcrumbs */}
+    <nav className="flex" aria-label="Breadcrumb">
+      <ol className="inline-flex items-center space-x-1">
+        <li>
+          <a href="/" className="text-gray-500 hover:text-gray-700">
+            Dashboard
+          </a>
+        </li>
+        <li>
+          <span className="mx-2 text-gray-400">/</span>
+          <a href="/users" className="text-gray-500 hover:text-gray-700">
+            Users
+          </a>
+        </li>
+        <li>
+          <span className="mx-2 text-gray-400">/</span>
+          <span className="text-gray-700">Profile</span>
+        </li>
+      </ol>
+    </nav>
+
+    {/* Page content */}
+    <div>
+      <h1 className="text-2xl font-bold">User Profile</h1>
+      {/* Profile content */}
+    </div>
+  </div>
+</Dashboard>
+```
+
+## Anti-Patterns to Avoid
+
+❌ **Don't create multiple dashboard layouts**
+❌ **Don't implement custom navigation systems**
+❌ **Don't forget to set active states**
+❌ **Don't hardcode user information**
+❌ **Don't skip mobile testing**
+
+## Integration with Other Components
+
+The Dashboard layout works seamlessly with all shadcn/ui components from `@/components/ui/` — drop in `Card`, `Table`, `Tabs`, `Dialog`, and the rest directly inside the dashboard content area.

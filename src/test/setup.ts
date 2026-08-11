@@ -1,1 +1,28 @@
-{"success":true,"path":"src/test/setup.ts","content":"import '@testing-library/jest-dom';\nimport { vi } from 'vitest';\n\n// Mock matchMedia. Guarded so node-environment tests (e.g. the dev-tools\n// boot-spinner boundary test, which drives real vite serve/build) can share\n// this setup file without a DOM.\nif (typeof window !== 'undefined') {\n  Object.defineProperty(window, 'matchMedia', {\n    writable: true,\n    value: vi.fn().mockImplementation(query => ({\n      matches: false,\n      media: query,\n      onchange: null,\n      addListener: vi.fn(), // deprecated\n      removeListener: vi.fn(), // deprecated\n      addEventListener: vi.fn(),\n      removeEventListener: vi.fn(),\n      dispatchEvent: vi.fn(),\n    })),\n  });\n}\n\n// Mock ResizeObserver\nglobal.ResizeObserver = vi.fn().mockImplementation(() => ({\n  observe: vi.fn(),\n  unobserve: vi.fn(),\n  disconnect: vi.fn(),\n}));\n","totalLines":29,"truncated":false}
+import '@testing-library/jest-dom';
+import { vi } from 'vitest';
+
+// Mock matchMedia. Guarded so node-environment tests (e.g. the dev-tools
+// boot-spinner boundary test, which drives real vite serve/build) can share
+// this setup file without a DOM.
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(), // deprecated
+      removeListener: vi.fn(), // deprecated
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
+
+// Mock ResizeObserver
+global.ResizeObserver = vi.fn().mockImplementation(() => ({
+  observe: vi.fn(),
+  unobserve: vi.fn(),
+  disconnect: vi.fn(),
+}));

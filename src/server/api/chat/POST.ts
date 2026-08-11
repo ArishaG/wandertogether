@@ -1,1 +1,78 @@
-{"success":true,"path":"src/server/api/chat/POST.ts","content":"/**\n * Chat API Route — Streaming Chatbot / Agent\n *\n * Handles POST /api/chat\n * Streams raw text responses from the configured AI provider using the Vercel AI SDK.\n *\n * The client reads this as a plain ReadableStream<string> — no special protocol needed.\n *\n * For AGENT MODE: Uncomment the two import lines at the top and the\n * tools/maxSteps block inside streamText() below, then implement your tools.\n *\n * See src/lib/chatbot/chat-config.ts to configure the provider and model.\n */\n\nimport type { Request, Response } from 'express';\nimport { streamText } from 'ai';\n// import { tool } from 'ai';   // ← Uncomment for agent mode\n// import { z } from 'zod';     // ← Uncomment for agent mode\nimport { getChatModel, SYSTEM_PROMPT } from '@/lib/chatbot/chat-config';\n\ninterface ChatMessage {\n  role: 'user' | 'assistant';\n  content: string;\n}\n\nexport default async function handler(req: Request, res: Response) {\n  const messages = req.body?.messages as ChatMessage[] | undefined;\n\n  if (!Array.isArray(messages)) {\n    res.status(400).json({ error: 'Missing or invalid messages array' });\n    return;\n  }\n\n  // Strip any system-role messages from the client — the server-side SYSTEM_PROMPT\n  // is the only authoritative system context. Allowing 'system' from the client\n  // would enable prompt injection attacks.\n  const safeMessages = messages.filter((m) => m.role === 'user' || m.role === 'assistant');\n\n  try {\n    const model = getChatModel();\n\n    const result = streamText({\n      model,\n      system: SYSTEM_PROMPT,\n      messages: safeMessages,\n\n      // ─── AGENT MODE ──────────────────────────────────────────────────────\n      // Uncomment tools and maxSteps to enable multi-step tool calling.\n      // tools: {\n      //   getCurrentTime: tool({\n      //     description: 'Get the current date and time',\n      //     parameters: z.object({}),\n      //     execute: async () => ({ time: new Date().toISOString() }),\n      //   }),\n      //   // Add more tools here...\n      // },\n      // maxSteps: 5,\n      // ─────────────────────────────────────────────────────────────────────\n    });\n\n    // Disable nginx proxy buffering so chunks reach the client immediately.\n    res.setHeader('X-Accel-Buffering', 'no');\n\n    // pipeTextStreamToResponse is the confirmed Express streaming method on\n    // StreamTextResult in AI SDK v6. It pipes the raw text stream directly\n    // into the Express ServerResponse and calls res.end() when complete.\n    result.pipeTextStreamToResponse(res);\n\n    console.log(JSON.stringify({ event: 'chat.stream.started', messageCount: safeMessages.length }));\n  } catch (error) {\n    const message = error instanceof Error ? error.message : 'Unknown error';\n    console.error(JSON.stringify({ event: 'chat.error', error: message }));\n\n    if (!res.headersSent) {\n      res.status(500).json({ error: 'Chat request failed' });\n    }\n  }\n}\n","totalLines":79,"truncated":false}
+/**
+ * Chat API Route — Streaming Chatbot / Agent
+ *
+ * Handles POST /api/chat
+ * Streams raw text responses from the configured AI provider using the Vercel AI SDK.
+ *
+ * The client reads this as a plain ReadableStream<string> — no special protocol needed.
+ *
+ * For AGENT MODE: Uncomment the two import lines at the top and the
+ * tools/maxSteps block inside streamText() below, then implement your tools.
+ *
+ * See src/lib/chatbot/chat-config.ts to configure the provider and model.
+ */
+
+import type { Request, Response } from 'express';
+import { streamText } from 'ai';
+// import { tool } from 'ai';   // ← Uncomment for agent mode
+// import { z } from 'zod';     // ← Uncomment for agent mode
+import { getChatModel, SYSTEM_PROMPT } from '@/lib/chatbot/chat-config';
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export default async function handler(req: Request, res: Response) {
+  const messages = req.body?.messages as ChatMessage[] | undefined;
+
+  if (!Array.isArray(messages)) {
+    res.status(400).json({ error: 'Missing or invalid messages array' });
+    return;
+  }
+
+  // Strip any system-role messages from the client — the server-side SYSTEM_PROMPT
+  // is the only authoritative system context. Allowing 'system' from the client
+  // would enable prompt injection attacks.
+  const safeMessages = messages.filter((m) => m.role === 'user' || m.role === 'assistant');
+
+  try {
+    const model = getChatModel();
+
+    const result = streamText({
+      model,
+      system: SYSTEM_PROMPT,
+      messages: safeMessages,
+
+      // ─── AGENT MODE ──────────────────────────────────────────────────────
+      // Uncomment tools and maxSteps to enable multi-step tool calling.
+      // tools: {
+      //   getCurrentTime: tool({
+      //     description: 'Get the current date and time',
+      //     parameters: z.object({}),
+      //     execute: async () => ({ time: new Date().toISOString() }),
+      //   }),
+      //   // Add more tools here...
+      // },
+      // maxSteps: 5,
+      // ─────────────────────────────────────────────────────────────────────
+    });
+
+    // Disable nginx proxy buffering so chunks reach the client immediately.
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    // pipeTextStreamToResponse is the confirmed Express streaming method on
+    // StreamTextResult in AI SDK v6. It pipes the raw text stream directly
+    // into the Express ServerResponse and calls res.end() when complete.
+    result.pipeTextStreamToResponse(res);
+
+    console.log(JSON.stringify({ event: 'chat.stream.started', messageCount: safeMessages.length }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error(JSON.stringify({ event: 'chat.error', error: message }));
+
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Chat request failed' });
+    }
+  }
+}

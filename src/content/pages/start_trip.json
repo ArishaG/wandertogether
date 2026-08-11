@@ -1,1 +1,122 @@
-{"success":true,"path":"src/content/pages/start_trip.json","content":"{\n  \"meta\": {\n    \"title\": \"Start a Trip — Wander.\",\n    \"description\": \"Create a trip, set your preferences, and start planning together with Wander.\"\n  },\n  \"onboarding\": {\n    \"eyebrow\": \"onboarding\",\n    \"skip\": \"Skip for now\",\n    \"stepOne\": {\n      \"heading\": \"Let's plan something.\",\n      \"description\": \"Give your trip a name, then pick what kind of trip it is — we'll show only the tools you actually need.\",\n      \"tripNameLabel\": \"Trip name\",\n      \"defaultTripName\": \"Lisbon Long Weekend\",\n      \"tripTypeLabel\": \"What kind of trip?\",\n      \"types\": [\n        {\n          \"id\": \"day\",\n          \"title\": \"Day trip\",\n          \"description\": \"Activities, food, and local transport\"\n        },\n        {\n          \"id\": \"local\",\n          \"title\": \"Local trip\",\n          \"description\": \"Lodging, activities, food, and ground transport\"\n        },\n        {\n          \"id\": \"overseas\",\n          \"title\": \"Overseas\",\n          \"description\": \"Flights, lodging, visas, activities, and budgeting\"\n        }\n      ],\n      \"continue\": \"Create trip and invite friends\",\n      \"hint\": \"You can change the trip type later from settings.\"\n    },\n    \"stepTwo\": {\n      \"heading\": \"Anything we should account for?\",\n      \"description\": \"This personalizes the safety and accessibility tags you'll see on locations. You can change this anytime.\",\n      \"options\": [\n        {\n          \"id\": \"accessibility\",\n          \"label\": \"I’d like accessibility info highlighted (mobility, wheelchair access)\"\n        },\n        {\n          \"id\": \"safety\",\n          \"label\": \"I’d like safety info for solo/women travelers highlighted\"\n        },\n        {\n          \"id\": \"dietary\",\n          \"label\": \"I have dietary restrictions\"\n        }\n      ],\n      \"dietaryPlaceholder\": \"e.g., vegetarian, gluten-free...\",\n      \"privacy\": \"This info is only used to personalize your recommendations — it's never shared with other trip members.\",\n      \"back\": \"Back\",\n      \"continue\": \"Continue\"\n    },\n    \"stepThree\": {\n      \"heading\": \"What should we notify you about?\",\n      \"description\": \"Choose the updates that help you keep the trip moving. You can change these anytime.\",\n      \"options\": [\n        {\n          \"id\": \"poll\",\n          \"label\": \"New vote or poll created\"\n        },\n        {\n          \"id\": \"location\",\n          \"label\": \"Someone adds a location or item\"\n        },\n        {\n          \"id\": \"member\",\n          \"label\": \"Someone joins or leaves a trip\"\n        },\n        {\n          \"id\": \"closing\",\n          \"label\": \"Poll is about to close\"\n        },\n        {\n          \"id\": \"ai\",\n          \"label\": \"AI route/budget suggestions\"\n        }\n      ],\n      \"back\": \"Back\",\n      \"finish\": \"Finish setup\"\n    }\n  },\n  \"whiteboard\": {\n    \"nav\": {\n      \"tripCreation\": \"Trip Creation\",\n      \"whiteboard\": \"Whiteboard\",\n      \"itinerary\": \"Itinerary\",\n      \"status\": \"planning together\"\n    },\n    \"toolbar\": {\n      \"addWidget\": \"Widget\",\n      \"map\": \"Map\",\n      \"vote\": \"Vote\",\n      \"viewItinerary\": \"View itinerary\",\n      \"share\": \"Share\"\n    },\n    \"tip\": \"✥ Drag widgets anywhere · nothing here is a required step\",\n    \"itinerary\": {\n      \"eyebrow\": \"Itinerary\",\n      \"days\": [\n        {\n          \"id\": \"day-1\",\n          \"title\": \"Day 1 · Arrival\",\n          \"description\": \"Check in, sunset walk, dinner in Alfama\"\n        },\n        {\n          \"id\": \"day-2\",\n          \"title\": \"Day 2 · Belém & Alfama\",\n          \"description\": \"Belém Tower, MAAT Museum, riverside dinner\"\n        },\n        {\n          \"id\": \"day-3\",\n          \"title\": \"Day 3 · Free day\",\n          \"description\": \"Add your own plans\"\n        }\n      ]\n    }\n  }\n}\n","totalLines":123,"truncated":false}
+{
+  "meta": {
+    "title": "Start a Trip — Wander.",
+    "description": "Create a trip, set your preferences, and start planning together with Wander."
+  },
+  "onboarding": {
+    "eyebrow": "onboarding",
+    "skip": "Skip for now",
+    "stepOne": {
+      "heading": "Let's plan something.",
+      "description": "Give your trip a name, then pick what kind of trip it is — we'll show only the tools you actually need.",
+      "tripNameLabel": "Trip name",
+      "defaultTripName": "Lisbon Long Weekend",
+      "tripTypeLabel": "What kind of trip?",
+      "types": [
+        {
+          "id": "day",
+          "title": "Day trip",
+          "description": "Activities, food, and local transport"
+        },
+        {
+          "id": "local",
+          "title": "Local trip",
+          "description": "Lodging, activities, food, and ground transport"
+        },
+        {
+          "id": "overseas",
+          "title": "Overseas",
+          "description": "Flights, lodging, visas, activities, and budgeting"
+        }
+      ],
+      "continue": "Create trip and invite friends",
+      "hint": "You can change the trip type later from settings."
+    },
+    "stepTwo": {
+      "heading": "Anything we should account for?",
+      "description": "This personalizes the safety and accessibility tags you'll see on locations. You can change this anytime.",
+      "options": [
+        {
+          "id": "accessibility",
+          "label": "I’d like accessibility info highlighted (mobility, wheelchair access)"
+        },
+        {
+          "id": "safety",
+          "label": "I’d like safety info for solo/women travelers highlighted"
+        },
+        {
+          "id": "dietary",
+          "label": "I have dietary restrictions"
+        }
+      ],
+      "dietaryPlaceholder": "e.g., vegetarian, gluten-free...",
+      "privacy": "This info is only used to personalize your recommendations — it's never shared with other trip members.",
+      "back": "Back",
+      "continue": "Continue"
+    },
+    "stepThree": {
+      "heading": "What should we notify you about?",
+      "description": "Choose the updates that help you keep the trip moving. You can change these anytime.",
+      "options": [
+        {
+          "id": "poll",
+          "label": "New vote or poll created"
+        },
+        {
+          "id": "location",
+          "label": "Someone adds a location or item"
+        },
+        {
+          "id": "member",
+          "label": "Someone joins or leaves a trip"
+        },
+        {
+          "id": "closing",
+          "label": "Poll is about to close"
+        },
+        {
+          "id": "ai",
+          "label": "AI route/budget suggestions"
+        }
+      ],
+      "back": "Back",
+      "finish": "Finish setup"
+    }
+  },
+  "whiteboard": {
+    "nav": {
+      "tripCreation": "Trip Creation",
+      "whiteboard": "Whiteboard",
+      "itinerary": "Itinerary",
+      "status": "planning together"
+    },
+    "toolbar": {
+      "addWidget": "Widget",
+      "map": "Map",
+      "vote": "Vote",
+      "viewItinerary": "View itinerary",
+      "share": "Share"
+    },
+    "tip": "✥ Drag widgets anywhere · nothing here is a required step",
+    "itinerary": {
+      "eyebrow": "Itinerary",
+      "days": [
+        {
+          "id": "day-1",
+          "title": "Day 1 · Arrival",
+          "description": "Check in, sunset walk, dinner in Alfama"
+        },
+        {
+          "id": "day-2",
+          "title": "Day 2 · Belém & Alfama",
+          "description": "Belém Tower, MAAT Museum, riverside dinner"
+        },
+        {
+          "id": "day-3",
+          "title": "Day 3 · Free day",
+          "description": "Add your own plans"
+        }
+      ]
+    }
+  }
+}

@@ -1,1 +1,42 @@
-{"success":true,"path":"src/server/seo-host.test.ts","content":"import { describe, it, expect } from \"vitest\";\nimport { isSystemHost } from \"./seo-host\";\n\ndescribe(\"isSystemHost\", () => {\n\tit(\"flags Airo subdomains as system hosts\", () => {\n\t\texpect(isSystemHost({ hostname: \"xyz.airoapp.ai\" })).toBe(true);\n\t\texpect(isSystemHost({ hostname: \"abc.test-airoapp.ai\" })).toBe(true);\n\t\texpect(isSystemHost({ hostname: \"abc.dev-airoapp.ai\" })).toBe(true);\n\t\texpect(isSystemHost({ hostname: \"preview.dev-godaddy.com\" })).toBe(true);\n\t});\n\n\tit(\"flags the apex airoapp.ai as a system host\", () => {\n\t\texpect(isSystemHost({ hostname: \"airoapp.ai\" })).toBe(true);\n\t});\n\n\tit(\"does NOT flag look-alike hosts that lack the dot separator\", () => {\n\t\t// endsWith(\".airoapp.ai\") guards against suffix-injection like\n\t\t// `evil-airoapp.ai`, which would otherwise be treated as a system\n\t\t// host and silently noindexed.\n\t\texpect(isSystemHost({ hostname: \"evil-airoapp.ai\" })).toBe(false);\n\t\texpect(isSystemHost({ hostname: \"notairoapp.ai\" })).toBe(false);\n\t});\n\n\tit(\"normalises case before matching\", () => {\n\t\texpect(isSystemHost({ hostname: \"XYZ.AiroApp.AI\" })).toBe(true);\n\t\texpect(isSystemHost({ hostname: \"Acme.COM\" })).toBe(false);\n\t});\n\n\tit(\"treats empty/local hostnames as system hosts (dev safety)\", () => {\n\t\texpect(isSystemHost({ hostname: \"\" })).toBe(true);\n\t\texpect(isSystemHost({ hostname: undefined })).toBe(true);\n\t\texpect(isSystemHost({ hostname: null })).toBe(true);\n\t\texpect(isSystemHost({ hostname: \"localhost\" })).toBe(true);\n\t\texpect(isSystemHost({ hostname: \"127.0.0.1\" })).toBe(true);\n\t});\n\n\tit(\"does NOT flag customer-attached domains as system hosts\", () => {\n\t\texpect(isSystemHost({ hostname: \"acme.com\" })).toBe(false);\n\t\texpect(isSystemHost({ hostname: \"shop.acme.co.uk\" })).toBe(false);\n\t\texpect(isSystemHost({ hostname: \"example.org\" })).toBe(false);\n\t});\n});\n","totalLines":43,"truncated":false}
+import { describe, it, expect } from "vitest";
+import { isSystemHost } from "./seo-host";
+
+describe("isSystemHost", () => {
+	it("flags Airo subdomains as system hosts", () => {
+		expect(isSystemHost({ hostname: "xyz.airoapp.ai" })).toBe(true);
+		expect(isSystemHost({ hostname: "abc.test-airoapp.ai" })).toBe(true);
+		expect(isSystemHost({ hostname: "abc.dev-airoapp.ai" })).toBe(true);
+		expect(isSystemHost({ hostname: "preview.dev-godaddy.com" })).toBe(true);
+	});
+
+	it("flags the apex airoapp.ai as a system host", () => {
+		expect(isSystemHost({ hostname: "airoapp.ai" })).toBe(true);
+	});
+
+	it("does NOT flag look-alike hosts that lack the dot separator", () => {
+		// endsWith(".airoapp.ai") guards against suffix-injection like
+		// `evil-airoapp.ai`, which would otherwise be treated as a system
+		// host and silently noindexed.
+		expect(isSystemHost({ hostname: "evil-airoapp.ai" })).toBe(false);
+		expect(isSystemHost({ hostname: "notairoapp.ai" })).toBe(false);
+	});
+
+	it("normalises case before matching", () => {
+		expect(isSystemHost({ hostname: "XYZ.AiroApp.AI" })).toBe(true);
+		expect(isSystemHost({ hostname: "Acme.COM" })).toBe(false);
+	});
+
+	it("treats empty/local hostnames as system hosts (dev safety)", () => {
+		expect(isSystemHost({ hostname: "" })).toBe(true);
+		expect(isSystemHost({ hostname: undefined })).toBe(true);
+		expect(isSystemHost({ hostname: null })).toBe(true);
+		expect(isSystemHost({ hostname: "localhost" })).toBe(true);
+		expect(isSystemHost({ hostname: "127.0.0.1" })).toBe(true);
+	});
+
+	it("does NOT flag customer-attached domains as system hosts", () => {
+		expect(isSystemHost({ hostname: "acme.com" })).toBe(false);
+		expect(isSystemHost({ hostname: "shop.acme.co.uk" })).toBe(false);
+		expect(isSystemHost({ hostname: "example.org" })).toBe(false);
+	});
+});

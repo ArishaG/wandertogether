@@ -1,1 +1,102 @@
-{"success":true,"path":"content-lib/src/ContentListContext.tsx","content":"import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';\n\ninterface ContentListContextProps {\n  /**\n   * Dotted path to the content-layer array backing this list (e.g. `\"products\"`\n   * or `\"site.nav\"`). Omit to render as a pass-through (non-CMS data source).\n   */\n  field?: string;\n  /**\n   * Optional className for the wrapper. When provided, the wrapper itself\n   * becomes the layout container (e.g. a grid) and is NOT `display: contents`.\n   * Use this pattern when the list needs its own grid/flex styling — it\n   * keeps the `.map()` output as direct children so each item is indexed\n   * correctly.\n   */\n  className?: string;\n  children: ReactNode;\n}\n\n/**\n * Marks an iteration over a content-layer array so edit mode can resolve\n * click targets back to a specific content entry. Tags each mapped item\n * with its iteration index so the iframe can compute the concrete content\n * key (e.g. `products[3].name`) when the user clicks.\n *\n * Handles three wrapping patterns:\n *\n *   1. `.map()` is a direct child (classic):\n *        <ContentListContext field=\"products\">\n *          {products.map(p => <Card key={p.id}>...</Card>)}\n *        </ContentListContext>\n *\n *   2. `.map()` wrapped in a single layout element (e.g. a grid) — common\n *      because grid/flex styling often needs its own container. This case\n *      is auto-detected and the wrapper is drilled through so the REAL\n *      items get indexed, not the grid itself.\n *        <ContentListContext field=\"products\">\n *          <div className=\"grid\">\n *            {products.map(p => <Card key={p.id}>...</Card>)}\n *          </div>\n *        </ContentListContext>\n *\n *   3. Explicit `className` — preferred for grids; ContentListContext IS the\n *      grid, no inner wrapper needed.\n *        <ContentListContext field=\"products\" className=\"grid grid-cols-3 gap-4\">\n *          {products.map(p => <Card key={p.id}>...</Card>)}\n *        </ContentListContext>\n *\n * Pass-through when `field` is undefined — use for the same component shape\n * backed by an external (non-CMS) data source.\n */\nexport function ContentListContext({ field, className, children }: ContentListContextProps) {\n  if (!field) {\n    return className ? <div className={className}>{children}</div> : children;\n  }\n\n  const direct = Children.toArray(children);\n\n  // Pattern 2: single element wrapper (e.g. a grid div) around the mapped\n  // items. Drill one level so index tags land on the real items, not the\n  // wrapper. Only drill when the inner has multiple children — a single-\n  // element inner is probably an intentional single-card layout, not a\n  // list-in-wrapper.\n  if (direct.length === 1 && isValidElement(direct[0])) {\n    const wrapper = direct[0] as ReactElement<{ children?: ReactNode }>;\n    const inner = Children.toArray(wrapper.props.children);\n    if (inner.length > 1) {\n      const tagged = inner.map((c, i) => tagChild(c, i));\n      return (\n        <div\n          data-dev-content-list={field}\n          className={className}\n          style={className ? undefined : { display: 'contents' }}\n        >\n          {cloneElement(wrapper, {}, tagged)}\n        </div>\n      );\n    }\n  }\n\n  const items = direct.map((c, i) => tagChild(c, i));\n\n  return (\n    <div\n      data-dev-content-list={field}\n      className={className}\n      style={className ? undefined : { display: 'contents' }}\n    >\n      {items}\n    </div>\n  );\n}\n\nfunction tagChild(child: ReactNode, index: number): ReactNode {\n  if (!isValidElement(child)) return child;\n  const existing = (child.props as Record<string, unknown>)['data-dev-content-list-index'];\n  return cloneElement(child, {\n    'data-dev-content-list-index': existing ?? index,\n  } as Record<string, unknown>);\n}\n\nexport default ContentListContext;\n","totalLines":103,"truncated":false}
+import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
+
+interface ContentListContextProps {
+  /**
+   * Dotted path to the content-layer array backing this list (e.g. `"products"`
+   * or `"site.nav"`). Omit to render as a pass-through (non-CMS data source).
+   */
+  field?: string;
+  /**
+   * Optional className for the wrapper. When provided, the wrapper itself
+   * becomes the layout container (e.g. a grid) and is NOT `display: contents`.
+   * Use this pattern when the list needs its own grid/flex styling — it
+   * keeps the `.map()` output as direct children so each item is indexed
+   * correctly.
+   */
+  className?: string;
+  children: ReactNode;
+}
+
+/**
+ * Marks an iteration over a content-layer array so edit mode can resolve
+ * click targets back to a specific content entry. Tags each mapped item
+ * with its iteration index so the iframe can compute the concrete content
+ * key (e.g. `products[3].name`) when the user clicks.
+ *
+ * Handles three wrapping patterns:
+ *
+ *   1. `.map()` is a direct child (classic):
+ *        <ContentListContext field="products">
+ *          {products.map(p => <Card key={p.id}>...</Card>)}
+ *        </ContentListContext>
+ *
+ *   2. `.map()` wrapped in a single layout element (e.g. a grid) — common
+ *      because grid/flex styling often needs its own container. This case
+ *      is auto-detected and the wrapper is drilled through so the REAL
+ *      items get indexed, not the grid itself.
+ *        <ContentListContext field="products">
+ *          <div className="grid">
+ *            {products.map(p => <Card key={p.id}>...</Card>)}
+ *          </div>
+ *        </ContentListContext>
+ *
+ *   3. Explicit `className` — preferred for grids; ContentListContext IS the
+ *      grid, no inner wrapper needed.
+ *        <ContentListContext field="products" className="grid grid-cols-3 gap-4">
+ *          {products.map(p => <Card key={p.id}>...</Card>)}
+ *        </ContentListContext>
+ *
+ * Pass-through when `field` is undefined — use for the same component shape
+ * backed by an external (non-CMS) data source.
+ */
+export function ContentListContext({ field, className, children }: ContentListContextProps) {
+  if (!field) {
+    return className ? <div className={className}>{children}</div> : children;
+  }
+
+  const direct = Children.toArray(children);
+
+  // Pattern 2: single element wrapper (e.g. a grid div) around the mapped
+  // items. Drill one level so index tags land on the real items, not the
+  // wrapper. Only drill when the inner has multiple children — a single-
+  // element inner is probably an intentional single-card layout, not a
+  // list-in-wrapper.
+  if (direct.length === 1 && isValidElement(direct[0])) {
+    const wrapper = direct[0] as ReactElement<{ children?: ReactNode }>;
+    const inner = Children.toArray(wrapper.props.children);
+    if (inner.length > 1) {
+      const tagged = inner.map((c, i) => tagChild(c, i));
+      return (
+        <div
+          data-dev-content-list={field}
+          className={className}
+          style={className ? undefined : { display: 'contents' }}
+        >
+          {cloneElement(wrapper, {}, tagged)}
+        </div>
+      );
+    }
+  }
+
+  const items = direct.map((c, i) => tagChild(c, i));
+
+  return (
+    <div
+      data-dev-content-list={field}
+      className={className}
+      style={className ? undefined : { display: 'contents' }}
+    >
+      {items}
+    </div>
+  );
+}
+
+function tagChild(child: ReactNode, index: number): ReactNode {
+  if (!isValidElement(child)) return child;
+  const existing = (child.props as Record<string, unknown>)['data-dev-content-list-index'];
+  return cloneElement(child, {
+    'data-dev-content-list-index': existing ?? index,
+  } as Record<string, unknown>);
+}
+
+export default ContentListContext;

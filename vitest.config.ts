@@ -1,1 +1,49 @@
-{"success":true,"path":"vitest.config.ts","content":"import { defineConfig } from 'vitest/config';\nimport react from '@vitejs/plugin-react';\nimport path from 'path';\n\nexport default defineConfig({\n  plugins: [react()],\n  test: {\n    environment: 'jsdom',\n    globals: true,\n    setupFiles: './src/test/setup.ts',\n    // Use forks pool to isolate memory per test file (prevents OOM)\n    pool: 'forks',\n    poolOptions: {\n      forks: {\n        minForks: 1,\n        maxForks: 4, // Limit parallelism to prevent memory exhaustion\n        isolate: true, // Each test file runs in fresh process\n      },\n    },\n    // Limit concurrent tests within each file\n    maxConcurrency: 5,\n    coverage: {\n      provider: 'v8',\n      reporter: ['text', 'json', 'html'],\n      exclude: [\n        'node_modules/',\n        'src/test/',\n        '*.config.js',\n        '*.config.ts',\n      ],\n    },\n  },\n  resolve: {\n    alias: {\n      'virtual:format-overrides': path.resolve(__dirname, './src/test/format-overrides-module.ts'),\n      '@airo/content': path.resolve(__dirname, './content-lib/src/index.ts'),\n      '@/': path.resolve(__dirname, './src/'),\n      '@/components': path.resolve(__dirname, './src/components'),\n      '@/lib': path.resolve(__dirname, './src/lib'),\n      '@/api': path.resolve(__dirname, './src/server/api'),\n      '@/db': path.resolve(__dirname, './src/server/db'),\n      '@/layouts': path.resolve(__dirname, './src/layouts'),\n      '@/patterns': path.resolve(__dirname, './src/patterns'),\n      '@/pages': path.resolve(__dirname, './src/pages'),\n      '@/hooks': path.resolve(__dirname, './src/hooks'),\n      '@/styles': path.resolve(__dirname, './src/styles'),\n    },\n  },\n});\n","totalLines":50,"truncated":false}
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.ts',
+    // Use forks pool to isolate memory per test file (prevents OOM)
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        minForks: 1,
+        maxForks: 4, // Limit parallelism to prevent memory exhaustion
+        isolate: true, // Each test file runs in fresh process
+      },
+    },
+    // Limit concurrent tests within each file
+    maxConcurrency: 5,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'src/test/',
+        '*.config.js',
+        '*.config.ts',
+      ],
+    },
+  },
+  resolve: {
+    alias: {
+      'virtual:format-overrides': path.resolve(__dirname, './src/test/format-overrides-module.ts'),
+      '@airo/content': path.resolve(__dirname, './content-lib/src/index.ts'),
+      '@/': path.resolve(__dirname, './src/'),
+      '@/components': path.resolve(__dirname, './src/components'),
+      '@/lib': path.resolve(__dirname, './src/lib'),
+      '@/api': path.resolve(__dirname, './src/server/api'),
+      '@/db': path.resolve(__dirname, './src/server/db'),
+      '@/layouts': path.resolve(__dirname, './src/layouts'),
+      '@/patterns': path.resolve(__dirname, './src/patterns'),
+      '@/pages': path.resolve(__dirname, './src/pages'),
+      '@/hooks': path.resolve(__dirname, './src/hooks'),
+      '@/styles': path.resolve(__dirname, './src/styles'),
+    },
+  },
+});

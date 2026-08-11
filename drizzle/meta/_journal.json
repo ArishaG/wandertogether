@@ -1,1 +1,20 @@
-{"success":true,"path":"drizzle/meta/_journal.json","content":"{\n  \"version\": \"7\",\n  \"dialect\": \"mysql\",\n  \"entries\": [\n    {\n      \"idx\": 0,\n      \"version\": \"5\",\n      \"when\": 1786388823123,\n      \"tag\": \"0000_loose_wildside\",\n      \"breakpoints\": true\n    },\n    {\n      \"idx\": 1,\n      \"version\": \"5\",\n      \"when\": 1786466458746,\n      \"tag\": \"0001_third_lady_deathstrike\",\n      \"breakpoints\": true\n    }\n  ]\n}","totalLines":20,"truncated":false}
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1786388823123,
+      "tag": "0000_loose_wildside",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1786466458746,
+      "tag": "0001_third_lady_deathstrike",
+      "breakpoints": true
+    }
+  ]
+}

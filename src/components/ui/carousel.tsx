@@ -1,1 +1,419 @@
-{"success":true,"path":"src/components/ui/carousel.tsx","content":"import * as React from \"react\"\nimport useEmblaCarousel, {\n  type UseEmblaCarouselType,\n} from \"embla-carousel-react\"\nimport { ArrowLeft, ArrowRight } from \"lucide-react\"\n\nimport { cn } from \"@/lib/utils\"\nimport { Button } from \"@/components/ui/button\"\n\ntype AutoplayEventHook = (event: \"autoplay:play\", fn: () => void) => void\n\ndeclare global {\n  interface Window {\n    __airoEditModeActive?: boolean\n    __airoCarouselSlotEditActive?: boolean\n    __airoCarouselSlotEditRoot?: HTMLElement | null\n    __airoCarouselToolbarPauseRoot?: HTMLElement | null\n  }\n}\n\ntype CarouselApi = UseEmblaCarouselType[1]\ntype UseCarouselParameters = Parameters<typeof useEmblaCarousel>\ntype CarouselOptions = UseCarouselParameters[0]\ntype CarouselPlugin = UseCarouselParameters[1]\n\ntype CarouselProps = {\n  opts?: CarouselOptions\n  plugins?: CarouselPlugin\n  orientation?: \"horizontal\" | \"vertical\"\n  setApi?: (api: CarouselApi) => void\n}\n\ntype CarouselContextProps = {\n  carouselRef: ReturnType<typeof useEmblaCarousel>[0]\n  api: ReturnType<typeof useEmblaCarousel>[1]\n  scrollPrev: () => void\n  scrollNext: () => void\n  canScrollPrev: boolean\n  canScrollNext: boolean\n  carouselSlotEditActive: boolean\n} & CarouselProps\n\nconst CarouselContext = React.createContext<CarouselContextProps | null>(null)\n\nfunction useCarousel() {\n  const context = React.useContext(CarouselContext)\n\n  if (!context) {\n    throw new Error(\"useCarousel must be used within a <Carousel />\")\n  }\n\n  return context\n}\n\nconst Carousel = React.forwardRef<\n  HTMLDivElement,\n  React.HTMLAttributes<HTMLDivElement> & CarouselProps\n>(\n  (\n    {\n      orientation = \"horizontal\",\n      opts,\n      setApi,\n      plugins,\n      className,\n      children,\n      ...props\n    },\n    ref\n  ) => {\n    const [carouselRef, api] = useEmblaCarousel(\n      {\n        ...opts,\n        axis: orientation === \"horizontal\" ? \"x\" : \"y\",\n      },\n      plugins\n    )\n    const [canScrollPrev, setCanScrollPrev] = React.useState(false)\n    const [canScrollNext, setCanScrollNext] = React.useState(false)\n    const rootRef = React.useRef<HTMLDivElement | null>(null)\n\n    const mergedRef = React.useCallback(\n      (node: HTMLDivElement | null) => {\n        rootRef.current = node\n        if (typeof ref === \"function\") {\n          ref(node)\n        } else if (ref) {\n          ref.current = node\n        }\n      },\n      [ref]\n    )\n\n    const onSelect = React.useCallback((api: CarouselApi) => {\n      if (!api) {\n        return\n      }\n\n      setCanScrollPrev(api.canScrollPrev())\n      setCanScrollNext(api.canScrollNext())\n    }, [])\n\n    const scrollPrev = React.useCallback(() => {\n      api?.scrollPrev()\n    }, [api])\n\n    const scrollNext = React.useCallback(() => {\n      api?.scrollNext()\n    }, [api])\n\n    const handleKeyDown = React.useCallback(\n      (event: React.KeyboardEvent<HTMLDivElement>) => {\n        if (event.key === \"ArrowLeft\") {\n          event.preventDefault()\n          scrollPrev()\n        } else if (event.key === \"ArrowRight\") {\n          event.preventDefault()\n          scrollNext()\n        }\n      },\n      [scrollPrev, scrollNext]\n    )\n\n    React.useEffect(() => {\n      if (!api || !setApi) {\n        return\n      }\n\n      setApi(api)\n    }, [api, setApi])\n\n    React.useEffect(() => {\n      if (!api) {\n        return\n      }\n\n      onSelect(api)\n      api.on(\"reInit\", onSelect)\n      api.on(\"select\", onSelect)\n\n      return () => {\n        api?.off(\"select\", onSelect)\n      }\n    }, [api, onSelect])\n\n    // True when dev-tools carousel slot edit targets this carousel instance.\n    const [isSlotEditTarget, setIsSlotEditTarget] = React.useState<boolean>(false)\n    React.useEffect(() => {\n      const syncSlotEditTarget = (): void => {\n        const active = Boolean(window.__airoCarouselSlotEditActive)\n        const root = window.__airoCarouselSlotEditRoot\n        setIsSlotEditTarget(Boolean(active && rootRef.current && root === rootRef.current))\n      }\n      syncSlotEditTarget()\n      window.addEventListener(\"airo:carousel-slot-edit\", syncSlotEditTarget)\n      return () => {\n        window.removeEventListener(\"airo:carousel-slot-edit\", syncSlotEditTarget)\n      }\n    }, [])\n\n    React.useEffect(() => {\n      const emitNavState = (): void => {\n        if (!rootRef.current || !window.__airoCarouselSlotEditActive) return\n        if (window.__airoCarouselSlotEditRoot !== rootRef.current) return\n        window.dispatchEvent(\n          new CustomEvent(\"airo:carousel-slot-nav-state\", {\n            detail: {\n              canScrollPrev,\n              canScrollNext,\n              carouselRoot: rootRef.current,\n            },\n          })\n        )\n      }\n      emitNavState()\n      window.addEventListener(\"airo:carousel-slot-edit\", emitNavState)\n      return () => {\n        window.removeEventListener(\"airo:carousel-slot-edit\", emitNavState)\n      }\n    }, [canScrollPrev, canScrollNext, isSlotEditTarget])\n\n    React.useEffect(() => {\n      const handleNav = (event: Event): void => {\n        const detail = (event as CustomEvent<{ direction?: string }>).detail\n        if (!rootRef.current || window.__airoCarouselSlotEditRoot !== rootRef.current) return\n        if (detail?.direction === \"prev\" && canScrollPrev) scrollPrev()\n        else if (detail?.direction === \"next\" && canScrollNext) scrollNext()\n      }\n      window.addEventListener(\"airo:carousel-slot-nav\", handleNav)\n      return () => {\n        window.removeEventListener(\"airo:carousel-slot-nav\", handleNav)\n      }\n    }, [scrollPrev, scrollNext, canScrollPrev, canScrollNext])\n\n    React.useEffect(() => {\n      if (!api || !isSlotEditTarget) return\n\n      const emitSelectedSlide = (): void => {\n        if (!rootRef.current) return\n        if (window.__airoCarouselSlotEditRoot !== rootRef.current) return\n        window.dispatchEvent(\n          new CustomEvent(\"airo:carousel-slot-select\", {\n            detail: {\n              carouselRoot: rootRef.current,\n              selectedIndex: api.selectedScrollSnap(),\n            },\n          })\n        )\n      }\n\n      api.on(\"select\", emitSelectedSlide)\n      return () => {\n        api.off(\"select\", emitSelectedSlide)\n      }\n    }, [api, isSlotEditTarget])\n\n    React.useEffect(() => {\n      if (!api) return\n      type PausablePlugin = { stop: () => void; play: () => void }\n      const getAutoplay = (): PausablePlugin | undefined => {\n        const plugin: unknown = (api.plugins() as Record<string, unknown>).autoplay\n        if (\n          plugin &&\n          typeof (plugin as PausablePlugin).stop === \"function\" &&\n          typeof (plugin as PausablePlugin).play === \"function\"\n        ) {\n          return plugin as PausablePlugin\n        }\n        return undefined\n      }\n      const shouldPauseAutoplay = (): boolean => {\n        const root = rootRef.current\n        if (!root) return false\n        if (window.__airoCarouselSlotEditActive) {\n          const slotEditRoot = window.__airoCarouselSlotEditRoot\n          if (slotEditRoot == null || slotEditRoot === root) return true\n        }\n        return window.__airoCarouselToolbarPauseRoot === root\n      }\n      const apply = (paused: boolean): void => {\n        const autoplay: PausablePlugin | undefined = getAutoplay()\n        if (!autoplay) return\n        if (paused) autoplay.stop()\n        else autoplay.play()\n      }\n      const syncAutoplay = (): void => {\n        apply(shouldPauseAutoplay())\n      }\n      syncAutoplay()\n      const handleAutoplayPauseChange = (): void => {\n        syncAutoplay()\n      }\n      const onAutoplayPlay = (): void => {\n        if (!shouldPauseAutoplay()) return\n        queueMicrotask(() => {\n          if (shouldPauseAutoplay()) getAutoplay()?.stop()\n        })\n      }\n      window.addEventListener(\"airo:carousel-slot-edit\", handleAutoplayPauseChange)\n      window.addEventListener(\"airo:carousel-toolbar-pause\", handleAutoplayPauseChange)\n      const onAutoplay: AutoplayEventHook = api.on as unknown as AutoplayEventHook\n      const offAutoplay: AutoplayEventHook = api.off as unknown as AutoplayEventHook\n      onAutoplay(\"autoplay:play\", onAutoplayPlay)\n      return () => {\n        window.removeEventListener(\"airo:carousel-slot-edit\", handleAutoplayPauseChange)\n        window.removeEventListener(\"airo:carousel-toolbar-pause\", handleAutoplayPauseChange)\n        offAutoplay(\"autoplay:play\", onAutoplayPlay)\n      }\n    }, [api])\n\n    return (\n      <CarouselContext.Provider\n        value={{\n          carouselRef,\n          api: api,\n          opts,\n          orientation:\n            orientation || (opts?.axis === \"y\" ? \"vertical\" : \"horizontal\"),\n          scrollPrev,\n          scrollNext,\n          canScrollPrev,\n          canScrollNext,\n          carouselSlotEditActive: isSlotEditTarget,\n        }}\n      >\n        <div\n          ref={mergedRef}\n          onKeyDownCapture={handleKeyDown}\n          className={cn(\"relative\", className)}\n          role=\"region\"\n          aria-roledescription=\"carousel\"\n          {...props}\n        >\n          {children}\n        </div>\n      </CarouselContext.Provider>\n    )\n  }\n)\nCarousel.displayName = \"Carousel\"\n\nconst CarouselContent = React.forwardRef<\n  HTMLDivElement,\n  React.HTMLAttributes<HTMLDivElement>\n>(({ className, ...props }, ref) => {\n  const { carouselRef, orientation } = useCarousel()\n\n  return (\n    <div ref={carouselRef} className=\"overflow-hidden\">\n      <div\n        ref={ref}\n        className={cn(\n          \"flex\",\n          orientation === \"horizontal\" ? \"-ml-4\" : \"-mt-4 flex-col\",\n          className\n        )}\n        {...props}\n      />\n    </div>\n  )\n})\nCarouselContent.displayName = \"CarouselContent\"\n\nconst CarouselItem = React.forwardRef<\n  HTMLDivElement,\n  React.HTMLAttributes<HTMLDivElement>\n>(({ className, ...props }, ref) => {\n  const { orientation } = useCarousel()\n\n  return (\n    <div\n      ref={ref}\n      role=\"group\"\n      aria-roledescription=\"slide\"\n      className={cn(\n        \"min-w-0 shrink-0 grow-0 basis-full\",\n        orientation === \"horizontal\" ? \"pl-4\" : \"pt-4\",\n        className\n      )}\n      {...props}\n    />\n  )\n})\nCarouselItem.displayName = \"CarouselItem\"\n\nconst CarouselPrevious = React.forwardRef<\n  HTMLButtonElement,\n  React.ComponentProps<typeof Button>\n>(({ className, variant = \"outline\", size = \"icon\", ...props }, ref) => {\n  const { orientation, scrollPrev, canScrollPrev, carouselSlotEditActive } = useCarousel()\n\n  if (carouselSlotEditActive) {\n    return null\n  }\n\n  return (\n    <Button\n      ref={ref}\n      variant={variant}\n      size={size}\n      className={cn(\n        \"absolute  h-8 w-8 rounded-full\",\n        orientation === \"horizontal\"\n          ? \"-left-12 top-1/2 -translate-y-1/2\"\n          : \"-top-12 left-1/2 -translate-x-1/2 rotate-90\",\n        className\n      )}\n      disabled={!canScrollPrev}\n      onClick={scrollPrev}\n      {...props}\n    >\n      <ArrowLeft className=\"h-4 w-4\" />\n      <span className=\"sr-only\">Previous slide</span>\n    </Button>\n  )\n})\nCarouselPrevious.displayName = \"CarouselPrevious\"\n\nconst CarouselNext = React.forwardRef<\n  HTMLButtonElement,\n  React.ComponentProps<typeof Button>\n>(({ className, variant = \"outline\", size = \"icon\", ...props }, ref) => {\n  const { orientation, scrollNext, canScrollNext, carouselSlotEditActive } = useCarousel()\n\n  if (carouselSlotEditActive) {\n    return null\n  }\n\n  return (\n    <Button\n      ref={ref}\n      variant={variant}\n      size={size}\n      className={cn(\n        \"absolute h-8 w-8 rounded-full\",\n        orientation === \"horizontal\"\n          ? \"-right-12 top-1/2 -translate-y-1/2\"\n          : \"-bottom-12 left-1/2 -translate-x-1/2 rotate-90\",\n        className\n      )}\n      disabled={!canScrollNext}\n      onClick={scrollNext}\n      {...props}\n    >\n      <ArrowRight className=\"h-4 w-4\" />\n      <span className=\"sr-only\">Next slide</span>\n    </Button>\n  )\n})\nCarouselNext.displayName = \"CarouselNext\"\n\nexport {\n  type CarouselApi,\n  Carousel,\n  CarouselContent,\n  CarouselItem,\n  CarouselPrevious,\n  CarouselNext,\n}\n","totalLines":420,"truncated":false}
+import * as React from "react"
+import useEmblaCarousel, {
+  type UseEmblaCarouselType,
+} from "embla-carousel-react"
+import { ArrowLeft, ArrowRight } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+
+type AutoplayEventHook = (event: "autoplay:play", fn: () => void) => void
+
+declare global {
+  interface Window {
+    __airoEditModeActive?: boolean
+    __airoCarouselSlotEditActive?: boolean
+    __airoCarouselSlotEditRoot?: HTMLElement | null
+    __airoCarouselToolbarPauseRoot?: HTMLElement | null
+  }
+}
+
+type CarouselApi = UseEmblaCarouselType[1]
+type UseCarouselParameters = Parameters<typeof useEmblaCarousel>
+type CarouselOptions = UseCarouselParameters[0]
+type CarouselPlugin = UseCarouselParameters[1]
+
+type CarouselProps = {
+  opts?: CarouselOptions
+  plugins?: CarouselPlugin
+  orientation?: "horizontal" | "vertical"
+  setApi?: (api: CarouselApi) => void
+}
+
+type CarouselContextProps = {
+  carouselRef: ReturnType<typeof useEmblaCarousel>[0]
+  api: ReturnType<typeof useEmblaCarousel>[1]
+  scrollPrev: () => void
+  scrollNext: () => void
+  canScrollPrev: boolean
+  canScrollNext: boolean
+  carouselSlotEditActive: boolean
+} & CarouselProps
+
+const CarouselContext = React.createContext<CarouselContextProps | null>(null)
+
+function useCarousel() {
+  const context = React.useContext(CarouselContext)
+
+  if (!context) {
+    throw new Error("useCarousel must be used within a <Carousel />")
+  }
+
+  return context
+}
+
+const Carousel = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & CarouselProps
+>(
+  (
+    {
+      orientation = "horizontal",
+      opts,
+      setApi,
+      plugins,
+      className,
+      children,
+      ...props
+    },
+    ref
+  ) => {
+    const [carouselRef, api] = useEmblaCarousel(
+      {
+        ...opts,
+        axis: orientation === "horizontal" ? "x" : "y",
+      },
+      plugins
+    )
+    const [canScrollPrev, setCanScrollPrev] = React.useState(false)
+    const [canScrollNext, setCanScrollNext] = React.useState(false)
+    const rootRef = React.useRef<HTMLDivElement | null>(null)
+
+    const mergedRef = React.useCallback(
+      (node: HTMLDivElement | null) => {
+        rootRef.current = node
+        if (typeof ref === "function") {
+          ref(node)
+        } else if (ref) {
+          ref.current = node
+        }
+      },
+      [ref]
+    )
+
+    const onSelect = React.useCallback((api: CarouselApi) => {
+      if (!api) {
+        return
+      }
+
+      setCanScrollPrev(api.canScrollPrev())
+      setCanScrollNext(api.canScrollNext())
+    }, [])
+
+    const scrollPrev = React.useCallback(() => {
+      api?.scrollPrev()
+    }, [api])
+
+    const scrollNext = React.useCallback(() => {
+      api?.scrollNext()
+    }, [api])
+
+    const handleKeyDown = React.useCallback(
+      (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === "ArrowLeft") {
+          event.preventDefault()
+          scrollPrev()
+        } else if (event.key === "ArrowRight") {
+          event.preventDefault()
+          scrollNext()
+        }
+      },
+      [scrollPrev, scrollNext]
+    )
+
+    React.useEffect(() => {
+      if (!api || !setApi) {
+        return
+      }
+
+      setApi(api)
+    }, [api, setApi])
+
+    React.useEffect(() => {
+      if (!api) {
+        return
+      }
+
+      onSelect(api)
+      api.on("reInit", onSelect)
+      api.on("select", onSelect)
+
+      return () => {
+        api?.off("select", onSelect)
+      }
+    }, [api, onSelect])
+
+    // True when dev-tools carousel slot edit targets this carousel instance.
+    const [isSlotEditTarget, setIsSlotEditTarget] = React.useState<boolean>(false)
+    React.useEffect(() => {
+      const syncSlotEditTarget = (): void => {
+        const active = Boolean(window.__airoCarouselSlotEditActive)
+        const root = window.__airoCarouselSlotEditRoot
+        setIsSlotEditTarget(Boolean(active && rootRef.current && root === rootRef.current))
+      }
+      syncSlotEditTarget()
+      window.addEventListener("airo:carousel-slot-edit", syncSlotEditTarget)
+      return () => {
+        window.removeEventListener("airo:carousel-slot-edit", syncSlotEditTarget)
+      }
+    }, [])
+
+    React.useEffect(() => {
+      const emitNavState = (): void => {
+        if (!rootRef.current || !window.__airoCarouselSlotEditActive) return
+        if (window.__airoCarouselSlotEditRoot !== rootRef.current) return
+        window.dispatchEvent(
+          new CustomEvent("airo:carousel-slot-nav-state", {
+            detail: {
+              canScrollPrev,
+              canScrollNext,
+              carouselRoot: rootRef.current,
+            },
+          })
+        )
+      }
+      emitNavState()
+      window.addEventListener("airo:carousel-slot-edit", emitNavState)
+      return () => {
+        window.removeEventListener("airo:carousel-slot-edit", emitNavState)
+      }
+    }, [canScrollPrev, canScrollNext, isSlotEditTarget])
+
+    React.useEffect(() => {
+      const handleNav = (event: Event): void => {
+        const detail = (event as CustomEvent<{ direction?: string }>).detail
+        if (!rootRef.current || window.__airoCarouselSlotEditRoot !== rootRef.current) return
+        if (detail?.direction === "prev" && canScrollPrev) scrollPrev()
+        else if (detail?.direction === "next" && canScrollNext) scrollNext()
+      }
+      window.addEventListener("airo:carousel-slot-nav", handleNav)
+      return () => {
+        window.removeEventListener("airo:carousel-slot-nav", handleNav)
+      }
+    }, [scrollPrev, scrollNext, canScrollPrev, canScrollNext])
+
+    React.useEffect(() => {
+      if (!api || !isSlotEditTarget) return
+
+      const emitSelectedSlide = (): void => {
+        if (!rootRef.current) return
+        if (window.__airoCarouselSlotEditRoot !== rootRef.current) return
+        window.dispatchEvent(
+          new CustomEvent("airo:carousel-slot-select", {
+            detail: {
+              carouselRoot: rootRef.current,
+              selectedIndex: api.selectedScrollSnap(),
+            },
+          })
+        )
+      }
+
+      api.on("select", emitSelectedSlide)
+      return () => {
+        api.off("select", emitSelectedSlide)
+      }
+    }, [api, isSlotEditTarget])
+
+    React.useEffect(() => {
+      if (!api) return
+      type PausablePlugin = { stop: () => void; play: () => void }
+      const getAutoplay = (): PausablePlugin | undefined => {
+        const plugin: unknown = (api.plugins() as Record<string, unknown>).autoplay
+        if (
+          plugin &&
+          typeof (plugin as PausablePlugin).stop === "function" &&
+          typeof (plugin as PausablePlugin).play === "function"
+        ) {
+          return plugin as PausablePlugin
+        }
+        return undefined
+      }
+      const shouldPauseAutoplay = (): boolean => {
+        const root = rootRef.current
+        if (!root) return false
+        if (window.__airoCarouselSlotEditActive) {
+          const slotEditRoot = window.__airoCarouselSlotEditRoot
+          if (slotEditRoot == null || slotEditRoot === root) return true
+        }
+        return window.__airoCarouselToolbarPauseRoot === root
+      }
+      const apply = (paused: boolean): void => {
+        const autoplay: PausablePlugin | undefined = getAutoplay()
+        if (!autoplay) return
+        if (paused) autoplay.stop()
+        else autoplay.play()
+      }
+      const syncAutoplay = (): void => {
+        apply(shouldPauseAutoplay())
+      }
+      syncAutoplay()
+      const handleAutoplayPauseChange = (): void => {
+        syncAutoplay()
+      }
+      const onAutoplayPlay = (): void => {
+        if (!shouldPauseAutoplay()) return
+        queueMicrotask(() => {
+          if (shouldPauseAutoplay()) getAutoplay()?.stop()
+        })
+      }
+      window.addEventListener("airo:carousel-slot-edit", handleAutoplayPauseChange)
+      window.addEventListener("airo:carousel-toolbar-pause", handleAutoplayPauseChange)
+      const onAutoplay: AutoplayEventHook = api.on as unknown as AutoplayEventHook
+      const offAutoplay: AutoplayEventHook = api.off as unknown as AutoplayEventHook
+      onAutoplay("autoplay:play", onAutoplayPlay)
+      return () => {
+        window.removeEventListener("airo:carousel-slot-edit", handleAutoplayPauseChange)
+        window.removeEventListener("airo:carousel-toolbar-pause", handleAutoplayPauseChange)
+        offAutoplay("autoplay:play", onAutoplayPlay)
+      }
+    }, [api])
+
+    return (
+      <CarouselContext.Provider
+        value={{
+          carouselRef,
+          api: api,
+          opts,
+          orientation:
+            orientation || (opts?.axis === "y" ? "vertical" : "horizontal"),
+          scrollPrev,
+          scrollNext,
+          canScrollPrev,
+          canScrollNext,
+          carouselSlotEditActive: isSlotEditTarget,
+        }}
+      >
+        <div
+          ref={mergedRef}
+          onKeyDownCapture={handleKeyDown}
+          className={cn("relative", className)}
+          role="region"
+          aria-roledescription="carousel"
+          {...props}
+        >
+          {children}
+        </div>
+      </CarouselContext.Provider>
+    )
+  }
+)
+Carousel.displayName = "Carousel"
+
+const CarouselContent = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => {
+  const { carouselRef, orientation } = useCarousel()
+
+  return (
+    <div ref={carouselRef} className="overflow-hidden">
+      <div
+        ref={ref}
+        className={cn(
+          "flex",
+          orientation === "horizontal" ? "-ml-4" : "-mt-4 flex-col",
+          className
+        )}
+        {...props}
+      />
+    </div>
+  )
+})
+CarouselContent.displayName = "CarouselContent"
+
+const CarouselItem = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => {
+  const { orientation } = useCarousel()
+
+  return (
+    <div
+      ref={ref}
+      role="group"
+      aria-roledescription="slide"
+      className={cn(
+        "min-w-0 shrink-0 grow-0 basis-full",
+        orientation === "horizontal" ? "pl-4" : "pt-4",
+        className
+      )}
+      {...props}
+    />
+  )
+})
+CarouselItem.displayName = "CarouselItem"
+
+const CarouselPrevious = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<typeof Button>
+>(({ className, variant = "outline", size = "icon", ...props }, ref) => {
+  const { orientation, scrollPrev, canScrollPrev, carouselSlotEditActive } = useCarousel()
+
+  if (carouselSlotEditActive) {
+    return null
+  }
+
+  return (
+    <Button
+      ref={ref}
+      variant={variant}
+      size={size}
+      className={cn(
+        "absolute  h-8 w-8 rounded-full",
+        orientation === "horizontal"
+          ? "-left-12 top-1/2 -translate-y-1/2"
+          : "-top-12 left-1/2 -translate-x-1/2 rotate-90",
+        className
+      )}
+      disabled={!canScrollPrev}
+      onClick={scrollPrev}
+      {...props}
+    >
+      <ArrowLeft className="h-4 w-4" />
+      <span className="sr-only">Previous slide</span>
+    </Button>
+  )
+})
+CarouselPrevious.displayName = "CarouselPrevious"
+
+const CarouselNext = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<typeof Button>
+>(({ className, variant = "outline", size = "icon", ...props }, ref) => {
+  const { orientation, scrollNext, canScrollNext, carouselSlotEditActive } = useCarousel()
+
+  if (carouselSlotEditActive) {
+    return null
+  }
+
+  return (
+    <Button
+      ref={ref}
+      variant={variant}
+      size={size}
+      className={cn(
+        "absolute h-8 w-8 rounded-full",
+        orientation === "horizontal"
+          ? "-right-12 top-1/2 -translate-y-1/2"
+          : "-bottom-12 left-1/2 -translate-x-1/2 rotate-90",
+        className
+      )}
+      disabled={!canScrollNext}
+      onClick={scrollNext}
+      {...props}
+    >
+      <ArrowRight className="h-4 w-4" />
+      <span className="sr-only">Next slide</span>
+    </Button>
+  )
+})
+CarouselNext.displayName = "CarouselNext"
+
+export {
+  type CarouselApi,
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+}

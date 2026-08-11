@@ -1,1 +1,63 @@
-{"success":true,"path":"src/routes.tsx","content":"import { RouteObject } from 'react-router-dom';\nimport { lazy } from 'react';\nimport HomePage from './pages/index';\nimport DashboardPage from './pages/dashboard';\nimport StartTripPage from './pages/start-trip';\nimport PollsPage from './pages/polls';\nimport ItineraryPage from './pages/itinerary';\nimport TripsPage from './pages/trips';\nimport AuthPage from './pages/auth/AuthPage';\nimport { ProtectedRoute } from './lib/auth/auth-client';\n// Eager import so renderToString doesn't hit a Suspense boundary on 404 routes\n// and abort to client rendering. The prod 404 page is tiny; the dev-tools\n// variant stays lazy because it pulls in dev-only code we don't want in\n// production bundles.\nimport ProdNotFoundPage from './pages/_404';\n\nconst NotFoundPage = import.meta.env.DEV\n  ? lazy(() => import('../dev-tools/src/PageNotFound'))\n  : ProdNotFoundPage;\n\nexport const routes: RouteObject[] = [\n  {\n    path: '/',\n    element: <HomePage />,\n  },\n  {\n    path: '/login',\n    element: <AuthPage mode=\"login\" />,\n  },\n  {\n    path: '/signup',\n    element: <AuthPage mode=\"signup\" />,\n  },\n  {\n    path: '/dashboard',\n    element: <ProtectedRoute><DashboardPage /></ProtectedRoute>,\n  },\n  {\n    path: '/trips',\n    element: <ProtectedRoute><TripsPage /></ProtectedRoute>,\n  },\n  {\n    path: '/start-trip',\n    element: <StartTripPage />,\n  },\n  {\n    path: '/polls',\n    element: <PollsPage />,\n  },\n  {\n    path: '/itinerary',\n    element: <ItineraryPage />,\n  },\n  {\n    path: '*',\n    element: <NotFoundPage />,\n  },\n];\n\n// Types for type-safe navigation\nexport type Path = '/' | '/login' | '/signup' | '/dashboard' | '/trips' | '/start-trip' | '/polls' | '/itinerary';\n\nexport type Params = Record<string, string | undefined>;\n","totalLines":64,"truncated":false}
+import { RouteObject } from 'react-router-dom';
+import { lazy } from 'react';
+import HomePage from './pages/index';
+import DashboardPage from './pages/dashboard';
+import StartTripPage from './pages/start-trip';
+import PollsPage from './pages/polls';
+import ItineraryPage from './pages/itinerary';
+import TripsPage from './pages/trips';
+import AuthPage from './pages/auth/AuthPage';
+import { ProtectedRoute } from './lib/auth/auth-client';
+// Eager import so renderToString doesn't hit a Suspense boundary on 404 routes
+// and abort to client rendering. The prod 404 page is tiny; the dev-tools
+// variant stays lazy because it pulls in dev-only code we don't want in
+// production bundles.
+import ProdNotFoundPage from './pages/_404';
+
+const NotFoundPage = import.meta.env.DEV
+  ? lazy(() => import('../dev-tools/src/PageNotFound'))
+  : ProdNotFoundPage;
+
+export const routes: RouteObject[] = [
+  {
+    path: '/',
+    element: <HomePage />,
+  },
+  {
+    path: '/login',
+    element: <AuthPage mode="login" />,
+  },
+  {
+    path: '/signup',
+    element: <AuthPage mode="signup" />,
+  },
+  {
+    path: '/dashboard',
+    element: <ProtectedRoute><DashboardPage /></ProtectedRoute>,
+  },
+  {
+    path: '/trips',
+    element: <ProtectedRoute><TripsPage /></ProtectedRoute>,
+  },
+  {
+    path: '/start-trip',
+    element: <StartTripPage />,
+  },
+  {
+    path: '/polls',
+    element: <PollsPage />,
+  },
+  {
+    path: '/itinerary',
+    element: <ItineraryPage />,
+  },
+  {
+    path: '*',
+    element: <NotFoundPage />,
+  },
+];
+
+// Types for type-safe navigation
+export type Path = '/' | '/login' | '/signup' | '/dashboard' | '/trips' | '/start-trip' | '/polls' | '/itinerary';
+
+export type Params = Record<string, string | undefined>;

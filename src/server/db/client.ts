@@ -1,1 +1,51 @@
-{"success":true,"path":"src/server/db/client.ts","content":"/** TREAT AS IMMUTABLE - This file is protected by the file-edit tool\n *\n * Database connection setup using Drizzle ORM with MySQL2\n */\n\nimport { drizzle } from 'drizzle-orm/mysql2';\nimport mysql from 'mysql2/promise';\nimport { getDatabaseCredentials } from './config';\nimport * as schema from './schema';\n\n// Get database configuration\nconst dbConfig = getDatabaseCredentials();\n\n// Create MySQL connection pool with SSL enabled\nconst poolConnection = mysql.createPool({\n  host: dbConfig.host,\n  port: dbConfig.port,\n  user: dbConfig.user,\n  password: dbConfig.password,\n  database: dbConfig.database,\n  ssl: {\n    rejectUnauthorized: false,\n  },\n  waitForConnections: true,\n  connectionLimit: 10,\n  queueLimit: 0,\n});\n\n// Create Drizzle instance\nexport const db = drizzle(poolConnection, { schema, mode: 'default' });\n\n/**\n * Test database connection\n */\nexport async function testConnection(): Promise<boolean> {\n  try {\n    const connection = await poolConnection.getConnection();\n    await connection.ping();\n    connection.release();\n    return true;\n  } catch {\n    return false;\n  }\n}\n\n/**\n * Close database connection pool\n */\nexport async function closeConnection(): Promise<void> {\n  await poolConnection.end();\n}\n","totalLines":52,"truncated":false}
+/** TREAT AS IMMUTABLE - This file is protected by the file-edit tool
+ *
+ * Database connection setup using Drizzle ORM with MySQL2
+ */
+
+import { drizzle } from 'drizzle-orm/mysql2';
+import mysql from 'mysql2/promise';
+import { getDatabaseCredentials } from './config';
+import * as schema from './schema';
+
+// Get database configuration
+const dbConfig = getDatabaseCredentials();
+
+// Create MySQL connection pool with SSL enabled
+const poolConnection = mysql.createPool({
+  host: dbConfig.host,
+  port: dbConfig.port,
+  user: dbConfig.user,
+  password: dbConfig.password,
+  database: dbConfig.database,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+});
+
+// Create Drizzle instance
+export const db = drizzle(poolConnection, { schema, mode: 'default' });
+
+/**
+ * Test database connection
+ */
+export async function testConnection(): Promise<boolean> {
+  try {
+    const connection = await poolConnection.getConnection();
+    await connection.ping();
+    connection.release();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Close database connection pool
+ */
+export async function closeConnection(): Promise<void> {
+  await poolConnection.end();
+}

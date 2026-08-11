@@ -1,1 +1,36 @@
-{"success":true,"path":"src/server/indexnow-key.ts","content":"import { existsSync, readFileSync } from \"node:fs\";\nimport { normalize, resolve, sep } from \"node:path\";\n\nconst INDEXNOW_KEY_FILENAME = \"airo-indexnow.json\";\n\ninterface IndexNowKeyManifest {\n\tkey: string;\n}\n\nfunction isIndexNowKeyManifest(value: unknown): value is IndexNowKeyManifest {\n\tif (typeof value !== \"object\" || value === null) return false;\n\tconst candidate = value as Partial<IndexNowKeyManifest>;\n\treturn typeof candidate.key === \"string\" && /^[a-f0-9]{32}$/.test(candidate.key);\n}\n\nexport function loadIndexNowKey(baseDir: string): string | null {\n\tif (baseDir.includes(\"\\0\")) return null;\n\tif (baseDir.split(/[\\\\/]+/).includes(\"..\")) return null;\n\tconst normalizedBaseDir = normalize(baseDir);\n\tconst resolvedBaseDir = resolve(normalizedBaseDir);\n\tconst resolvedManifestPath = resolve(resolvedBaseDir, INDEXNOW_KEY_FILENAME);\n\tconst basePrefix = resolvedBaseDir.endsWith(sep) ? resolvedBaseDir : `${resolvedBaseDir}${sep}`;\n\tif (resolvedManifestPath !== resolvedBaseDir && !resolvedManifestPath.startsWith(basePrefix)) {\n\t\treturn null;\n\t}\n\n\tif (!existsSync(resolvedManifestPath)) return null;\n\n\ttry {\n\t\tconst parsed = JSON.parse(readFileSync(resolvedManifestPath, \"utf8\")) as unknown;\n\t\tif (!isIndexNowKeyManifest(parsed)) return null;\n\t\treturn parsed.key;\n\t} catch {\n\t\treturn null;\n\t}\n}\n","totalLines":37,"truncated":false}
+import { existsSync, readFileSync } from "node:fs";
+import { normalize, resolve, sep } from "node:path";
+
+const INDEXNOW_KEY_FILENAME = "airo-indexnow.json";
+
+interface IndexNowKeyManifest {
+	key: string;
+}
+
+function isIndexNowKeyManifest(value: unknown): value is IndexNowKeyManifest {
+	if (typeof value !== "object" || value === null) return false;
+	const candidate = value as Partial<IndexNowKeyManifest>;
+	return typeof candidate.key === "string" && /^[a-f0-9]{32}$/.test(candidate.key);
+}
+
+export function loadIndexNowKey(baseDir: string): string | null {
+	if (baseDir.includes("\0")) return null;
+	if (baseDir.split(/[\\/]+/).includes("..")) return null;
+	const normalizedBaseDir = normalize(baseDir);
+	const resolvedBaseDir = resolve(normalizedBaseDir);
+	const resolvedManifestPath = resolve(resolvedBaseDir, INDEXNOW_KEY_FILENAME);
+	const basePrefix = resolvedBaseDir.endsWith(sep) ? resolvedBaseDir : `${resolvedBaseDir}${sep}`;
+	if (resolvedManifestPath !== resolvedBaseDir && !resolvedManifestPath.startsWith(basePrefix)) {
+		return null;
+	}
+
+	if (!existsSync(resolvedManifestPath)) return null;
+
+	try {
+		const parsed = JSON.parse(readFileSync(resolvedManifestPath, "utf8")) as unknown;
+		if (!isIndexNowKeyManifest(parsed)) return null;
+		return parsed.key;
+	} catch {
+		return null;
+	}
+}

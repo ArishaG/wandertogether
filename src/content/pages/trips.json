@@ -1,1 +1,43 @@
-{"success":true,"path":"src/content/pages/trips.json","content":"{\n  \"eyebrow\": \"Your travel plans\",\n  \"title\": \"Trips you’re planning\",\n  \"description\": \"Pick up where your group left off, or revisit the trips you’ve already taken.\",\n  \"currentTitle\": \"Current trips\",\n  \"pastTitle\": \"Past trips\",\n  \"currentTrips\": [\n    {\n      \"name\": \"Lisbon Long Weekend\",\n      \"dates\": \"Aug 14–17, 2026\",\n      \"status\": \"Planning in progress\",\n      \"members\": \"4 travellers\",\n      \"nextStep\": \"Vote on where to stay\",\n      \"route\": \"/start-trip?view=whiteboard\",\n      \"id\": \"JTgUqFFS6T6MQQfNp2jws\"\n    },\n    {\n      \"name\": \"Kyoto in Autumn\",\n      \"dates\": \"Nov 6–12, 2026\",\n      \"status\": \"Planning in progress\",\n      \"members\": \"3 travellers\",\n      \"nextStep\": \"Confirm the day-two itinerary\",\n      \"route\": \"/start-trip?view=whiteboard\",\n      \"id\": \"FyFB--FsPh5i3NYk2Isxf\"\n    }\n  ],\n  \"pastTrips\": [\n    {\n      \"name\": \"Coastal California\",\n      \"dates\": \"May 2–5, 2026\",\n      \"summary\": \"A long weekend of coastal drives, markets, and sunset dinners.\",\n      \"members\": \"5 travellers\",\n      \"id\": \"ZNZVjifyjJ7IEOGhU7veJ\"\n    },\n    {\n      \"name\": \"Portland Food Weekend\",\n      \"dates\": \"Oct 10–13, 2025\",\n      \"summary\": \"A shared list of bakeries, bookstores, and rainy-day plans.\",\n      \"members\": \"4 travellers\",\n      \"id\": \"_bZDM3oqTdN5zQ_CgeV7b\"\n    }\n  ]\n}\n","totalLines":44,"truncated":false}
+{
+  "eyebrow": "Your travel plans",
+  "title": "Trips you’re planning",
+  "description": "Pick up where your group left off, or revisit the trips you’ve already taken.",
+  "currentTitle": "Current trips",
+  "pastTitle": "Past trips",
+  "currentTrips": [
+    {
+      "name": "Lisbon Long Weekend",
+      "dates": "Aug 14–17, 2026",
+      "status": "Planning in progress",
+      "members": "4 travellers",
+      "nextStep": "Vote on where to stay",
+      "route": "/start-trip?view=whiteboard",
+      "id": "JTgUqFFS6T6MQQfNp2jws"
+    },
+    {
+      "name": "Kyoto in Autumn",
+      "dates": "Nov 6–12, 2026",
+      "status": "Planning in progress",
+      "members": "3 travellers",
+      "nextStep": "Confirm the day-two itinerary",
+      "route": "/start-trip?view=whiteboard",
+      "id": "FyFB--FsPh5i3NYk2Isxf"
+    }
+  ],
+  "pastTrips": [
+    {
+      "name": "Coastal California",
+      "dates": "May 2–5, 2026",
+      "summary": "A long weekend of coastal drives, markets, and sunset dinners.",
+      "members": "5 travellers",
+      "id": "ZNZVjifyjJ7IEOGhU7veJ"
+    },
+    {
+      "name": "Portland Food Weekend",
+      "dates": "Oct 10–13, 2025",
+      "summary": "A shared list of bakeries, bookstores, and rainy-day plans.",
+      "members": "4 travellers",
+      "id": "_bZDM3oqTdN5zQ_CgeV7b"
+    }
+  ]
+}

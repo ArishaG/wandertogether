@@ -1,1 +1,53 @@
-{"success":true,"path":"src/lib/__tests__/format-overrides-store.test.ts","content":"import { afterEach, describe, expect, it, vi } from 'vitest'\n\nimport type { FormatOverrideBundle } from '../format-overrides'\nimport {\n  FORMAT_OVERRIDES_WILL_UPDATE_EVENT,\n  getFormatOverrideBundle,\n  setFormatOverrideBundle,\n  subscribeFormatOverrideBundle,\n} from '../format-overrides-store'\n\nconst emptyBundle: FormatOverrideBundle = { version: 1, scopes: {} }\n\ndescribe('format override store', () => {\n  afterEach(() => {\n    setFormatOverrideBundle(emptyBundle)\n    vi.restoreAllMocks()\n  })\n\n  it('unsubscribes listeners with a void cleanup callback', () => {\n    const listener = vi.fn()\n    const unsubscribe = subscribeFormatOverrideBundle(listener)\n\n    const result = unsubscribe()\n    setFormatOverrideBundle(emptyBundle)\n\n    expect(result).toBeUndefined()\n    expect(listener).not.toHaveBeenCalled()\n  })\n\n  it('dispatches a will-update window event before notifying subscribers', () => {\n    const bundle: FormatOverrideBundle = {\n      version: 1,\n      scopes: {\n        shared: { version: 1, overrides: {} },\n      },\n    }\n    const events: FormatOverrideBundle[] = []\n    window.addEventListener(FORMAT_OVERRIDES_WILL_UPDATE_EVENT, ((event: CustomEvent<FormatOverrideBundle>) => {\n      events.push(event.detail)\n    }) as EventListener, { once: true })\n\n    const listener = vi.fn(() => {\n      expect(getFormatOverrideBundle()).toBe(bundle)\n      expect(events).toEqual([bundle])\n    })\n    const unsubscribe = subscribeFormatOverrideBundle(listener)\n\n    setFormatOverrideBundle(bundle)\n    unsubscribe()\n\n    expect(listener).toHaveBeenCalledOnce()\n  })\n})\n","totalLines":54,"truncated":false}
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import type { FormatOverrideBundle } from '../format-overrides'
+import {
+  FORMAT_OVERRIDES_WILL_UPDATE_EVENT,
+  getFormatOverrideBundle,
+  setFormatOverrideBundle,
+  subscribeFormatOverrideBundle,
+} from '../format-overrides-store'
+
+const emptyBundle: FormatOverrideBundle = { version: 1, scopes: {} }
+
+describe('format override store', () => {
+  afterEach(() => {
+    setFormatOverrideBundle(emptyBundle)
+    vi.restoreAllMocks()
+  })
+
+  it('unsubscribes listeners with a void cleanup callback', () => {
+    const listener = vi.fn()
+    const unsubscribe = subscribeFormatOverrideBundle(listener)
+
+    const result = unsubscribe()
+    setFormatOverrideBundle(emptyBundle)
+
+    expect(result).toBeUndefined()
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('dispatches a will-update window event before notifying subscribers', () => {
+    const bundle: FormatOverrideBundle = {
+      version: 1,
+      scopes: {
+        shared: { version: 1, overrides: {} },
+      },
+    }
+    const events: FormatOverrideBundle[] = []
+    window.addEventListener(FORMAT_OVERRIDES_WILL_UPDATE_EVENT, ((event: CustomEvent<FormatOverrideBundle>) => {
+      events.push(event.detail)
+    }) as EventListener, { once: true })
+
+    const listener = vi.fn(() => {
+      expect(getFormatOverrideBundle()).toBe(bundle)
+      expect(events).toEqual([bundle])
+    })
+    const unsubscribe = subscribeFormatOverrideBundle(listener)
+
+    setFormatOverrideBundle(bundle)
+    unsubscribe()
+
+    expect(listener).toHaveBeenCalledOnce()
+  })
+})

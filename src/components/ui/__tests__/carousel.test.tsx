@@ -1,1 +1,263 @@
-{"success":true,"path":"src/components/ui/__tests__/carousel.test.tsx","content":"import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';\nimport { render, act } from '@testing-library/react';\nimport { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../carousel';\n\ntype EmblaListener = (...args: unknown[]) => void;\ntype PluginShape = { stop: ReturnType<typeof vi.fn>; play: ReturnType<typeof vi.fn> };\n\ninterface EmblaMockApi {\n  canScrollPrev: () => boolean;\n  canScrollNext: () => boolean;\n  scrollPrev: ReturnType<typeof vi.fn>;\n  scrollNext: ReturnType<typeof vi.fn>;\n  selectedScrollSnap: () => number;\n  plugins: () => Record<string, unknown>;\n  on: (event: string, fn: EmblaListener) => void;\n  off: (event: string, fn: EmblaListener) => void;\n}\n\nconst mocks = vi.hoisted(() => ({\n  state: {\n    listeners: {} as Record<string, EmblaListener[]>,\n    autoplay: null as PluginShape | null,\n    api: null as EmblaMockApi | null,\n  },\n}));\n\nvi.mock('embla-carousel-react', () => ({\n  default: () => [vi.fn(), mocks.state.api],\n}));\n\nfunction emit(event: string): void {\n  const listeners: EmblaListener[] = mocks.state.listeners[event] ?? [];\n  listeners.forEach((fn: EmblaListener) => fn());\n}\n\nfunction dispatchEditMode(active: boolean): void {\n  (window as Window & { __airoEditModeActive?: boolean }).__airoEditModeActive = active;\n  act(() => {\n    window.dispatchEvent(new CustomEvent('airo:edit-mode-change', { detail: { active } }));\n  });\n}\n\nfunction dispatchCarouselSlotEdit(active: boolean, carouselRoot?: HTMLElement | null): void {\n  (window as Window & { __airoCarouselSlotEditActive?: boolean }).__airoCarouselSlotEditActive =\n    active;\n  (window as Window & { __airoCarouselSlotEditRoot?: HTMLElement | null }).__airoCarouselSlotEditRoot =\n    active ? (carouselRoot ?? null) : null;\n  act(() => {\n    window.dispatchEvent(new CustomEvent('airo:carousel-slot-edit', { detail: { active } }));\n  });\n}\n\nfunction dispatchCarouselToolbarPause(active: boolean, carouselRoot?: HTMLElement | null): void {\n  (window as Window & { __airoCarouselToolbarPauseRoot?: HTMLElement | null }).__airoCarouselToolbarPauseRoot =\n    active ? (carouselRoot ?? null) : null;\n  act(() => {\n    window.dispatchEvent(new CustomEvent('airo:carousel-toolbar-pause', { detail: { active } }));\n  });\n}\n\nfunction renderCarouselWithNav(): ReturnType<typeof render> {\n  return render(\n    <Carousel>\n      <CarouselContent>\n        <CarouselItem>slide 1</CarouselItem>\n        <CarouselItem>slide 2</CarouselItem>\n      </CarouselContent>\n      <CarouselPrevious />\n      <CarouselNext />\n    </Carousel>,\n  );\n}\n\nfunction renderCarousel(): ReturnType<typeof render> {\n  return render(\n    <Carousel>\n      <CarouselContent>\n        <CarouselItem>slide 1</CarouselItem>\n        <CarouselItem>slide 2</CarouselItem>\n      </CarouselContent>\n    </Carousel>,\n  );\n}\n\ndescribe('Carousel — edit-mode pause + nav overlay', () => {\n  beforeEach(() => {\n    delete (window as Window & { __airoEditModeActive?: boolean }).__airoEditModeActive;\n    delete (window as Window & { __airoCarouselSlotEditActive?: boolean }).__airoCarouselSlotEditActive;\n    delete (window as Window & { __airoCarouselSlotEditRoot?: HTMLElement | null }).__airoCarouselSlotEditRoot;\n    delete (window as Window & { __airoCarouselToolbarPauseRoot?: HTMLElement | null }).__airoCarouselToolbarPauseRoot;\n    mocks.state.listeners = {};\n    mocks.state.autoplay = { stop: vi.fn(), play: vi.fn() };\n    mocks.state.api = {\n      canScrollPrev: (): boolean => true,\n      canScrollNext: (): boolean => true,\n      scrollPrev: vi.fn(),\n      scrollNext: vi.fn(),\n      selectedScrollSnap: (): number => 1,\n      plugins: (): Record<string, unknown> => ({ autoplay: mocks.state.autoplay }),\n      on: (event: string, fn: EmblaListener): void => {\n        const arr: EmblaListener[] = mocks.state.listeners[event] ?? [];\n        arr.push(fn);\n        mocks.state.listeners[event] = arr;\n      },\n      off: (event: string, fn: EmblaListener): void => {\n        const arr: EmblaListener[] = mocks.state.listeners[event] ?? [];\n        mocks.state.listeners[event] = arr.filter((l: EmblaListener) => l !== fn);\n      },\n    };\n  });\n\n  afterEach(() => {\n    delete (window as Window & { __airoEditModeActive?: boolean }).__airoEditModeActive;\n    delete (window as Window & { __airoCarouselSlotEditActive?: boolean }).__airoCarouselSlotEditActive;\n    delete (window as Window & { __airoCarouselSlotEditRoot?: HTMLElement | null }).__airoCarouselSlotEditRoot;\n    delete (window as Window & { __airoCarouselToolbarPauseRoot?: HTMLElement | null }).__airoCarouselToolbarPauseRoot;\n  });\n\n  it('keeps autoplay running when edit mode is enabled', () => {\n    renderCarousel();\n    mocks.state.autoplay?.play.mockClear();\n    mocks.state.autoplay?.stop.mockClear();\n    dispatchEditMode(true);\n    expect(mocks.state.autoplay?.stop).not.toHaveBeenCalled();\n    expect(mocks.state.autoplay?.play).not.toHaveBeenCalled();\n  });\n\n  it('pauses autoplay when carousel slot edit is active', () => {\n    renderCarousel();\n    mocks.state.autoplay?.play.mockClear();\n    mocks.state.autoplay?.stop.mockClear();\n    dispatchCarouselSlotEdit(true);\n    expect(mocks.state.autoplay?.stop).toHaveBeenCalled();\n    expect(mocks.state.autoplay?.play).not.toHaveBeenCalled();\n  });\n\n  it('pauses autoplay when the Replace toolbar is open on the target carousel', () => {\n    const { container } = renderCarousel();\n    const carouselRoot = container.querySelector('[aria-roledescription=\"carousel\"]') as HTMLElement;\n    mocks.state.autoplay?.play.mockClear();\n    mocks.state.autoplay?.stop.mockClear();\n    dispatchCarouselToolbarPause(true, carouselRoot);\n    expect(mocks.state.autoplay?.stop).toHaveBeenCalled();\n    expect(mocks.state.autoplay?.play).not.toHaveBeenCalled();\n  });\n\n  it('resumes autoplay when the Replace toolbar closes on the target carousel', () => {\n    const { container } = renderCarousel();\n    const carouselRoot = container.querySelector('[aria-roledescription=\"carousel\"]') as HTMLElement;\n    dispatchCarouselToolbarPause(true, carouselRoot);\n    mocks.state.autoplay?.stop.mockClear();\n    mocks.state.autoplay?.play.mockClear();\n    dispatchCarouselToolbarPause(false);\n    expect(mocks.state.autoplay?.play).toHaveBeenCalled();\n  });\n\n  it('resumes autoplay when carousel slot edit ends', () => {\n    renderCarousel();\n    dispatchCarouselSlotEdit(true);\n    mocks.state.autoplay?.stop.mockClear();\n    mocks.state.autoplay?.play.mockClear();\n    dispatchCarouselSlotEdit(false);\n    expect(mocks.state.autoplay?.play).toHaveBeenCalled();\n  });\n\n  it('honors the initial carousel-slot-edit flag set before mount', () => {\n    (window as Window & { __airoCarouselSlotEditActive?: boolean }).__airoCarouselSlotEditActive =\n      true;\n    renderCarousel();\n    expect(mocks.state.autoplay?.stop).toHaveBeenCalled();\n  });\n\n  it('defers re-stop via microtask when autoplay:play fires during carousel slot edit', async () => {\n    renderCarousel();\n    dispatchCarouselSlotEdit(true);\n    mocks.state.autoplay?.stop.mockClear();\n\n    emit('autoplay:play');\n    expect(mocks.state.autoplay?.stop).not.toHaveBeenCalled();\n\n    await Promise.resolve();\n    expect(mocks.state.autoplay?.stop).toHaveBeenCalled();\n  });\n\n  it('defers re-stop via microtask when autoplay:play fires during toolbar pause', async () => {\n    const { container } = renderCarousel();\n    const carouselRoot = container.querySelector('[aria-roledescription=\"carousel\"]') as HTMLElement;\n    dispatchCarouselToolbarPause(true, carouselRoot);\n    mocks.state.autoplay?.stop.mockClear();\n\n    emit('autoplay:play');\n    expect(mocks.state.autoplay?.stop).not.toHaveBeenCalled();\n\n    await Promise.resolve();\n    expect(mocks.state.autoplay?.stop).toHaveBeenCalled();\n  });\n\n  it('does not re-stop on autoplay:play when edit mode is off', async () => {\n    renderCarousel();\n    mocks.state.autoplay?.stop.mockClear();\n\n    emit('autoplay:play');\n    await Promise.resolve();\n    expect(mocks.state.autoplay?.stop).not.toHaveBeenCalled();\n  });\n\n  it('hides native carousel nav buttons during carousel slot edit on the target carousel', () => {\n    const { queryByRole, container } = renderCarouselWithNav();\n    const carouselRoot = container.querySelector('[aria-roledescription=\"carousel\"]') as HTMLElement;\n    expect(queryByRole('button', { name: 'Previous slide' })).not.toBeNull();\n    expect(queryByRole('button', { name: 'Next slide' })).not.toBeNull();\n    dispatchCarouselSlotEdit(true, carouselRoot);\n    expect(queryByRole('button', { name: 'Previous slide' })).toBeNull();\n    expect(queryByRole('button', { name: 'Next slide' })).toBeNull();\n    dispatchCarouselSlotEdit(false);\n    expect(queryByRole('button', { name: 'Previous slide' })).not.toBeNull();\n    expect(queryByRole('button', { name: 'Next slide' })).not.toBeNull();\n  });\n\n  it('responds to carousel slot nav events for the target carousel', () => {\n    const { container } = renderCarousel();\n    const carouselRoot = container.querySelector('[aria-roledescription=\"carousel\"]') as HTMLElement;\n    dispatchCarouselSlotEdit(true, carouselRoot);\n    act(() => {\n      window.dispatchEvent(\n        new CustomEvent('airo:carousel-slot-nav', { detail: { direction: 'next' } }),\n      );\n    });\n    expect(mocks.state.api?.scrollNext).toHaveBeenCalled();\n  });\n\n  it('emits carousel slot select when slide changes during slot edit', () => {\n    const handler = vi.fn();\n    window.addEventListener('airo:carousel-slot-select', handler);\n    try {\n      const { container } = renderCarousel();\n      const carouselRoot = container.querySelector('[aria-roledescription=\"carousel\"]') as HTMLElement;\n      dispatchCarouselSlotEdit(true, carouselRoot);\n      emit('select');\n      expect(handler).toHaveBeenCalledWith(\n        expect.objectContaining({\n          detail: expect.objectContaining({\n            carouselRoot,\n            selectedIndex: 1,\n          }),\n        }),\n      );\n    } finally {\n      window.removeEventListener('airo:carousel-slot-select', handler);\n    }\n  });\n\n  it('is a no-op when the carousel has no autoplay plugin', () => {\n    mocks.state.autoplay = null;\n    mocks.state.api = {\n      ...(mocks.state.api as EmblaMockApi),\n      plugins: (): Record<string, unknown> => ({}),\n    };\n    renderCarousel();\n    expect(() => dispatchEditMode(true)).not.toThrow();\n    expect(() => dispatchEditMode(false)).not.toThrow();\n  });\n});\n","totalLines":264,"truncated":false}
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, act } from '@testing-library/react';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '../carousel';
+
+type EmblaListener = (...args: unknown[]) => void;
+type PluginShape = { stop: ReturnType<typeof vi.fn>; play: ReturnType<typeof vi.fn> };
+
+interface EmblaMockApi {
+  canScrollPrev: () => boolean;
+  canScrollNext: () => boolean;
+  scrollPrev: ReturnType<typeof vi.fn>;
+  scrollNext: ReturnType<typeof vi.fn>;
+  selectedScrollSnap: () => number;
+  plugins: () => Record<string, unknown>;
+  on: (event: string, fn: EmblaListener) => void;
+  off: (event: string, fn: EmblaListener) => void;
+}
+
+const mocks = vi.hoisted(() => ({
+  state: {
+    listeners: {} as Record<string, EmblaListener[]>,
+    autoplay: null as PluginShape | null,
+    api: null as EmblaMockApi | null,
+  },
+}));
+
+vi.mock('embla-carousel-react', () => ({
+  default: () => [vi.fn(), mocks.state.api],
+}));
+
+function emit(event: string): void {
+  const listeners: EmblaListener[] = mocks.state.listeners[event] ?? [];
+  listeners.forEach((fn: EmblaListener) => fn());
+}
+
+function dispatchEditMode(active: boolean): void {
+  (window as Window & { __airoEditModeActive?: boolean }).__airoEditModeActive = active;
+  act(() => {
+    window.dispatchEvent(new CustomEvent('airo:edit-mode-change', { detail: { active } }));
+  });
+}
+
+function dispatchCarouselSlotEdit(active: boolean, carouselRoot?: HTMLElement | null): void {
+  (window as Window & { __airoCarouselSlotEditActive?: boolean }).__airoCarouselSlotEditActive =
+    active;
+  (window as Window & { __airoCarouselSlotEditRoot?: HTMLElement | null }).__airoCarouselSlotEditRoot =
+    active ? (carouselRoot ?? null) : null;
+  act(() => {
+    window.dispatchEvent(new CustomEvent('airo:carousel-slot-edit', { detail: { active } }));
+  });
+}
+
+function dispatchCarouselToolbarPause(active: boolean, carouselRoot?: HTMLElement | null): void {
+  (window as Window & { __airoCarouselToolbarPauseRoot?: HTMLElement | null }).__airoCarouselToolbarPauseRoot =
+    active ? (carouselRoot ?? null) : null;
+  act(() => {
+    window.dispatchEvent(new CustomEvent('airo:carousel-toolbar-pause', { detail: { active } }));
+  });
+}
+
+function renderCarouselWithNav(): ReturnType<typeof render> {
+  return render(
+    <Carousel>
+      <CarouselContent>
+        <CarouselItem>slide 1</CarouselItem>
+        <CarouselItem>slide 2</CarouselItem>
+      </CarouselContent>
+      <CarouselPrevious />
+      <CarouselNext />
+    </Carousel>,
+  );
+}
+
+function renderCarousel(): ReturnType<typeof render> {
+  return render(
+    <Carousel>
+      <CarouselContent>
+        <CarouselItem>slide 1</CarouselItem>
+        <CarouselItem>slide 2</CarouselItem>
+      </CarouselContent>
+    </Carousel>,
+  );
+}
+
+describe('Carousel — edit-mode pause + nav overlay', () => {
+  beforeEach(() => {
+    delete (window as Window & { __airoEditModeActive?: boolean }).__airoEditModeActive;
+    delete (window as Window & { __airoCarouselSlotEditActive?: boolean }).__airoCarouselSlotEditActive;
+    delete (window as Window & { __airoCarouselSlotEditRoot?: HTMLElement | null }).__airoCarouselSlotEditRoot;
+    delete (window as Window & { __airoCarouselToolbarPauseRoot?: HTMLElement | null }).__airoCarouselToolbarPauseRoot;
+    mocks.state.listeners = {};
+    mocks.state.autoplay = { stop: vi.fn(), play: vi.fn() };
+    mocks.state.api = {
+      canScrollPrev: (): boolean => true,
+      canScrollNext: (): boolean => true,
+      scrollPrev: vi.fn(),
+      scrollNext: vi.fn(),
+      selectedScrollSnap: (): number => 1,
+      plugins: (): Record<string, unknown> => ({ autoplay: mocks.state.autoplay }),
+      on: (event: string, fn: EmblaListener): void => {
+        const arr: EmblaListener[] = mocks.state.listeners[event] ?? [];
+        arr.push(fn);
+        mocks.state.listeners[event] = arr;
+      },
+      off: (event: string, fn: EmblaListener): void => {
+        const arr: EmblaListener[] = mocks.state.listeners[event] ?? [];
+        mocks.state.listeners[event] = arr.filter((l: EmblaListener) => l !== fn);
+      },
+    };
+  });
+
+  afterEach(() => {
+    delete (window as Window & { __airoEditModeActive?: boolean }).__airoEditModeActive;
+    delete (window as Window & { __airoCarouselSlotEditActive?: boolean }).__airoCarouselSlotEditActive;
+    delete (window as Window & { __airoCarouselSlotEditRoot?: HTMLElement | null }).__airoCarouselSlotEditRoot;
+    delete (window as Window & { __airoCarouselToolbarPauseRoot?: HTMLElement | null }).__airoCarouselToolbarPauseRoot;
+  });
+
+  it('keeps autoplay running when edit mode is enabled', () => {
+    renderCarousel();
+    mocks.state.autoplay?.play.mockClear();
+    mocks.state.autoplay?.stop.mockClear();
+    dispatchEditMode(true);
+    expect(mocks.state.autoplay?.stop).not.toHaveBeenCalled();
+    expect(mocks.state.autoplay?.play).not.toHaveBeenCalled();
+  });
+
+  it('pauses autoplay when carousel slot edit is active', () => {
+    renderCarousel();
+    mocks.state.autoplay?.play.mockClear();
+    mocks.state.autoplay?.stop.mockClear();
+    dispatchCarouselSlotEdit(true);
+    expect(mocks.state.autoplay?.stop).toHaveBeenCalled();
+    expect(mocks.state.autoplay?.play).not.toHaveBeenCalled();
+  });
+
+  it('pauses autoplay when the Replace toolbar is open on the target carousel', () => {
+    const { container } = renderCarousel();
+    const carouselRoot = container.querySelector('[aria-roledescription="carousel"]') as HTMLElement;
+    mocks.state.autoplay?.play.mockClear();
+    mocks.state.autoplay?.stop.mockClear();
+    dispatchCarouselToolbarPause(true, carouselRoot);
+    expect(mocks.state.autoplay?.stop).toHaveBeenCalled();
+    expect(mocks.state.autoplay?.play).not.toHaveBeenCalled();
+  });
+
+  it('resumes autoplay when the Replace toolbar closes on the target carousel', () => {
+    const { container } = renderCarousel();
+    const carouselRoot = container.querySelector('[aria-roledescription="carousel"]') as HTMLElement;
+    dispatchCarouselToolbarPause(true, carouselRoot);
+    mocks.state.autoplay?.stop.mockClear();
+    mocks.state.autoplay?.play.mockClear();
+    dispatchCarouselToolbarPause(false);
+    expect(mocks.state.autoplay?.play).toHaveBeenCalled();
+  });
+
+  it('resumes autoplay when carousel slot edit ends', () => {
+    renderCarousel();
+    dispatchCarouselSlotEdit(true);
+    mocks.state.autoplay?.stop.mockClear();
+    mocks.state.autoplay?.play.mockClear();
+    dispatchCarouselSlotEdit(false);
+    expect(mocks.state.autoplay?.play).toHaveBeenCalled();
+  });
+
+  it('honors the initial carousel-slot-edit flag set before mount', () => {
+    (window as Window & { __airoCarouselSlotEditActive?: boolean }).__airoCarouselSlotEditActive =
+      true;
+    renderCarousel();
+    expect(mocks.state.autoplay?.stop).toHaveBeenCalled();
+  });
+
+  it('defers re-stop via microtask when autoplay:play fires during carousel slot edit', async () => {
+    renderCarousel();
+    dispatchCarouselSlotEdit(true);
+    mocks.state.autoplay?.stop.mockClear();
+
+    emit('autoplay:play');
+    expect(mocks.state.autoplay?.stop).not.toHaveBeenCalled();
+
+    await Promise.resolve();
+    expect(mocks.state.autoplay?.stop).toHaveBeenCalled();
+  });
+
+  it('defers re-stop via microtask when autoplay:play fires during toolbar pause', async () => {
+    const { container } = renderCarousel();
+    const carouselRoot = container.querySelector('[aria-roledescription="carousel"]') as HTMLElement;
+    dispatchCarouselToolbarPause(true, carouselRoot);
+    mocks.state.autoplay?.stop.mockClear();
+
+    emit('autoplay:play');
+    expect(mocks.state.autoplay?.stop).not.toHaveBeenCalled();
+
+    await Promise.resolve();
+    expect(mocks.state.autoplay?.stop).toHaveBeenCalled();
+  });
+
+  it('does not re-stop on autoplay:play when edit mode is off', async () => {
+    renderCarousel();
+    mocks.state.autoplay?.stop.mockClear();
+
+    emit('autoplay:play');
+    await Promise.resolve();
+    expect(mocks.state.autoplay?.stop).not.toHaveBeenCalled();
+  });
+
+  it('hides native carousel nav buttons during carousel slot edit on the target carousel', () => {
+    const { queryByRole, container } = renderCarouselWithNav();
+    const carouselRoot = container.querySelector('[aria-roledescription="carousel"]') as HTMLElement;
+    expect(queryByRole('button', { name: 'Previous slide' })).not.toBeNull();
+    expect(queryByRole('button', { name: 'Next slide' })).not.toBeNull();
+    dispatchCarouselSlotEdit(true, carouselRoot);
+    expect(queryByRole('button', { name: 'Previous slide' })).toBeNull();
+    expect(queryByRole('button', { name: 'Next slide' })).toBeNull();
+    dispatchCarouselSlotEdit(false);
+    expect(queryByRole('button', { name: 'Previous slide' })).not.toBeNull();
+    expect(queryByRole('button', { name: 'Next slide' })).not.toBeNull();
+  });
+
+  it('responds to carousel slot nav events for the target carousel', () => {
+    const { container } = renderCarousel();
+    const carouselRoot = container.querySelector('[aria-roledescription="carousel"]') as HTMLElement;
+    dispatchCarouselSlotEdit(true, carouselRoot);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('airo:carousel-slot-nav', { detail: { direction: 'next' } }),
+      );
+    });
+    expect(mocks.state.api?.scrollNext).toHaveBeenCalled();
+  });
+
+  it('emits carousel slot select when slide changes during slot edit', () => {
+    const handler = vi.fn();
+    window.addEventListener('airo:carousel-slot-select', handler);
+    try {
+      const { container } = renderCarousel();
+      const carouselRoot = container.querySelector('[aria-roledescription="carousel"]') as HTMLElement;
+      dispatchCarouselSlotEdit(true, carouselRoot);
+      emit('select');
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: expect.objectContaining({
+            carouselRoot,
+            selectedIndex: 1,
+          }),
+        }),
+      );
+    } finally {
+      window.removeEventListener('airo:carousel-slot-select', handler);
+    }
+  });
+
+  it('is a no-op when the carousel has no autoplay plugin', () => {
+    mocks.state.autoplay = null;
+    mocks.state.api = {
+      ...(mocks.state.api as EmblaMockApi),
+      plugins: (): Record<string, unknown> => ({}),
+    };
+    renderCarousel();
+    expect(() => dispatchEditMode(true)).not.toThrow();
+    expect(() => dispatchEditMode(false)).not.toThrow();
+  });
+});

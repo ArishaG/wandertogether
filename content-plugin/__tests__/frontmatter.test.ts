@@ -1,1 +1,24 @@
-{"success":true,"path":"content-plugin/__tests__/frontmatter.test.ts","content":"import { describe, it, expect } from 'vitest';\nimport { parseFrontmatter } from '../src/frontmatter';\n\ndescribe('parseFrontmatter', () => {\n  it('parses frontmatter fields and trims the body', () => {\n    const raw: string = `---\\ntitle: Hello\\npublished: true\\ntags: [a, b]\\n---\\n\\n# Body\\ntext`;\n    const { data, content } = parseFrontmatter(raw);\n    expect(data).toEqual({ title: 'Hello', published: true, tags: ['a', 'b'] });\n    expect(content).toBe('# Body\\ntext');\n  });\n\n  it('strips surrounding quotes and keeps ISO date strings', () => {\n    const raw: string = `---\\npublishedAt: '2026-06-20T10:00:00Z'\\ntitle: \"Quoted\"\\n---\\nbody`;\n    const { data } = parseFrontmatter(raw);\n    expect(data.publishedAt).toBe('2026-06-20T10:00:00Z');\n    expect(data.title).toBe('Quoted');\n  });\n\n  it('returns whole input as content when there is no frontmatter', () => {\n    const { data, content } = parseFrontmatter('no frontmatter here');\n    expect(data).toEqual({});\n    expect(content).toBe('no frontmatter here');\n  });\n});\n","totalLines":25,"truncated":false}
+import { describe, it, expect } from 'vitest';
+import { parseFrontmatter } from '../src/frontmatter';
+
+describe('parseFrontmatter', () => {
+  it('parses frontmatter fields and trims the body', () => {
+    const raw: string = `---\ntitle: Hello\npublished: true\ntags: [a, b]\n---\n\n# Body\ntext`;
+    const { data, content } = parseFrontmatter(raw);
+    expect(data).toEqual({ title: 'Hello', published: true, tags: ['a', 'b'] });
+    expect(content).toBe('# Body\ntext');
+  });
+
+  it('strips surrounding quotes and keeps ISO date strings', () => {
+    const raw: string = `---\npublishedAt: '2026-06-20T10:00:00Z'\ntitle: "Quoted"\n---\nbody`;
+    const { data } = parseFrontmatter(raw);
+    expect(data.publishedAt).toBe('2026-06-20T10:00:00Z');
+    expect(data.title).toBe('Quoted');
+  });
+
+  it('returns whole input as content when there is no frontmatter', () => {
+    const { data, content } = parseFrontmatter('no frontmatter here');
+    expect(data).toEqual({});
+    expect(content).toBe('no frontmatter here');
+  });
+});

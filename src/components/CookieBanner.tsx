@@ -1,1 +1,236 @@
-{"success":true,"path":"src/components/CookieBanner.tsx","content":"import { useEffect, useState } from 'react';\n\nimport { Button } from '@/components/ui/button';\n\nconst COOKIE_CONSENT_KEY = 'c2_analytics_consent';\nconst COOKIE_CONSENT_EXPIRES_DAYS = 365;\nconst BANNER_RESET_KEY = 'airo-banner-reset';\n\ninterface CookieConsent {\n  analytics: boolean;\n  timestamp: number;\n}\n\ndeclare global {\n  interface Window {\n    _signalsDataLayer?: unknown[];\n    revokeAnalyticsConsent?: () => void;\n    __SCC_INIT__?: boolean;\n  }\n}\n\n// Inline C2 tracking - loads script and tracks clicks/pageviews\nfunction initC2Tracking(): void {\n  if (typeof window === 'undefined' || window.__SCC_INIT__) return;\n  window.__SCC_INIT__ = true;\n  window._signalsDataLayer = window._signalsDataLayer || [];\n\n  const track = (eid: string, type: string, label: string, props?: Record<string, unknown>) => {\n    window._signalsDataLayer!.push({\n      schema: 'add_event', version: 'v1',\n      data: { eid, type, event_label: label, custom_properties: { ...props, timestamp: new Date().toISOString(), source: 'airo-app-builder' } }\n    });\n  };\n\n  const getSection = (el: HTMLElement): string => {\n    if (el.closest('header')) return 'header';\n    if (el.closest('footer')) return 'footer';\n    if (el.closest('nav')) return 'nav';\n    if (el.closest('main')) return 'main';\n    return 'page';\n  };\n\n  const getDevice = (): string => {\n    const w = window.innerWidth;\n    return w < 768 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop';\n  };\n\n  // Initial events\n  track('airo.website.session', 'session', 'start', { page_path: location.pathname, referrer: document.referrer });\n  track('airo.website.pageview', 'pageview', document.title, { page_path: location.pathname, referrer: document.referrer });\n\n  // Click tracking\n  // Capture phase (true) ensures we track clicks even if event.stopPropagation() is called\n  document.addEventListener('click', (e) => {\n    const el = (e.target as HTMLElement)?.closest('a, button, [role=\"button\"]') as HTMLElement;\n    if (!el) return;\n    const text = el.textContent?.trim()?.substring(0, 100) || '';\n    const href = (el as HTMLAnchorElement).href || '';\n    const type = el.tagName.toLowerCase() === 'a' ? 'link' : 'button';\n\n    let isExternal: boolean | undefined;\n    if (href) {\n      try {\n        isExternal = new URL(href, location.origin).origin !== location.origin;\n      } catch {\n        // Malformed URL, treat as internal\n      }\n    }\n\n    track('airo.website.click', 'click', text || type, {\n      element_type: type,\n      element_text: text,\n      element_id: el.id || undefined,\n      section: getSection(el),\n      page_path: location.pathname,\n      page_title: document.title,\n      href: href || undefined,\n      is_external: href ? isExternal : undefined,\n      device: getDevice(),\n      viewport_width: window.innerWidth\n    });\n  }, true);\n\n  // Route tracking\n  let lastUrl = location.href;\n  const trackPage = () => {\n    if (location.href !== lastUrl) {\n      track('airo.website.pageview', 'pageview', document.title, { page_path: location.pathname, referrer: lastUrl });\n      lastUrl = location.href;\n    }\n  };\n  window.addEventListener('popstate', trackPage);\n  const push = history.pushState, replace = history.replaceState;\n  history.pushState = (...args) => { push.apply(history, args); setTimeout(trackPage, 0); };\n  history.replaceState = (...args) => { replace.apply(history, args); setTimeout(trackPage, 0); };\n\n  // Load SCC script\n  const h = location.hostname;\n  const url = h === 'localhost' || h.includes('dev-airoapp')\n    ? 'https://img1.dev-wsimg.com/signals/js/clients/scc-c2/scc-c2.js'\n    : h.includes('test-airoapp')\n      ? 'https://img1.test-wsimg.com/signals/js/clients/scc-c2/scc-c2.min.js'\n      : 'https://img1.wsimg.com/signals/js/clients/scc-c2/scc-c2.min.js';\n  const script = document.createElement('script');\n  script.src = url;\n  script.async = true;\n  document.head.appendChild(script);\n}\n\n/**\n * Cookie banner component for C2 analytics consent\n *\n * Displays a consent banner for C2 analytics tracking. Manages user consent\n * preferences in localStorage and controls whether analytics scripts are loaded.\n */\nexport default function CookieBanner() {\n  const [showBanner, setShowBanner] = useState(false);\n  const [isLoaded, setIsLoaded] = useState(false);\n  const isEmbedded: boolean = typeof window !== 'undefined' && window.parent !== window;\n  const [hideForBuilderPreview, setHideForBuilderPreview] = useState<boolean>(\n    () => {\n      if (!isEmbedded) return false;\n      try {\n        return sessionStorage.getItem(BANNER_RESET_KEY) !== 'true';\n      } catch (e) {\n        console.warn('CookieBanner: sessionStorage unavailable, banner state will not persist across remounts:', e instanceof Error ? e.message : String(e));\n        return true;\n      }\n    }\n  );\n\n  useEffect(function checkConsent() {\n    if (typeof window === 'undefined') return;\n\n    const consentData = localStorage.getItem(COOKIE_CONSENT_KEY);\n\n    if (!consentData) {\n      setShowBanner(true);\n      setIsLoaded(true);\n      return;\n    }\n\n    try {\n      const consent: CookieConsent = JSON.parse(consentData);\n      const daysSinceConsent = (Date.now() - consent.timestamp) / (1000 * 60 * 60 * 24);\n\n      if (daysSinceConsent > COOKIE_CONSENT_EXPIRES_DAYS) {\n        localStorage.removeItem(COOKIE_CONSENT_KEY);\n        setShowBanner(true);\n      } else if (consent.analytics) {\n        initC2Tracking();\n      }\n    } catch {\n      localStorage.removeItem(COOKIE_CONSENT_KEY);\n      setShowBanner(true);\n    }\n\n    setIsLoaded(true);\n  }, []);\n\n  function saveConsent(analytics: boolean) {\n    localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({ analytics, timestamp: Date.now() }));\n    window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: analytics } }));\n    if (analytics) initC2Tracking();\n    setShowBanner(false);\n  }\n\n  function revokeConsent() {\n    if (typeof window === 'undefined') return;\n    localStorage.removeItem(COOKIE_CONSENT_KEY);\n    window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: false } }));\n    setShowBanner(true);\n  }\n\n  useEffect(function exposeRevokeFunction() {\n    if (typeof window === 'undefined') return;\n    window.revokeAnalyticsConsent = revokeConsent;\n    return () => { delete window.revokeAnalyticsConsent; };\n  }, []);\n\n  useEffect(function listenForBuilderBuildComplete() {\n    if (typeof window === 'undefined' || window.parent === window) return;\n\n    function handleMessage(event: MessageEvent): void {\n      if (event.source !== window.parent) return;\n      if (event.data?.type === 'INITIAL_BUILD_COMPLETE') {\n        saveConsent(true);\n        setHideForBuilderPreview(true);\n        try {\n          sessionStorage.removeItem(BANNER_RESET_KEY);\n        } catch (e) {\n          console.warn('CookieBanner: sessionStorage unavailable, could not clear reset flag:', e instanceof Error ? e.message : String(e));\n        }\n      }\n      if (event.data?.type === 'RESET_INITIAL_BUILD_HIDE') {\n        setHideForBuilderPreview(false);\n        try {\n          sessionStorage.setItem(BANNER_RESET_KEY, 'true');\n        } catch (e) {\n          console.warn('CookieBanner: sessionStorage unavailable, reset flag will not persist:', e instanceof Error ? e.message : String(e));\n        }\n      }\n    }\n\n    window.addEventListener('message', handleMessage);\n    return () => window.removeEventListener('message', handleMessage);\n  }, []);\n\n  if (hideForBuilderPreview || !isLoaded || !showBanner) return null;\n\n  return (\n    <div\n      className=\"fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg\"\n      role=\"alertdialog\"\n      aria-live=\"polite\"\n      aria-label=\"Cookie consent banner\"\n      aria-describedby=\"cookie-banner-description\"\n      data-airo-non-editable\n    >\n      <div className=\"max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8\">\n        <div className=\"flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4\">\n          <div className=\"flex-1\">\n            <h3 className=\"text-sm font-semibold text-gray-900 mb-1\">Cookie Consent</h3>\n            <p id=\"cookie-banner-description\" className=\"text-sm text-gray-600\">\n              We serve cookies. We use tools, such as cookies, to enable essential services and functionality on our site and to collect data on how visitors interact with our site, products and services. By clicking Accept, you agree to our use of these tools for advertising, analytics and support.\n            </p>\n          </div>\n          <div className=\"flex items-center gap-3 flex-shrink-0\">\n            <Button size=\"sm\" variant=\"secondary\" onClick={() => saveConsent(false)} className=\"whitespace-nowrap\">Decline</Button>\n            <Button size=\"sm\" onClick={() => saveConsent(true)} className=\"whitespace-nowrap\" autoFocus>Accept</Button>\n          </div>\n        </div>\n      </div>\n    </div>\n  );\n}\n","totalLines":237,"truncated":false}
+import { useEffect, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+
+const COOKIE_CONSENT_KEY = 'c2_analytics_consent';
+const COOKIE_CONSENT_EXPIRES_DAYS = 365;
+const BANNER_RESET_KEY = 'airo-banner-reset';
+
+interface CookieConsent {
+  analytics: boolean;
+  timestamp: number;
+}
+
+declare global {
+  interface Window {
+    _signalsDataLayer?: unknown[];
+    revokeAnalyticsConsent?: () => void;
+    __SCC_INIT__?: boolean;
+  }
+}
+
+// Inline C2 tracking - loads script and tracks clicks/pageviews
+function initC2Tracking(): void {
+  if (typeof window === 'undefined' || window.__SCC_INIT__) return;
+  window.__SCC_INIT__ = true;
+  window._signalsDataLayer = window._signalsDataLayer || [];
+
+  const track = (eid: string, type: string, label: string, props?: Record<string, unknown>) => {
+    window._signalsDataLayer!.push({
+      schema: 'add_event', version: 'v1',
+      data: { eid, type, event_label: label, custom_properties: { ...props, timestamp: new Date().toISOString(), source: 'airo-app-builder' } }
+    });
+  };
+
+  const getSection = (el: HTMLElement): string => {
+    if (el.closest('header')) return 'header';
+    if (el.closest('footer')) return 'footer';
+    if (el.closest('nav')) return 'nav';
+    if (el.closest('main')) return 'main';
+    return 'page';
+  };
+
+  const getDevice = (): string => {
+    const w = window.innerWidth;
+    return w < 768 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop';
+  };
+
+  // Initial events
+  track('airo.website.session', 'session', 'start', { page_path: location.pathname, referrer: document.referrer });
+  track('airo.website.pageview', 'pageview', document.title, { page_path: location.pathname, referrer: document.referrer });
+
+  // Click tracking
+  // Capture phase (true) ensures we track clicks even if event.stopPropagation() is called
+  document.addEventListener('click', (e) => {
+    const el = (e.target as HTMLElement)?.closest('a, button, [role="button"]') as HTMLElement;
+    if (!el) return;
+    const text = el.textContent?.trim()?.substring(0, 100) || '';
+    const href = (el as HTMLAnchorElement).href || '';
+    const type = el.tagName.toLowerCase() === 'a' ? 'link' : 'button';
+
+    let isExternal: boolean | undefined;
+    if (href) {
+      try {
+        isExternal = new URL(href, location.origin).origin !== location.origin;
+      } catch {
+        // Malformed URL, treat as internal
+      }
+    }
+
+    track('airo.website.click', 'click', text || type, {
+      element_type: type,
+      element_text: text,
+      element_id: el.id || undefined,
+      section: getSection(el),
+      page_path: location.pathname,
+      page_title: document.title,
+      href: href || undefined,
+      is_external: href ? isExternal : undefined,
+      device: getDevice(),
+      viewport_width: window.innerWidth
+    });
+  }, true);
+
+  // Route tracking
+  let lastUrl = location.href;
+  const trackPage = () => {
+    if (location.href !== lastUrl) {
+      track('airo.website.pageview', 'pageview', document.title, { page_path: location.pathname, referrer: lastUrl });
+      lastUrl = location.href;
+    }
+  };
+  window.addEventListener('popstate', trackPage);
+  const push = history.pushState, replace = history.replaceState;
+  history.pushState = (...args) => { push.apply(history, args); setTimeout(trackPage, 0); };
+  history.replaceState = (...args) => { replace.apply(history, args); setTimeout(trackPage, 0); };
+
+  // Load SCC script
+  const h = location.hostname;
+  const url = h === 'localhost' || h.includes('dev-airoapp')
+    ? 'https://img1.dev-wsimg.com/signals/js/clients/scc-c2/scc-c2.js'
+    : h.includes('test-airoapp')
+      ? 'https://img1.test-wsimg.com/signals/js/clients/scc-c2/scc-c2.min.js'
+      : 'https://img1.wsimg.com/signals/js/clients/scc-c2/scc-c2.min.js';
+  const script = document.createElement('script');
+  script.src = url;
+  script.async = true;
+  document.head.appendChild(script);
+}
+
+/**
+ * Cookie banner component for C2 analytics consent
+ *
+ * Displays a consent banner for C2 analytics tracking. Manages user consent
+ * preferences in localStorage and controls whether analytics scripts are loaded.
+ */
+export default function CookieBanner() {
+  const [showBanner, setShowBanner] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const isEmbedded: boolean = typeof window !== 'undefined' && window.parent !== window;
+  const [hideForBuilderPreview, setHideForBuilderPreview] = useState<boolean>(
+    () => {
+      if (!isEmbedded) return false;
+      try {
+        return sessionStorage.getItem(BANNER_RESET_KEY) !== 'true';
+      } catch (e) {
+        console.warn('CookieBanner: sessionStorage unavailable, banner state will not persist across remounts:', e instanceof Error ? e.message : String(e));
+        return true;
+      }
+    }
+  );
+
+  useEffect(function checkConsent() {
+    if (typeof window === 'undefined') return;
+
+    const consentData = localStorage.getItem(COOKIE_CONSENT_KEY);
+
+    if (!consentData) {
+      setShowBanner(true);
+      setIsLoaded(true);
+      return;
+    }
+
+    try {
+      const consent: CookieConsent = JSON.parse(consentData);
+      const daysSinceConsent = (Date.now() - consent.timestamp) / (1000 * 60 * 60 * 24);
+
+      if (daysSinceConsent > COOKIE_CONSENT_EXPIRES_DAYS) {
+        localStorage.removeItem(COOKIE_CONSENT_KEY);
+        setShowBanner(true);
+      } else if (consent.analytics) {
+        initC2Tracking();
+      }
+    } catch {
+      localStorage.removeItem(COOKIE_CONSENT_KEY);
+      setShowBanner(true);
+    }
+
+    setIsLoaded(true);
+  }, []);
+
+  function saveConsent(analytics: boolean) {
+    localStorage.setItem(COOKIE_CONSENT_KEY, JSON.stringify({ analytics, timestamp: Date.now() }));
+    window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: analytics } }));
+    if (analytics) initC2Tracking();
+    setShowBanner(false);
+  }
+
+  function revokeConsent() {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(COOKIE_CONSENT_KEY);
+    window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: false } }));
+    setShowBanner(true);
+  }
+
+  useEffect(function exposeRevokeFunction() {
+    if (typeof window === 'undefined') return;
+    window.revokeAnalyticsConsent = revokeConsent;
+    return () => { delete window.revokeAnalyticsConsent; };
+  }, []);
+
+  useEffect(function listenForBuilderBuildComplete() {
+    if (typeof window === 'undefined' || window.parent === window) return;
+
+    function handleMessage(event: MessageEvent): void {
+      if (event.source !== window.parent) return;
+      if (event.data?.type === 'INITIAL_BUILD_COMPLETE') {
+        saveConsent(true);
+        setHideForBuilderPreview(true);
+        try {
+          sessionStorage.removeItem(BANNER_RESET_KEY);
+        } catch (e) {
+          console.warn('CookieBanner: sessionStorage unavailable, could not clear reset flag:', e instanceof Error ? e.message : String(e));
+        }
+      }
+      if (event.data?.type === 'RESET_INITIAL_BUILD_HIDE') {
+        setHideForBuilderPreview(false);
+        try {
+          sessionStorage.setItem(BANNER_RESET_KEY, 'true');
+        } catch (e) {
+          console.warn('CookieBanner: sessionStorage unavailable, reset flag will not persist:', e instanceof Error ? e.message : String(e));
+        }
+      }
+    }
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  if (hideForBuilderPreview || !isLoaded || !showBanner) return null;
+
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 shadow-lg"
+      role="alertdialog"
+      aria-live="polite"
+      aria-label="Cookie consent banner"
+      aria-describedby="cookie-banner-description"
+      data-airo-non-editable
+    >
+      <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-gray-900 mb-1">Cookie Consent</h3>
+            <p id="cookie-banner-description" className="text-sm text-gray-600">
+              We serve cookies. We use tools, such as cookies, to enable essential services and functionality on our site and to collect data on how visitors interact with our site, products and services. By clicking Accept, you agree to our use of these tools for advertising, analytics and support.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <Button size="sm" variant="secondary" onClick={() => saveConsent(false)} className="whitespace-nowrap">Decline</Button>
+            <Button size="sm" onClick={() => saveConsent(true)} className="whitespace-nowrap" autoFocus>Accept</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,1 +1,25 @@
-{"success":true,"path":"src/components/CookieBannerErrorBoundary.tsx","content":"import { Component, type ErrorInfo, type ReactNode } from 'react';\n\nexport default class CookieBannerErrorBoundary extends Component<\n  { children: ReactNode },\n  { hasError: boolean }\n> {\n  constructor(props: { children: ReactNode }) {\n    super(props);\n    this.state = { hasError: false };\n  }\n\n  // eslint-disable-next-line @typescript-eslint/no-unused-vars\n  static getDerivedStateFromError(_error: unknown): { hasError: boolean } {\n    return { hasError: true };\n  }\n\n  componentDidCatch(error: Error, errorInfo: ErrorInfo) {\n    console.warn('CookieBanner error boundary caught an error:', error, errorInfo);\n  }\n\n  render() {\n    if (this.state.hasError) return null;\n    return this.props.children;\n  }\n}\n","totalLines":26,"truncated":false}
+import { Component, type ErrorInfo, type ReactNode } from 'react';
+
+export default class CookieBannerErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static getDerivedStateFromError(_error: unknown): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.warn('CookieBanner error boundary caught an error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}

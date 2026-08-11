@@ -1,1 +1,27 @@
-{"success":true,"path":"src/components/ui/hover-card.tsx","content":"import * as React from \"react\"\nimport * as HoverCardPrimitive from \"@radix-ui/react-hover-card\"\n\nimport { cn } from \"@/lib/utils\"\n\nconst HoverCard = HoverCardPrimitive.Root\n\nconst HoverCardTrigger = HoverCardPrimitive.Trigger\n\nconst HoverCardContent = React.forwardRef<\n  React.ElementRef<typeof HoverCardPrimitive.Content>,\n  React.ComponentPropsWithoutRef<typeof HoverCardPrimitive.Content>\n>(({ className, align = \"center\", sideOffset = 4, ...props }, ref) => (\n  <HoverCardPrimitive.Content\n    ref={ref}\n    align={align}\n    sideOffset={sideOffset}\n    className={cn(\n      \"z-50 w-64 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-hover-card-content-transform-origin]\",\n      className\n    )}\n    {...props}\n  />\n))\nHoverCardContent.displayName = HoverCardPrimitive.Content.displayName\n\nexport { HoverCard, HoverCardTrigger, HoverCardContent }\n","totalLines":28,"truncated":false}
+import * as React from "react"
+import * as HoverCardPrimitive from "@radix-ui/react-hover-card"
+
+import { cn } from "@/lib/utils"
+
+const HoverCard = HoverCardPrimitive.Root
+
+const HoverCardTrigger = HoverCardPrimitive.Trigger
+
+const HoverCardContent = React.forwardRef<
+  React.ElementRef<typeof HoverCardPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof HoverCardPrimitive.Content>
+>(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
+  <HoverCardPrimitive.Content
+    ref={ref}
+    align={align}
+    sideOffset={sideOffset}
+    className={cn(
+      "z-50 w-64 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-hover-card-content-transform-origin]",
+      className
+    )}
+    {...props}
+  />
+))
+HoverCardContent.displayName = HoverCardPrimitive.Content.displayName
+
+export { HoverCard, HoverCardTrigger, HoverCardContent }

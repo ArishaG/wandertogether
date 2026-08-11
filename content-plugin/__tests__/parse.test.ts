@@ -1,1 +1,18 @@
-{"success":true,"path":"content-plugin/__tests__/parse.test.ts","content":"import { describe, it, expect } from 'vitest';\nimport { parseJson } from '../src/parse';\n\ndescribe('parseJson', () => {\n  it('parses valid JSON', () => {\n    expect(parseJson('[{\"id\": \"a\"}]')).toEqual([{ id: 'a' }]);\n  });\n\n  it('parses nested objects', () => {\n    expect(parseJson('{\"hero\":{\"title\":\"Welcome\",\"nav\":[{\"href\":\"/\",\"label\":\"Home\"}]}}')).toEqual({\n      hero: { title: 'Welcome', nav: [{ href: '/', label: 'Home' }] },\n    });\n  });\n\n  it('throws on invalid JSON', () => {\n    expect(() => parseJson('{not json}')).toThrow();\n  });\n});\n","totalLines":19,"truncated":false}
+import { describe, it, expect } from 'vitest';
+import { parseJson } from '../src/parse';
+
+describe('parseJson', () => {
+  it('parses valid JSON', () => {
+    expect(parseJson('[{"id": "a"}]')).toEqual([{ id: 'a' }]);
+  });
+
+  it('parses nested objects', () => {
+    expect(parseJson('{"hero":{"title":"Welcome","nav":[{"href":"/","label":"Home"}]}}')).toEqual({
+      hero: { title: 'Welcome', nav: [{ href: '/', label: 'Home' }] },
+    });
+  });
+
+  it('throws on invalid JSON', () => {
+    expect(() => parseJson('{not json}')).toThrow();
+  });
+});

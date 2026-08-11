@@ -1,1 +1,17 @@
-{"success":true,"path":"src/server/api/trips/GET.ts","content":"import type { Request, Response } from 'express';\nimport { desc, eq } from 'drizzle-orm';\nimport { getAuth } from '../../../lib/auth/auth.js';\nimport { db } from '../../db/client.js';\nimport { trip } from '../../db/schema.js';\n\nexport default async function handler(req: Request, res: Response) {\n  try {\n    const session = await getAuth().api.getSession({ headers: req.headers as unknown as Headers });\n    if (!session?.user?.id) return res.status(401).json({ error: 'Authentication required' });\n\n    const trips = await db.select().from(trip).where(eq(trip.ownerId, session.user.id)).orderBy(desc(trip.createdAt));\n    res.json(trips);\n  } catch (error) {\n    res.status(500).json({ error: 'Failed to load trips', message: String(error) });\n  }\n}\n","totalLines":18,"truncated":false}
+import type { Request, Response } from 'express';
+import { desc, eq } from 'drizzle-orm';
+import { getAuth } from '../../../lib/auth/auth.js';
+import { db } from '../../db/client.js';
+import { trip } from '../../db/schema.js';
+
+export default async function handler(req: Request, res: Response) {
+  try {
+    const session = await getAuth().api.getSession({ headers: req.headers as unknown as Headers });
+    if (!session?.user?.id) return res.status(401).json({ error: 'Authentication required' });
+
+    const trips = await db.select().from(trip).where(eq(trip.ownerId, session.user.id)).orderBy(desc(trip.createdAt));
+    res.json(trips);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load trips', message: String(error) });
+  }
+}

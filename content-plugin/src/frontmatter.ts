@@ -1,1 +1,52 @@
-{"success":true,"path":"content-plugin/src/frontmatter.ts","content":"/**\n * Lightweight YAML-frontmatter parser — no deps. Ported from the former blog\n * skill loader (agents/src/skills/blog/templates/lib/frontmatter.ts — that\n * sibling still exists but is no longer the canonical source; this copy is\n * independently maintained for the build-time content-plugin). Retyped to\n * avoid `any`.\n */\nexport interface ParsedMarkdown {\n  data: Record<string, unknown>;\n  content: string;\n}\n\nexport function parseFrontmatter(markdown: string): ParsedMarkdown {\n  // Requires a newline after the closing ---; a file ending exactly at --- with no trailing newline falls back to { data: {}, content: <whole file> }\n  const frontmatterRegex: RegExp = /^---\\s*\\n([\\s\\S]*?)\\n---\\s*\\n([\\s\\S]*)$/;\n  const match: RegExpMatchArray | null = markdown.match(frontmatterRegex);\n  if (!match) return { data: {}, content: markdown };\n\n  const frontmatterText: string = match[1];\n  const body: string = match[2];\n  const data: Record<string, unknown> = {};\n\n  for (const line of frontmatterText.split('\\n')) {\n    const colonIndex: number = line.indexOf(':');\n    if (colonIndex === -1) continue;\n    const key: string = line.slice(0, colonIndex).trim();\n    let value: string = line.slice(colonIndex + 1).trim();\n\n    if (\n      (value.startsWith('\"') && value.endsWith('\"')) ||\n      (value.startsWith(\"'\") && value.endsWith(\"'\"))\n    ) {\n      value = value.slice(1, -1);\n      data[key] = value;\n      continue;\n    }\n    if (value.startsWith('[') && value.endsWith(']')) {\n      data[key] = value\n        .slice(1, -1)\n        .split(',')\n        .map((item: string): string => item.trim().replace(/^[\"']|[\"']$/g, ''))\n        .filter((item: string): boolean => item.length > 0);\n      continue;\n    }\n    if (value === 'true') { data[key] = true; continue; }\n    if (value === 'false') { data[key] = false; continue; }\n    if (value !== '' && !Number.isNaN(Number(value))) { data[key] = Number(value); continue; }\n    data[key] = value;\n  }\n\n  return { data, content: body.trim() };\n}\n","totalLines":53,"truncated":false}
+/**
+ * Lightweight YAML-frontmatter parser — no deps. Ported from the former blog
+ * skill loader (agents/src/skills/blog/templates/lib/frontmatter.ts — that
+ * sibling still exists but is no longer the canonical source; this copy is
+ * independently maintained for the build-time content-plugin). Retyped to
+ * avoid `any`.
+ */
+export interface ParsedMarkdown {
+  data: Record<string, unknown>;
+  content: string;
+}
+
+export function parseFrontmatter(markdown: string): ParsedMarkdown {
+  // Requires a newline after the closing ---; a file ending exactly at --- with no trailing newline falls back to { data: {}, content: <whole file> }
+  const frontmatterRegex: RegExp = /^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/;
+  const match: RegExpMatchArray | null = markdown.match(frontmatterRegex);
+  if (!match) return { data: {}, content: markdown };
+
+  const frontmatterText: string = match[1];
+  const body: string = match[2];
+  const data: Record<string, unknown> = {};
+
+  for (const line of frontmatterText.split('\n')) {
+    const colonIndex: number = line.indexOf(':');
+    if (colonIndex === -1) continue;
+    const key: string = line.slice(0, colonIndex).trim();
+    let value: string = line.slice(colonIndex + 1).trim();
+
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+      data[key] = value;
+      continue;
+    }
+    if (value.startsWith('[') && value.endsWith(']')) {
+      data[key] = value
+        .slice(1, -1)
+        .split(',')
+        .map((item: string): string => item.trim().replace(/^["']|["']$/g, ''))
+        .filter((item: string): boolean => item.length > 0);
+      continue;
+    }
+    if (value === 'true') { data[key] = true; continue; }
+    if (value === 'false') { data[key] = false; continue; }
+    if (value !== '' && !Number.isNaN(Number(value))) { data[key] = Number(value); continue; }
+    data[key] = value;
+  }
+
+  return { data, content: body.trim() };
+}

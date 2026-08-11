@@ -1,1 +1,6 @@
-{"success":true,"path":"postcss.config.js","content":"export default {\n  plugins: {\n    tailwindcss: {},\n    autoprefixer: {},\n  },\n}\n","totalLines":7,"truncated":false}
+export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}

@@ -1,1 +1,104 @@
-{"success":true,"path":"src/entry-server.tsx","content":"import { StrictMode, Suspense } from 'react';\nimport { renderToString } from 'react-dom/server';\nimport { HelmetProvider } from '@dr.pogodin/react-helmet';\nimport type { HelmetServerState } from '@dr.pogodin/react-helmet';\nimport { QueryClient, QueryClientProvider } from '@tanstack/react-query';\nimport {\n  Outlet,\n  StaticRouterProvider,\n  createStaticHandler,\n  createStaticRouter,\n  type RouteObject,\n} from 'react-router-dom';\n\nimport RootLayout from './layouts/RootLayout';\nimport Spinner from './components/Spinner';\nimport { routes } from './routes';\n\nexport interface RenderResult {\n  html: string;\n  head: string;\n  status: number;\n  redirect?: string;\n}\n\nconst SpinnerFallback = () => (\n  <div className=\"flex justify-center py-8 h-screen items-center\">\n    <Spinner />\n  </div>\n);\n\n// Mirrors the layout wrapping in App.tsx so client and server render the same\n// tree. Kept separate from the client `router` in App.tsx because\n// createBrowserRouter touches `window` at module load and must never be\n// evaluated in the SSR bundle.\nconst routeTree: RouteObject[] = [\n  {\n    element: (\n      <Suspense fallback={<SpinnerFallback />}>\n        <RootLayout>\n          <Outlet />\n        </RootLayout>\n      </Suspense>\n    ),\n    children: routes,\n  },\n];\n\nconst handler = createStaticHandler(routeTree);\n\nexport async function render(url: string): Promise<RenderResult> {\n  // createStaticHandler works off a WHATWG Request. We only need the pathname +\n  // search; scheme/host don't affect routing. Using a stable sentinel host\n  // avoids env-dependent URL parsing.\n  const context = await handler.query(new Request(`http://ssr${url}`));\n\n  // A loader/action that throws a Response (or calls redirect()) surfaces here\n  // as a Response instead of a StaticHandlerContext. Forward the redirect.\n  if (context instanceof Response) {\n    return {\n      html: '',\n      head: '',\n      status: context.status,\n      redirect: context.headers.get('Location') ?? undefined,\n    };\n  }\n\n  const router = createStaticRouter(routeTree, context);\n  const helmetContext: { helmet?: HelmetServerState } = {};\n  const queryClient = new QueryClient({\n    defaultOptions: {\n      queries: {\n        staleTime: 1000 * 60 * 5,\n        gcTime: 1000 * 60 * 10,\n        retry: 1,\n        refetchOnWindowFocus: false,\n      },\n      mutations: { retry: 0 },\n    },\n  });\n\n  const html = renderToString(\n    <StrictMode>\n      <HelmetProvider context={helmetContext}>\n        <QueryClientProvider client={queryClient}>\n          <StaticRouterProvider router={router} context={context} />\n        </QueryClientProvider>\n      </HelmetProvider>\n    </StrictMode>\n  );\n\n  const h = helmetContext.helmet;\n  const head = h\n    ? [\n        h.title?.toString() ?? '',\n        h.meta?.toString() ?? '',\n        h.link?.toString() ?? '',\n        h.script?.toString() ?? '',\n      ]\n        .filter(Boolean)\n        .join('\\n')\n    : '';\n\n  return { html, head, status: context.statusCode ?? 200 };\n}\n","totalLines":105,"truncated":false}
+import { StrictMode, Suspense } from 'react';
+import { renderToString } from 'react-dom/server';
+import { HelmetProvider } from '@dr.pogodin/react-helmet';
+import type { HelmetServerState } from '@dr.pogodin/react-helmet';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  Outlet,
+  StaticRouterProvider,
+  createStaticHandler,
+  createStaticRouter,
+  type RouteObject,
+} from 'react-router-dom';
+
+import RootLayout from './layouts/RootLayout';
+import Spinner from './components/Spinner';
+import { routes } from './routes';
+
+export interface RenderResult {
+  html: string;
+  head: string;
+  status: number;
+  redirect?: string;
+}
+
+const SpinnerFallback = () => (
+  <div className="flex justify-center py-8 h-screen items-center">
+    <Spinner />
+  </div>
+);
+
+// Mirrors the layout wrapping in App.tsx so client and server render the same
+// tree. Kept separate from the client `router` in App.tsx because
+// createBrowserRouter touches `window` at module load and must never be
+// evaluated in the SSR bundle.
+const routeTree: RouteObject[] = [
+  {
+    element: (
+      <Suspense fallback={<SpinnerFallback />}>
+        <RootLayout>
+          <Outlet />
+        </RootLayout>
+      </Suspense>
+    ),
+    children: routes,
+  },
+];
+
+const handler = createStaticHandler(routeTree);
+
+export async function render(url: string): Promise<RenderResult> {
+  // createStaticHandler works off a WHATWG Request. We only need the pathname +
+  // search; scheme/host don't affect routing. Using a stable sentinel host
+  // avoids env-dependent URL parsing.
+  const context = await handler.query(new Request(`http://ssr${url}`));
+
+  // A loader/action that throws a Response (or calls redirect()) surfaces here
+  // as a Response instead of a StaticHandlerContext. Forward the redirect.
+  if (context instanceof Response) {
+    return {
+      html: '',
+      head: '',
+      status: context.status,
+      redirect: context.headers.get('Location') ?? undefined,
+    };
+  }
+
+  const router = createStaticRouter(routeTree, context);
+  const helmetContext: { helmet?: HelmetServerState } = {};
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5,
+        gcTime: 1000 * 60 * 10,
+        retry: 1,
+        refetchOnWindowFocus: false,
+      },
+      mutations: { retry: 0 },
+    },
+  });
+
+  const html = renderToString(
+    <StrictMode>
+      <HelmetProvider context={helmetContext}>
+        <QueryClientProvider client={queryClient}>
+          <StaticRouterProvider router={router} context={context} />
+        </QueryClientProvider>
+      </HelmetProvider>
+    </StrictMode>
+  );
+
+  const h = helmetContext.helmet;
+  const head = h
+    ? [
+        h.title?.toString() ?? '',
+        h.meta?.toString() ?? '',
+        h.link?.toString() ?? '',
+        h.script?.toString() ?? '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : '';
+
+  return { html, head, status: context.statusCode ?? 200 };
+}

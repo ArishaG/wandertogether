@@ -1,1 +1,114 @@
-{"success":true,"path":"src/lib/__tests__/analytics-consent.test.ts","content":"import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';\n\nconst CONSENT_KEY = 'c2_analytics_consent';\n\ndescribe('analytics-consent', () => {\n  beforeEach(() => {\n    localStorage.clear();\n    vi.resetModules();\n  });\n\n  afterEach(() => {\n    vi.unstubAllEnvs();\n  });\n\n  async function loadModule(): Promise<typeof import('../../lib/analytics-consent')> {\n    return import('../../lib/analytics-consent');\n  }\n\n  describe('getAnalyticsConsent', () => {\n    it('returns false when no consent is stored', async () => {\n      const { getAnalyticsConsent } = await loadModule();\n      expect(getAnalyticsConsent()).toBe(false);\n    });\n\n    it('returns true when analytics consent is stored', async () => {\n      localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics: true, timestamp: Date.now() }));\n      const { getAnalyticsConsent } = await loadModule();\n      expect(getAnalyticsConsent()).toBe(true);\n    });\n\n    it('returns false when analytics is declined', async () => {\n      localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics: false, timestamp: Date.now() }));\n      const { getAnalyticsConsent } = await loadModule();\n      expect(getAnalyticsConsent()).toBe(false);\n    });\n\n    it('returns false when stored value is invalid JSON', async () => {\n      localStorage.setItem(CONSENT_KEY, 'not-json');\n      const { getAnalyticsConsent } = await loadModule();\n      expect(getAnalyticsConsent()).toBe(false);\n    });\n  });\n\n  describe('onConsentChange', () => {\n    it('fires callback when cookie-consent-changed event is dispatched', async () => {\n      const { onConsentChange } = await loadModule();\n      const callback = vi.fn();\n\n      onConsentChange(callback);\n      window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: true } }));\n\n      expect(callback).toHaveBeenCalledWith(true);\n    });\n\n    it('fires callback with false on decline', async () => {\n      const { onConsentChange } = await loadModule();\n      const callback = vi.fn();\n\n      onConsentChange(callback);\n      window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: false } }));\n\n      expect(callback).toHaveBeenCalledWith(false);\n    });\n\n    it('cleanup function removes listener', async () => {\n      const { onConsentChange } = await loadModule();\n      const callback = vi.fn();\n\n      const cleanup = onConsentChange(callback);\n      cleanup();\n      window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: true } }));\n\n      expect(callback).not.toHaveBeenCalled();\n    });\n  });\n\n  describe('consent-gated widget integration', () => {\n    it('widget loads when consent is already granted', async () => {\n      localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics: true, timestamp: Date.now() }));\n      const { getAnalyticsConsent } = await loadModule();\n\n      const loadWidget = vi.fn();\n      if (getAnalyticsConsent()) loadWidget();\n\n      expect(loadWidget).toHaveBeenCalled();\n    });\n\n    it('widget loads after consent is granted via event', async () => {\n      const { getAnalyticsConsent, onConsentChange } = await loadModule();\n\n      const loadWidget = vi.fn();\n      if (getAnalyticsConsent()) loadWidget();\n      onConsentChange((consented) => { if (consented) loadWidget(); });\n\n      expect(loadWidget).not.toHaveBeenCalled();\n\n      window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: true } }));\n\n      expect(loadWidget).toHaveBeenCalledTimes(1);\n    });\n\n    it('widget does not load when consent is declined', async () => {\n      const { getAnalyticsConsent, onConsentChange } = await loadModule();\n\n      const loadWidget = vi.fn();\n      if (getAnalyticsConsent()) loadWidget();\n      onConsentChange((consented) => { if (consented) loadWidget(); });\n\n      window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: false } }));\n\n      expect(loadWidget).not.toHaveBeenCalled();\n    });\n  });\n});\n","totalLines":115,"truncated":false}
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const CONSENT_KEY = 'c2_analytics_consent';
+
+describe('analytics-consent', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  async function loadModule(): Promise<typeof import('../../lib/analytics-consent')> {
+    return import('../../lib/analytics-consent');
+  }
+
+  describe('getAnalyticsConsent', () => {
+    it('returns false when no consent is stored', async () => {
+      const { getAnalyticsConsent } = await loadModule();
+      expect(getAnalyticsConsent()).toBe(false);
+    });
+
+    it('returns true when analytics consent is stored', async () => {
+      localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics: true, timestamp: Date.now() }));
+      const { getAnalyticsConsent } = await loadModule();
+      expect(getAnalyticsConsent()).toBe(true);
+    });
+
+    it('returns false when analytics is declined', async () => {
+      localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics: false, timestamp: Date.now() }));
+      const { getAnalyticsConsent } = await loadModule();
+      expect(getAnalyticsConsent()).toBe(false);
+    });
+
+    it('returns false when stored value is invalid JSON', async () => {
+      localStorage.setItem(CONSENT_KEY, 'not-json');
+      const { getAnalyticsConsent } = await loadModule();
+      expect(getAnalyticsConsent()).toBe(false);
+    });
+  });
+
+  describe('onConsentChange', () => {
+    it('fires callback when cookie-consent-changed event is dispatched', async () => {
+      const { onConsentChange } = await loadModule();
+      const callback = vi.fn();
+
+      onConsentChange(callback);
+      window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: true } }));
+
+      expect(callback).toHaveBeenCalledWith(true);
+    });
+
+    it('fires callback with false on decline', async () => {
+      const { onConsentChange } = await loadModule();
+      const callback = vi.fn();
+
+      onConsentChange(callback);
+      window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: false } }));
+
+      expect(callback).toHaveBeenCalledWith(false);
+    });
+
+    it('cleanup function removes listener', async () => {
+      const { onConsentChange } = await loadModule();
+      const callback = vi.fn();
+
+      const cleanup = onConsentChange(callback);
+      cleanup();
+      window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: true } }));
+
+      expect(callback).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('consent-gated widget integration', () => {
+    it('widget loads when consent is already granted', async () => {
+      localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics: true, timestamp: Date.now() }));
+      const { getAnalyticsConsent } = await loadModule();
+
+      const loadWidget = vi.fn();
+      if (getAnalyticsConsent()) loadWidget();
+
+      expect(loadWidget).toHaveBeenCalled();
+    });
+
+    it('widget loads after consent is granted via event', async () => {
+      const { getAnalyticsConsent, onConsentChange } = await loadModule();
+
+      const loadWidget = vi.fn();
+      if (getAnalyticsConsent()) loadWidget();
+      onConsentChange((consented) => { if (consented) loadWidget(); });
+
+      expect(loadWidget).not.toHaveBeenCalled();
+
+      window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: true } }));
+
+      expect(loadWidget).toHaveBeenCalledTimes(1);
+    });
+
+    it('widget does not load when consent is declined', async () => {
+      const { getAnalyticsConsent, onConsentChange } = await loadModule();
+
+      const loadWidget = vi.fn();
+      if (getAnalyticsConsent()) loadWidget();
+      onConsentChange((consented) => { if (consented) loadWidget(); });
+
+      window.dispatchEvent(new CustomEvent('cookie-consent-changed', { detail: { consented: false } }));
+
+      expect(loadWidget).not.toHaveBeenCalled();
+    });
+  });
+});

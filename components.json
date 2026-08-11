@@ -1,1 +1,16 @@
-{"success":true,"path":"components.json","content":"{\n  \"$schema\": \"https://ui.shadcn.com/schema.json\",\n  \"style\": \"default\",\n  \"rsc\": false,\n  \"tsx\": true,\n  \"tailwind\": {\n    \"config\": \"tailwind.config.js\",\n    \"css\": \"src/frontend/styles/globals.css\",\n    \"baseColor\": \"slate\",\n    \"cssVariables\": true\n  },\n  \"aliases\": {\n    \"components\": \"~/components\",\n    \"utils\": \"~/lib/utils\"\n  }\n}\n","totalLines":17,"truncated":false}
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "default",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "tailwind.config.js",
+    "css": "src/frontend/styles/globals.css",
+    "baseColor": "slate",
+    "cssVariables": true
+  },
+  "aliases": {
+    "components": "~/components",
+    "utils": "~/lib/utils"
+  }
+}

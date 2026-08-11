@@ -1,1 +1,9 @@
-{"success":true,"path":"src/server/api/health/GET.ts","content":"import type { Request, Response } from \"express\";\n\nexport default async function handler(_req: Request, res: Response) {\n\tres.json({\n\t\tstatus: \"ok\",\n\t\ttimestamp: new Date().toISOString(),\n\t\tmessage: \"Hello World!\",\n\t});\n}\n","totalLines":10,"truncated":false}
+import type { Request, Response } from "express";
+
+export default async function handler(_req: Request, res: Response) {
+	res.json({
+		status: "ok",
+		timestamp: new Date().toISOString(),
+		message: "Hello World!",
+	});
+}

@@ -1,1 +1,167 @@
-{"success":true,"path":"src/server/adsense-manifest.test.ts","content":"import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from \"node:fs\";\nimport { tmpdir } from \"node:os\";\nimport { join } from \"node:path\";\nimport { afterEach, describe, expect, it, vi } from \"vitest\";\n\nimport {\n\tEMPTY_ADSENSE_RUNTIME_CONFIG,\n\tbuildCanonicalAdSenseScript,\n\tloadAdSenseRuntimeConfig,\n\tresolveAdSenseTextFile,\n} from \"./adsense-manifest\";\n\nconst publisherId = \"ca-pub-1234567890123456\";\nconst canonicalScript = `<script async src=\"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${publisherId}\" crossorigin=\"anonymous\"></script>`;\n\nlet tempDir: string | null = null;\n\nfunction makeTempDir(): string {\n\ttempDir = mkdtempSync(join(tmpdir(), \"adsense-manifest-\"));\n\treturn tempDir;\n}\n\nfunction writeManifest(baseDir: string, value: unknown): void {\n\twriteFileSync(join(baseDir, \"airo-adsense.json\"), JSON.stringify(value), \"utf8\");\n}\n\nafterEach(() => {\n\tif (tempDir) rmSync(tempDir, { recursive: true, force: true });\n\ttempDir = null;\n\tvi.restoreAllMocks();\n});\n\ndescribe(\"AdSense runtime manifest\", () => {\n\tit(\"returns disabled config when the runtime manifest is missing\", () => {\n\t\texpect(loadAdSenseRuntimeConfig(makeTempDir())).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);\n\t});\n\n\tit(\"returns disabled config when the runtime directory uses traversal segments\", () => {\n\t\tconst rootDir = makeTempDir();\n\t\tconst childDir = join(rootDir, \"child\");\n\t\tmkdirSync(childDir);\n\t\twriteManifest(rootDir, {\n\t\t\tversion: 1,\n\t\t\tenabled: true,\n\t\t\tpublisherId,\n\t\t\tscriptSnippet: canonicalScript,\n\t\t\tadsTxt: { enabled: true, content: \"google.com, pub-123, DIRECT, f08c47fec0942fa0\" },\n\t\t\tappAdsTxt: { enabled: false, content: \"\" },\n\t\t});\n\n\t\texpect(loadAdSenseRuntimeConfig(`${childDir}/..`)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);\n\t});\n\n\tit(\"returns disabled config when the runtime manifest is malformed\", () => {\n\t\tconst consoleErrorSpy = vi.spyOn(console, \"error\").mockImplementation(() => {});\n\t\tconst dir = makeTempDir();\n\t\twriteFileSync(join(dir, \"airo-adsense.json\"), \"{not-json\", \"utf8\");\n\n\t\texpect(loadAdSenseRuntimeConfig(dir)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);\n\t\texpect(consoleErrorSpy).toHaveBeenCalledWith(\n\t\t\t\"adsense.manifest.load_failed\",\n\t\t\texpect.objectContaining({ error: expect.any(String) }),\n\t\t);\n\t});\n\n\tit(\"returns disabled config when the runtime manifest shape is invalid\", () => {\n\t\tconst dir = makeTempDir();\n\t\twriteManifest(dir, {\n\t\t\tversion: 2,\n\t\t\tenabled: true,\n\t\t\tpublisherId,\n\t\t\tscriptSnippet: canonicalScript,\n\t\t\tadsTxt: { enabled: true, content: \"google.com, pub-123, DIRECT, f08c47fec0942fa0\" },\n\t\t\tappAdsTxt: { enabled: true, content: \"google.com, pub-456, DIRECT, f08c47fec0942fa0\" },\n\t\t});\n\n\t\texpect(loadAdSenseRuntimeConfig(dir)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);\n\t});\n\n\tit(\"returns disabled config when the runtime manifest enabled flag is missing\", () => {\n\t\tconst dir = makeTempDir();\n\t\twriteManifest(dir, {\n\t\t\tversion: 1,\n\t\t\tpublisherId,\n\t\t\tscriptSnippet: canonicalScript,\n\t\t\tadsTxt: { enabled: true, content: \"google.com, pub-123, DIRECT, f08c47fec0942fa0\" },\n\t\t\tappAdsTxt: { enabled: true, content: \"app.example.com, pub-123, DIRECT\" },\n\t\t});\n\n\t\texpect(loadAdSenseRuntimeConfig(dir)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);\n\t});\n\n\tit(\"builds the canonical script from publisher ID instead of trusting stored scriptSnippet\", () => {\n\t\tconst dir = makeTempDir();\n\t\twriteManifest(dir, {\n\t\t\tversion: 1,\n\t\t\tenabled: true,\n\t\t\tpublisherId,\n\t\t\tscriptSnippet: \"<script src=\\\"https://example.com/not-trusted.js\\\"></script>\",\n\t\t\tadsTxt: { enabled: false, content: \"\" },\n\t\t\tappAdsTxt: { enabled: false, content: \"\" },\n\t\t});\n\n\t\texpect(loadAdSenseRuntimeConfig(dir)).toEqual({\n\t\t\tpublisherId,\n\t\t\tscriptHtml: canonicalScript,\n\t\t\tadsTxt: null,\n\t\t\tappAdsTxt: null,\n\t\t});\n\t\texpect(buildCanonicalAdSenseScript(publisherId)).toBe(canonicalScript);\n\t});\n\n\tit(\"returns disabled config when Display Ads are globally disabled\", () => {\n\t\tconst dir = makeTempDir();\n\t\twriteManifest(dir, {\n\t\t\tversion: 1,\n\t\t\tenabled: false,\n\t\t\tpublisherId,\n\t\t\tscriptSnippet: canonicalScript,\n\t\t\tadsTxt: { enabled: true, content: \"google.com, pub-123, DIRECT, f08c47fec0942fa0\" },\n\t\t\tappAdsTxt: { enabled: true, content: \"app.example.com, pub-123, DIRECT\" },\n\t\t});\n\n\t\texpect(loadAdSenseRuntimeConfig(dir)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);\n\t});\n\n\tit(\"disables script output when publisher ID is invalid\", () => {\n\t\tconst dir = makeTempDir();\n\t\twriteManifest(dir, {\n\t\t\tversion: 1,\n\t\t\tenabled: true,\n\t\t\tpublisherId: \"ca-pub-123\",\n\t\t\tscriptSnippet: canonicalScript,\n\t\t\tadsTxt: { enabled: false, content: \"\" },\n\t\t\tappAdsTxt: { enabled: false, content: \"\" },\n\t\t});\n\n\t\texpect(loadAdSenseRuntimeConfig(dir)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);\n\t});\n\n\tit(\"returns enabled text files and omits disabled text files\", () => {\n\t\tconst dir = makeTempDir();\n\t\twriteManifest(dir, {\n\t\t\tversion: 1,\n\t\t\tenabled: true,\n\t\t\tpublisherId: null,\n\t\t\tscriptSnippet: \"\",\n\t\t\tadsTxt: {\n\t\t\t\tenabled: true,\n\t\t\t\tcontent: \"google.com, pub-123, DIRECT, f08c47fec0942fa0\",\n\t\t\t},\n\t\t\tappAdsTxt: { enabled: false, content: \"draft app ads content\" },\n\t\t});\n\n\t\tconst config = loadAdSenseRuntimeConfig(dir);\n\t\texpect(resolveAdSenseTextFile(config, \"adsTxt\")).toBe(\n\t\t\t\"google.com, pub-123, DIRECT, f08c47fec0942fa0\",\n\t\t);\n\t\texpect(resolveAdSenseTextFile(config, \"appAdsTxt\")).toBeNull();\n\t\texpect(config).toEqual({\n\t\t\tpublisherId: null,\n\t\t\tscriptHtml: \"\",\n\t\t\tadsTxt: \"google.com, pub-123, DIRECT, f08c47fec0942fa0\",\n\t\t\tappAdsTxt: null,\n\t\t});\n\t});\n});\n","totalLines":168,"truncated":false}
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+	EMPTY_ADSENSE_RUNTIME_CONFIG,
+	buildCanonicalAdSenseScript,
+	loadAdSenseRuntimeConfig,
+	resolveAdSenseTextFile,
+} from "./adsense-manifest";
+
+const publisherId = "ca-pub-1234567890123456";
+const canonicalScript = `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${publisherId}" crossorigin="anonymous"></script>`;
+
+let tempDir: string | null = null;
+
+function makeTempDir(): string {
+	tempDir = mkdtempSync(join(tmpdir(), "adsense-manifest-"));
+	return tempDir;
+}
+
+function writeManifest(baseDir: string, value: unknown): void {
+	writeFileSync(join(baseDir, "airo-adsense.json"), JSON.stringify(value), "utf8");
+}
+
+afterEach(() => {
+	if (tempDir) rmSync(tempDir, { recursive: true, force: true });
+	tempDir = null;
+	vi.restoreAllMocks();
+});
+
+describe("AdSense runtime manifest", () => {
+	it("returns disabled config when the runtime manifest is missing", () => {
+		expect(loadAdSenseRuntimeConfig(makeTempDir())).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);
+	});
+
+	it("returns disabled config when the runtime directory uses traversal segments", () => {
+		const rootDir = makeTempDir();
+		const childDir = join(rootDir, "child");
+		mkdirSync(childDir);
+		writeManifest(rootDir, {
+			version: 1,
+			enabled: true,
+			publisherId,
+			scriptSnippet: canonicalScript,
+			adsTxt: { enabled: true, content: "google.com, pub-123, DIRECT, f08c47fec0942fa0" },
+			appAdsTxt: { enabled: false, content: "" },
+		});
+
+		expect(loadAdSenseRuntimeConfig(`${childDir}/..`)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);
+	});
+
+	it("returns disabled config when the runtime manifest is malformed", () => {
+		const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+		const dir = makeTempDir();
+		writeFileSync(join(dir, "airo-adsense.json"), "{not-json", "utf8");
+
+		expect(loadAdSenseRuntimeConfig(dir)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);
+		expect(consoleErrorSpy).toHaveBeenCalledWith(
+			"adsense.manifest.load_failed",
+			expect.objectContaining({ error: expect.any(String) }),
+		);
+	});
+
+	it("returns disabled config when the runtime manifest shape is invalid", () => {
+		const dir = makeTempDir();
+		writeManifest(dir, {
+			version: 2,
+			enabled: true,
+			publisherId,
+			scriptSnippet: canonicalScript,
+			adsTxt: { enabled: true, content: "google.com, pub-123, DIRECT, f08c47fec0942fa0" },
+			appAdsTxt: { enabled: true, content: "google.com, pub-456, DIRECT, f08c47fec0942fa0" },
+		});
+
+		expect(loadAdSenseRuntimeConfig(dir)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);
+	});
+
+	it("returns disabled config when the runtime manifest enabled flag is missing", () => {
+		const dir = makeTempDir();
+		writeManifest(dir, {
+			version: 1,
+			publisherId,
+			scriptSnippet: canonicalScript,
+			adsTxt: { enabled: true, content: "google.com, pub-123, DIRECT, f08c47fec0942fa0" },
+			appAdsTxt: { enabled: true, content: "app.example.com, pub-123, DIRECT" },
+		});
+
+		expect(loadAdSenseRuntimeConfig(dir)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);
+	});
+
+	it("builds the canonical script from publisher ID instead of trusting stored scriptSnippet", () => {
+		const dir = makeTempDir();
+		writeManifest(dir, {
+			version: 1,
+			enabled: true,
+			publisherId,
+			scriptSnippet: "<script src=\"https://example.com/not-trusted.js\"></script>",
+			adsTxt: { enabled: false, content: "" },
+			appAdsTxt: { enabled: false, content: "" },
+		});
+
+		expect(loadAdSenseRuntimeConfig(dir)).toEqual({
+			publisherId,
+			scriptHtml: canonicalScript,
+			adsTxt: null,
+			appAdsTxt: null,
+		});
+		expect(buildCanonicalAdSenseScript(publisherId)).toBe(canonicalScript);
+	});
+
+	it("returns disabled config when Display Ads are globally disabled", () => {
+		const dir = makeTempDir();
+		writeManifest(dir, {
+			version: 1,
+			enabled: false,
+			publisherId,
+			scriptSnippet: canonicalScript,
+			adsTxt: { enabled: true, content: "google.com, pub-123, DIRECT, f08c47fec0942fa0" },
+			appAdsTxt: { enabled: true, content: "app.example.com, pub-123, DIRECT" },
+		});
+
+		expect(loadAdSenseRuntimeConfig(dir)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);
+	});
+
+	it("disables script output when publisher ID is invalid", () => {
+		const dir = makeTempDir();
+		writeManifest(dir, {
+			version: 1,
+			enabled: true,
+			publisherId: "ca-pub-123",
+			scriptSnippet: canonicalScript,
+			adsTxt: { enabled: false, content: "" },
+			appAdsTxt: { enabled: false, content: "" },
+		});
+
+		expect(loadAdSenseRuntimeConfig(dir)).toEqual(EMPTY_ADSENSE_RUNTIME_CONFIG);
+	});
+
+	it("returns enabled text files and omits disabled text files", () => {
+		const dir = makeTempDir();
+		writeManifest(dir, {
+			version: 1,
+			enabled: true,
+			publisherId: null,
+			scriptSnippet: "",
+			adsTxt: {
+				enabled: true,
+				content: "google.com, pub-123, DIRECT, f08c47fec0942fa0",
+			},
+			appAdsTxt: { enabled: false, content: "draft app ads content" },
+		});
+
+		const config = loadAdSenseRuntimeConfig(dir);
+		expect(resolveAdSenseTextFile(config, "adsTxt")).toBe(
+			"google.com, pub-123, DIRECT, f08c47fec0942fa0",
+		);
+		expect(resolveAdSenseTextFile(config, "appAdsTxt")).toBeNull();
+		expect(config).toEqual({
+			publisherId: null,
+			scriptHtml: "",
+			adsTxt: "google.com, pub-123, DIRECT, f08c47fec0942fa0",
+			appAdsTxt: null,
+		});
+	});
+});

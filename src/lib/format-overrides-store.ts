@@ -1,1 +1,44 @@
-{"success":true,"path":"src/lib/format-overrides-store.ts","content":"import { useSyncExternalStore } from 'react'\n\nimport initialFormatOverrideBundle from 'virtual:format-overrides'\n\nimport type { FormatOverrideBundle } from './format-overrides'\n\nexport const FORMAT_OVERRIDES_UPDATE_EVENT = 'format-overrides:update'\nexport const FORMAT_OVERRIDES_WILL_UPDATE_EVENT = 'airo-format-overrides:will-update'\n\nconst listeners = new Set<() => void>()\nlet currentBundle: FormatOverrideBundle = initialFormatOverrideBundle\n\nexport function getFormatOverrideBundle(): FormatOverrideBundle {\n  return currentBundle\n}\n\nexport function subscribeFormatOverrideBundle(listener: () => void): () => void {\n  listeners.add(listener)\n  return () => {\n    listeners.delete(listener)\n  }\n}\n\nexport function setFormatOverrideBundle(bundle: FormatOverrideBundle): void {\n  currentBundle = bundle\n  if (typeof window !== 'undefined') {\n    window.dispatchEvent(new CustomEvent(FORMAT_OVERRIDES_WILL_UPDATE_EVENT, { detail: bundle }))\n  }\n  listeners.forEach((listener) => listener())\n}\n\nexport function useFormatOverrideBundle(): FormatOverrideBundle {\n  return useSyncExternalStore(\n    subscribeFormatOverrideBundle,\n    getFormatOverrideBundle,\n    getFormatOverrideBundle,\n  )\n}\n\nif (import.meta.hot) {\n  import.meta.hot.on(FORMAT_OVERRIDES_UPDATE_EVENT, (bundle: FormatOverrideBundle) => {\n    setFormatOverrideBundle(bundle)\n  })\n}\n","totalLines":45,"truncated":false}
+import { useSyncExternalStore } from 'react'
+
+import initialFormatOverrideBundle from 'virtual:format-overrides'
+
+import type { FormatOverrideBundle } from './format-overrides'
+
+export const FORMAT_OVERRIDES_UPDATE_EVENT = 'format-overrides:update'
+export const FORMAT_OVERRIDES_WILL_UPDATE_EVENT = 'airo-format-overrides:will-update'
+
+const listeners = new Set<() => void>()
+let currentBundle: FormatOverrideBundle = initialFormatOverrideBundle
+
+export function getFormatOverrideBundle(): FormatOverrideBundle {
+  return currentBundle
+}
+
+export function subscribeFormatOverrideBundle(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+export function setFormatOverrideBundle(bundle: FormatOverrideBundle): void {
+  currentBundle = bundle
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(FORMAT_OVERRIDES_WILL_UPDATE_EVENT, { detail: bundle }))
+  }
+  listeners.forEach((listener) => listener())
+}
+
+export function useFormatOverrideBundle(): FormatOverrideBundle {
+  return useSyncExternalStore(
+    subscribeFormatOverrideBundle,
+    getFormatOverrideBundle,
+    getFormatOverrideBundle,
+  )
+}
+
+if (import.meta.hot) {
+  import.meta.hot.on(FORMAT_OVERRIDES_UPDATE_EVENT, (bundle: FormatOverrideBundle) => {
+    setFormatOverrideBundle(bundle)
+  })
+}

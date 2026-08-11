@@ -1,1 +1,6 @@
-{"success":true,"path":"src/server/api/auth/[action]/GET.ts","content":"import type { Request, Response } from 'express';\nimport { authHandler } from '@/server/auth-middleware';\n\nexport default async function handler(req: Request, res: Response) {\n  await authHandler(req, res);\n}\n","totalLines":7,"truncated":false}
+import type { Request, Response } from 'express';
+import { authHandler } from '@/server/auth-middleware';
+
+export default async function handler(req: Request, res: Response) {
+  await authHandler(req, res);
+}

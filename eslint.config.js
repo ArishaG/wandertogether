@@ -1,1 +1,69 @@
-{"success":true,"path":"eslint.config.js","content":"import js from '@eslint/js';\nimport reactHooks from 'eslint-plugin-react-hooks';\nimport reactRefresh from 'eslint-plugin-react-refresh';\nimport tseslint from '@typescript-eslint/eslint-plugin';\nimport tsparser from '@typescript-eslint/parser';\n\nexport default [\n  {\n    ignores: ['dist', 'node_modules', '.next', '.vite'],\n  },\n  {\n    files: ['**/*.{ts,tsx}'],\n    languageOptions: {\n      ecmaVersion: 2020,\n      globals: {\n        console: 'readonly',\n        process: 'readonly',\n        Buffer: 'readonly',\n        __dirname: 'readonly',\n        __filename: 'readonly',\n        global: 'readonly',\n        window: 'readonly',\n        document: 'readonly',\n        navigator: 'readonly',\n        localStorage: 'readonly',\n        sessionStorage: 'readonly',\n        HTMLElement: 'readonly',\n        HTMLDivElement: 'readonly',\n        HTMLButtonElement: 'readonly',\n        HTMLInputElement: 'readonly',\n        HTMLSpanElement: 'readonly',\n        HTMLParagraphElement: 'readonly',\n        HTMLHeadingElement: 'readonly',\n        HTMLTableElement: 'readonly',\n        HTMLTableSectionElement: 'readonly',\n        HTMLTableRowElement: 'readonly',\n        HTMLTableCellElement: 'readonly',\n        HTMLTableCaptionElement: 'readonly',\n      },\n      parser: tsparser,\n      parserOptions: {\n        ecmaVersion: 'latest',\n        ecmaFeatures: { jsx: true },\n        sourceType: 'module',\n      },\n    },\n    plugins: {\n      '@typescript-eslint': tseslint,\n      'react-hooks': reactHooks,\n      'react-refresh': reactRefresh,\n    },\n    rules: {\n      ...js.configs.recommended.rules,\n      ...tseslint.configs.recommended.rules,\n      ...reactHooks.configs.recommended.rules,\n      'react-refresh/only-export-components': [\n        'warn',\n        { allowConstantExport: true },\n      ],\n      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],\n      '@typescript-eslint/no-explicit-any': 'warn',\n      '@typescript-eslint/explicit-function-return-type': 'off',\n      '@typescript-eslint/explicit-module-boundary-types': 'off',\n      '@typescript-eslint/no-empty-function': 'off',\n      'prefer-const': 'error',\n      'no-var': 'error',\n    },\n  },\n];\n","totalLines":70,"truncated":false}
+import js from '@eslint/js';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import tseslint from '@typescript-eslint/eslint-plugin';
+import tsparser from '@typescript-eslint/parser';
+
+export default [
+  {
+    ignores: ['dist', 'node_modules', '.next', '.vite'],
+  },
+  {
+    files: ['**/*.{ts,tsx}'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        Buffer: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+        global: 'readonly',
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        localStorage: 'readonly',
+        sessionStorage: 'readonly',
+        HTMLElement: 'readonly',
+        HTMLDivElement: 'readonly',
+        HTMLButtonElement: 'readonly',
+        HTMLInputElement: 'readonly',
+        HTMLSpanElement: 'readonly',
+        HTMLParagraphElement: 'readonly',
+        HTMLHeadingElement: 'readonly',
+        HTMLTableElement: 'readonly',
+        HTMLTableSectionElement: 'readonly',
+        HTMLTableRowElement: 'readonly',
+        HTMLTableCellElement: 'readonly',
+        HTMLTableCaptionElement: 'readonly',
+      },
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        ecmaFeatures: { jsx: true },
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      '@typescript-eslint': tseslint,
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...tseslint.configs.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-empty-function': 'off',
+      'prefer-const': 'error',
+      'no-var': 'error',
+    },
+  },
+];

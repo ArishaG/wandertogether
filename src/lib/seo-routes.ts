@@ -1,1 +1,41 @@
-{"success":true,"path":"src/lib/seo-routes.ts","content":"/**\n * Auto-synced registry of publicly-crawlable routes. Consumed by the\n * /sitemap.xml handler in src/server/entry.ts.\n *\n * DO NOT add or remove paths by hand. Static paths are mirrored here from\n * src/routes.tsx automatically whenever that file is edited (any manual\n * path edit would be overwritten on the next routes.tsx change). For sync\n * to pick up a route, its `path` must be a literal string starting with \"/\";\n * template literals and identifier refs are skipped, and dynamic-param routes\n * like \"/products/:id\" are excluded.\n *\n * The only fields safe to hand-edit are the per-entry metadata below, after a\n * sync:\n * - `priority` (0.0–1.0): Home = 1.0, main sections = 0.8, deep pages = 0.5.\n * - `changefreq` and `lastmod`.\n */\n\nexport interface SeoRoute {\n  path: string;\n  changefreq?:\n    | \"always\"\n    | \"hourly\"\n    | \"daily\"\n    | \"weekly\"\n    | \"monthly\"\n    | \"yearly\"\n    | \"never\";\n  priority?: number;\n  lastmod?: string;\n}\n\nexport const seoRoutes: SeoRoute[] = [\n  { path: \"/\", changefreq: \"weekly\", priority: 1.0 },\n  { path: \"/login\", changefreq: \"monthly\", priority: 0.8 },\n  { path: \"/signup\", changefreq: \"monthly\", priority: 0.8 },\n  { path: \"/dashboard\", changefreq: \"monthly\", priority: 0.8 },\n  { path: \"/trips\", changefreq: \"monthly\", priority: 0.8 },\n  { path: \"/start-trip\", changefreq: \"monthly\", priority: 0.8 },\n  { path: \"/polls\", changefreq: \"monthly\", priority: 0.8 },\n  { path: \"/itinerary\", changefreq: \"monthly\", priority: 0.8 },\n];\n","totalLines":42,"truncated":false}
+/**
+ * Auto-synced registry of publicly-crawlable routes. Consumed by the
+ * /sitemap.xml handler in src/server/entry.ts.
+ *
+ * DO NOT add or remove paths by hand. Static paths are mirrored here from
+ * src/routes.tsx automatically whenever that file is edited (any manual
+ * path edit would be overwritten on the next routes.tsx change). For sync
+ * to pick up a route, its `path` must be a literal string starting with "/";
+ * template literals and identifier refs are skipped, and dynamic-param routes
+ * like "/products/:id" are excluded.
+ *
+ * The only fields safe to hand-edit are the per-entry metadata below, after a
+ * sync:
+ * - `priority` (0.0–1.0): Home = 1.0, main sections = 0.8, deep pages = 0.5.
+ * - `changefreq` and `lastmod`.
+ */
+
+export interface SeoRoute {
+  path: string;
+  changefreq?:
+    | "always"
+    | "hourly"
+    | "daily"
+    | "weekly"
+    | "monthly"
+    | "yearly"
+    | "never";
+  priority?: number;
+  lastmod?: string;
+}
+
+export const seoRoutes: SeoRoute[] = [
+  { path: "/", changefreq: "weekly", priority: 1.0 },
+  { path: "/login", changefreq: "monthly", priority: 0.8 },
+  { path: "/signup", changefreq: "monthly", priority: 0.8 },
+  { path: "/dashboard", changefreq: "monthly", priority: 0.8 },
+  { path: "/trips", changefreq: "monthly", priority: 0.8 },
+  { path: "/start-trip", changefreq: "monthly", priority: 0.8 },
+  { path: "/polls", changefreq: "monthly", priority: 0.8 },
+  { path: "/itinerary", changefreq: "monthly", priority: 0.8 },
+];

@@ -1,1 +1,149 @@
-{"success":true,"path":"src/components/__tests__/FormattedBoundText.test.tsx","content":"/**\n * @vitest-environment jsdom\n */\nimport { act, render, screen } from '@testing-library/react'\nimport { beforeEach, describe, expect, it, vi } from 'vitest'\n\nimport type { FormatOverrideBundle } from '../../lib/format-overrides'\nimport { setFormatOverrideBundle } from '../../lib/format-overrides-store'\nimport { FormattedBoundText } from '../FormattedBoundText'\n\nconst { initialBundle } = vi.hoisted((): { initialBundle: FormatOverrideBundle } => ({\n  initialBundle: {\n    version: 1,\n    scopes: {\n      'pages/index': {\n        version: 1,\n        overrides: {\n          abc123: {\n            target: {\n              file: 'src/pages/index.tsx',\n              tagName: 'h1',\n              sourceKind: 'bound-expression',\n              contentKey: null,\n              contentKeyTemplate: null,\n              expressionHash: `sha256:${'a'.repeat(64)}`,\n            },\n            marks: { bold: true, italic: true, color: '#123abc' },\n            updatedAt: '2026-05-28T12:00:00.000Z',\n          },\n          stale: {\n            target: {\n              file: 'src/pages/index.tsx',\n              tagName: 'p',\n              sourceKind: 'bound-expression',\n              contentKey: null,\n              contentKeyTemplate: null,\n              expressionHash: `sha256:${'b'.repeat(64)}`,\n            },\n            marks: { bold: true },\n            updatedAt: '2026-05-28T12:00:00.000Z',\n          },\n        },\n      },\n    },\n  },\n}))\n\nvi.mock(\n  'virtual:format-overrides',\n  () => ({\n    default: initialBundle,\n  }),\n)\n\nconst guard = {\n  file: 'src/pages/index.tsx',\n  tagName: 'h1',\n  sourceKind: 'bound-expression' as const,\n  contentKey: null,\n  contentKeyTemplate: null,\n  expressionHash: `sha256:${'a'.repeat(64)}`,\n}\n\ndescribe('FormattedBoundText', () => {\n  beforeEach(() => {\n    vi.restoreAllMocks()\n    setFormatOverrideBundle(initialBundle)\n  })\n\n  it('renders children unchanged when no override exists', () => {\n    const { container } = render(\n      <FormattedBoundText devId=\"missing\" guard={guard}>\n        Site title\n      </FormattedBoundText>,\n    )\n\n    expect(container.querySelector('[data-airo-formatted-bound-text]')).toBeNull()\n    expect(container.textContent).toBe('Site title')\n  })\n\n  it('wraps children and applies matching override marks', () => {\n    render(\n      <FormattedBoundText devId=\"abc123\" guard={guard}>\n        Site title\n      </FormattedBoundText>,\n    )\n\n    const formatted = screen.getByText('Site title')\n    expect(formatted).toHaveAttribute('data-airo-formatted-bound-text', 'true')\n    expect(formatted).toHaveAttribute('data-airo-format-bold', 'true')\n    expect(formatted).toHaveAttribute('data-airo-format-italic', 'true')\n    expect(formatted).toHaveAttribute('data-airo-format-color', '#123abc')\n    expect(formatted).toHaveStyle({\n      fontWeight: '700',\n      fontStyle: 'italic',\n      color: '#123abc',\n    })\n  })\n\n  it('renders children unchanged and warns in dev on guard mismatch', () => {\n    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})\n\n    const { container } = render(\n      <FormattedBoundText devId=\"stale\" guard={guard}>\n        Site title\n      </FormattedBoundText>,\n    )\n\n    expect(container.querySelector('[data-airo-formatted-bound-text]')).toBeNull()\n    expect(container.textContent).toBe('Site title')\n    expect(warn).toHaveBeenCalledWith(\n      '[format-overrides] Ignoring stale override for bound text.',\n      expect.objectContaining({ devId: 'stale' }),\n    )\n  })\n\n  it('updates rendered marks when the format override bundle changes', () => {\n    render(\n      <FormattedBoundText devId=\"missing\" guard={guard}>\n        Site title\n      </FormattedBoundText>,\n    )\n\n    expect(screen.getByText('Site title')).not.toHaveAttribute('data-airo-formatted-bound-text')\n\n    act(() => {\n      setFormatOverrideBundle({\n        version: 1,\n        scopes: {\n          'pages/index': {\n            version: 1,\n            overrides: {\n              missing: {\n                target: guard,\n                marks: { italic: true },\n                updatedAt: '2026-05-28T12:00:00.000Z',\n              },\n            },\n          },\n        },\n      })\n    })\n\n    const formatted = screen.getByText('Site title')\n    expect(formatted).toHaveAttribute('data-airo-formatted-bound-text', 'true')\n    expect(formatted).toHaveAttribute('data-airo-format-italic', 'true')\n    expect(formatted).toHaveStyle({ fontStyle: 'italic' })\n  })\n})\n","totalLines":150,"truncated":false}
+/**
+ * @vitest-environment jsdom
+ */
+import { act, render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import type { FormatOverrideBundle } from '../../lib/format-overrides'
+import { setFormatOverrideBundle } from '../../lib/format-overrides-store'
+import { FormattedBoundText } from '../FormattedBoundText'
+
+const { initialBundle } = vi.hoisted((): { initialBundle: FormatOverrideBundle } => ({
+  initialBundle: {
+    version: 1,
+    scopes: {
+      'pages/index': {
+        version: 1,
+        overrides: {
+          abc123: {
+            target: {
+              file: 'src/pages/index.tsx',
+              tagName: 'h1',
+              sourceKind: 'bound-expression',
+              contentKey: null,
+              contentKeyTemplate: null,
+              expressionHash: `sha256:${'a'.repeat(64)}`,
+            },
+            marks: { bold: true, italic: true, color: '#123abc' },
+            updatedAt: '2026-05-28T12:00:00.000Z',
+          },
+          stale: {
+            target: {
+              file: 'src/pages/index.tsx',
+              tagName: 'p',
+              sourceKind: 'bound-expression',
+              contentKey: null,
+              contentKeyTemplate: null,
+              expressionHash: `sha256:${'b'.repeat(64)}`,
+            },
+            marks: { bold: true },
+            updatedAt: '2026-05-28T12:00:00.000Z',
+          },
+        },
+      },
+    },
+  },
+}))
+
+vi.mock(
+  'virtual:format-overrides',
+  () => ({
+    default: initialBundle,
+  }),
+)
+
+const guard = {
+  file: 'src/pages/index.tsx',
+  tagName: 'h1',
+  sourceKind: 'bound-expression' as const,
+  contentKey: null,
+  contentKeyTemplate: null,
+  expressionHash: `sha256:${'a'.repeat(64)}`,
+}
+
+describe('FormattedBoundText', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    setFormatOverrideBundle(initialBundle)
+  })
+
+  it('renders children unchanged when no override exists', () => {
+    const { container } = render(
+      <FormattedBoundText devId="missing" guard={guard}>
+        Site title
+      </FormattedBoundText>,
+    )
+
+    expect(container.querySelector('[data-airo-formatted-bound-text]')).toBeNull()
+    expect(container.textContent).toBe('Site title')
+  })
+
+  it('wraps children and applies matching override marks', () => {
+    render(
+      <FormattedBoundText devId="abc123" guard={guard}>
+        Site title
+      </FormattedBoundText>,
+    )
+
+    const formatted = screen.getByText('Site title')
+    expect(formatted).toHaveAttribute('data-airo-formatted-bound-text', 'true')
+    expect(formatted).toHaveAttribute('data-airo-format-bold', 'true')
+    expect(formatted).toHaveAttribute('data-airo-format-italic', 'true')
+    expect(formatted).toHaveAttribute('data-airo-format-color', '#123abc')
+    expect(formatted).toHaveStyle({
+      fontWeight: '700',
+      fontStyle: 'italic',
+      color: '#123abc',
+    })
+  })
+
+  it('renders children unchanged and warns in dev on guard mismatch', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const { container } = render(
+      <FormattedBoundText devId="stale" guard={guard}>
+        Site title
+      </FormattedBoundText>,
+    )
+
+    expect(container.querySelector('[data-airo-formatted-bound-text]')).toBeNull()
+    expect(container.textContent).toBe('Site title')
+    expect(warn).toHaveBeenCalledWith(
+      '[format-overrides] Ignoring stale override for bound text.',
+      expect.objectContaining({ devId: 'stale' }),
+    )
+  })
+
+  it('updates rendered marks when the format override bundle changes', () => {
+    render(
+      <FormattedBoundText devId="missing" guard={guard}>
+        Site title
+      </FormattedBoundText>,
+    )
+
+    expect(screen.getByText('Site title')).not.toHaveAttribute('data-airo-formatted-bound-text')
+
+    act(() => {
+      setFormatOverrideBundle({
+        version: 1,
+        scopes: {
+          'pages/index': {
+            version: 1,
+            overrides: {
+              missing: {
+                target: guard,
+                marks: { italic: true },
+                updatedAt: '2026-05-28T12:00:00.000Z',
+              },
+            },
+          },
+        },
+      })
+    })
+
+    const formatted = screen.getByText('Site title')
+    expect(formatted).toHaveAttribute('data-airo-formatted-bound-text', 'true')
+    expect(formatted).toHaveAttribute('data-airo-format-italic', 'true')
+    expect(formatted).toHaveStyle({ fontStyle: 'italic' })
+  })
+})

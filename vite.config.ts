@@ -1,1 +1,304 @@
-{"success":true,"path":"vite.config.ts","content":"import { defineConfig, type Plugin, type ViteDevServer } from \"vite\";\nimport react from \"@vitejs/plugin-react\";\nimport path from \"path\";\nimport { existsSync, statSync } from \"node:fs\";\nimport { readFile } from \"node:fs/promises\";\nimport type { IncomingMessage, ServerResponse } from \"node:http\";\nimport { URL } from \"node:url\";\nimport sourceMapperPlugin from \"./source-mapper/src/index\";\nimport { devToolsPlugin } from \"./dev-tools/src/vite-plugin\";\nimport { fullStoryPlugin } from \"./fullstory-plugin\";\nimport { errorInterceptorPlugin } from \"./dev-tools/src/vite-error-interceptor\";\nimport { mediaVersionsPlugin } from \"./dev-tools/src/vite-media-versions-plugin\";\nimport { formatOverridesPlugin } from \"./format-overrides-plugin\";\nimport { contentPlugin } from \"./content-plugin/src/index\";\n\nfunction extractHostname(value: string): string {\n  try {\n    if (value.includes(\"://\")) {\n      return new URL(value).hostname;\n    }\n    return value;\n  } catch {\n    return value;\n  }\n}\n\nfunction apiDevPlugin(): Plugin {\n  return {\n    name: \"api-dev\",\n    apply: \"serve\",\n    configureServer(server: ViteDevServer) {\n      server.middlewares.use(async (req, res, next) => {\n        if (!req.url?.startsWith(\"/api\")) return next();\n        try {\n          const mod = await server.ssrLoadModule(\"/src/server/entry.ts\");\n          const handler = mod.default;\n          handler(req, res, next);\n        } catch (err) {\n          if (err instanceof Error) server.ssrFixStacktrace(err);\n          next(err);\n        }\n      });\n    }\n  };\n}\n\n/**\n * Serves the pre-built output of an automation worktree when the\n * X-Worktree-Root header is present. Enables automation scan tools to\n * verify rendered HTML without affecting the user's live preview.\n *\n * Flow: dev-supervisor injects the header on requests carrying X-Base-Dir.\n * When the worktree has been built (dist/client/index.html exists), this\n * plugin serves the production build. Otherwise returns 503 so the\n * automation knows a build is needed first.\n */\nconst MIME_TYPES: Record<string, string> = {\n  \".js\": \"application/javascript\",\n  \".mjs\": \"application/javascript\",\n  \".css\": \"text/css\",\n  \".svg\": \"image/svg+xml\",\n  \".png\": \"image/png\",\n  \".jpg\": \"image/jpeg\",\n  \".woff2\": \"font/woff2\",\n  \".woff\": \"font/woff\",\n  \".json\": \"application/json\"\n};\n\nfunction worktreePreviewPlugin(): Plugin {\n  const serverBundleCache = new Map<string, {app: unknown;mtimeMs: number;}>();\n\n  return {\n    name: \"worktree-preview\",\n    apply: \"serve\",\n    configureServer(server: ViteDevServer) {\n      server.middlewares.use(async (req, res, next) => {\n        const worktreeRoot = req.headers[\"x-worktree-root\"] as string | undefined;\n        if (!worktreeRoot) return next();\n\n        const clientDir = path.join(worktreeRoot, \"dist\", \"client\");\n        const indexPath = path.join(clientDir, \"index.html\");\n\n        if (!existsSync(indexPath)) {\n          res.setHeader(\"X-Worktree-Status\", \"not-built\");\n          res.statusCode = 503;\n          res.end(JSON.stringify({ error: \"Worktree build not found. Run vite build first.\" }));\n          return;\n        }\n\n        const url = req.url || \"/\";\n\n        const ext = path.extname(url.split(\"?\")[0] || \"\");\n        if (ext && ext !== \".html\") {\n          const assetPath = path.resolve(clientDir, \".\" + (url.split(\"?\")[0] || \"\"));\n          if (assetPath.startsWith(clientDir + path.sep) && existsSync(assetPath)) {\n            res.setHeader(\"Content-Type\", MIME_TYPES[ext] || \"application/octet-stream\");\n            res.end(await readFile(assetPath));\n            return;\n          }\n        }\n\n        const bundlePath = path.join(worktreeRoot, \"dist\", \"server.bundle.mjs\");\n        if (!existsSync(bundlePath)) {\n          res.setHeader(\"Content-Type\", \"text/html\");\n          res.end(await readFile(indexPath, \"utf-8\"));\n          return;\n        }\n\n        try {\n          const bundleMtime: number = statSync(bundlePath).mtimeMs;\n          let cached = serverBundleCache.get(worktreeRoot);\n          if (!cached || cached.mtimeMs < bundleMtime) {\n            const cacheBuster: string = `?t=${bundleMtime}`;\n            const mod = await import(/* @vite-ignore */`${bundlePath}${cacheBuster}`);\n            cached = { app: mod.default, mtimeMs: bundleMtime };\n            serverBundleCache.set(worktreeRoot, cached);\n          }\n\n          const app = cached.app as (\n          req: IncomingMessage,\n          res: ServerResponse,\n          next: () => void)\n          => void;\n\n          app(req, res, () => {\n            readFile(indexPath, \"utf-8\").then((html) => {\n              res.setHeader(\"Content-Type\", \"text/html\");\n              res.end(html);\n            }).catch(() => {\n              res.statusCode = 500;\n              res.end(\"Failed to read index.html\");\n            });\n          });\n        } catch (err) {\n          const message = err instanceof Error ? err.message : String(err);\n          res.statusCode = 500;\n          res.end(JSON.stringify({ error: `Worktree server bundle failed: ${message}` }));\n        }\n      });\n    }\n  };\n}\n\nconst allowedHosts: string[] = [];\nconst corsOrigins: string[] = [];\n\nif (process.env.FRONTEND_DOMAIN) {\n  const frontendHost = extractHostname(process.env.FRONTEND_DOMAIN);\n  allowedHosts.push(frontendHost);\n  corsOrigins.push(`http://${frontendHost}`, `https://${frontendHost}`);\n}\nif (process.env.ALLOWED_ORIGINS) {\n  const origins = process.env.ALLOWED_ORIGINS.split(\",\");\n  allowedHosts.push(...origins.map(extractHostname));\n  corsOrigins.push(...origins);\n}\nif (process.env.VITE_PARENT_ORIGIN) {\n  allowedHosts.push(extractHostname(process.env.VITE_PARENT_ORIGIN));\n  corsOrigins.push(process.env.VITE_PARENT_ORIGIN);\n}\nif (allowedHosts.length === 0) {\n  allowedHosts.push(\"*\");\n}\nif (corsOrigins.length === 0) {\n  corsOrigins.push(\"*\");\n}\n\nexport default defineConfig(({ mode, isSsrBuild }) => ({\n  envPrefix: [\"VITE_\", \"SITE_\"],\n\n  plugins: [\n  react({\n    babel: {\n      plugins: [sourceMapperPlugin]\n    }\n  }),\n  worktreePreviewPlugin(),\n  apiDevPlugin(),\n  formatOverridesPlugin(__dirname),\n  contentPlugin(),\n  ...(mode === \"development\" ?\n  [\n  devToolsPlugin() as Plugin,\n  fullStoryPlugin(),\n  errorInterceptorPlugin(),\n  mediaVersionsPlugin() as Plugin] :\n\n  [])],\n\n\n  resolve: {\n    dedupe: [\"react\", \"react-dom\", \"react-router-dom\"],\n    alias: {\n      nothing: \"/src/fallbacks/missingModule.ts\",\n      \"@/api\": path.resolve(__dirname, \"./src/server/api\"),\n      \"@\": path.resolve(__dirname, \"./src\")\n    }\n  },\n\n  optimizeDeps: {\n    include: [\"react\", \"react-dom\", \"react-router-dom\", \"motion/react\"], exclude: [\"drizzle-orm\", \"mysql2\"]\n  },\n\n  ssr: {\n    noExternal: isSsrBuild ? true : undefined\n  },\n\n  server: {\n    host: process.env.HOST || \"0.0.0.0\",\n    port: parseInt(process.env.PORT || \"5173\"),\n    strictPort: !!process.env.PORT,\n    allowedHosts: true,\n    cors: {\n      origin: corsOrigins,\n      credentials: true,\n      methods: [\"GET\", \"POST\", \"PUT\", \"DELETE\", \"OPTIONS\"],\n      allowedHeaders: [\"Content-Type\", \"Authorization\", \"Accept\", \"User-Agent\"]\n    },\n    hmr: {\n      overlay: false\n    },\n    watch: {\n      ignored: [\"**/dist/**\"]\n    },\n    // Pre-transform the entry chain on dev-server start so the FIRST iframe\n    // request doesn't pay the full cold on-demand transpile cost. Paired with\n    // the container's pre-start `vite optimize` (container-scripts/preview/\n    // nomad_setup.sh), this shrinks the mount→IFRAME_READY window that the\n    // builder's recovery logic waits on.\n    warmup: {\n      clientFiles: [\"./src/main.tsx\", \"./src/App.tsx\"]\n    }\n  },\n\n  preview: {\n    host: process.env.HOST || \"0.0.0.0\",\n    port: parseInt(process.env.PORT || \"5173\"),\n    strictPort: !!process.env.PORT,\n    allowedHosts,\n    cors: {\n      origin: corsOrigins,\n      credentials: true,\n      methods: [\"GET\", \"POST\", \"PUT\", \"DELETE\", \"OPTIONS\"],\n      allowedHeaders: [\"Content-Type\", \"Authorization\", \"Accept\", \"User-Agent\"]\n    }\n  },\n\n  build: isSsrBuild ?\n  {\n    outDir: \"dist\",\n    emptyOutDir: false,\n    copyPublicDir: false,\n    ssr: \"src/server/entry.ts\",\n    rollupOptions: {\n      output: {\n        format: \"es\",\n        entryFileNames: \"server.bundle.mjs\",\n        chunkFileNames: \"bin/[name]-[hash].js\",\n        banner: \"import { createRequire } from 'module';\\nconst require = createRequire(import.meta.url);\"\n      }\n    }\n  } :\n  {\n    outDir: \"dist/client\",\n    emptyOutDir: true,\n    copyPublicDir: true,\n    rollupOptions: {\n      output: {\n        manualChunks: {\n          \"react-vendor\": [\"react\", \"react-dom\"],\n          \"radix-ui\": [\n          \"@radix-ui/react-accordion\",\n          \"@radix-ui/react-alert-dialog\",\n          \"@radix-ui/react-aspect-ratio\",\n          \"@radix-ui/react-avatar\",\n          \"@radix-ui/react-checkbox\",\n          \"@radix-ui/react-collapsible\",\n          \"@radix-ui/react-context-menu\",\n          \"@radix-ui/react-dialog\",\n          \"@radix-ui/react-dropdown-menu\",\n          \"@radix-ui/react-hover-card\",\n          \"@radix-ui/react-label\",\n          \"@radix-ui/react-menubar\",\n          \"@radix-ui/react-navigation-menu\",\n          \"@radix-ui/react-popover\",\n          \"@radix-ui/react-progress\",\n          \"@radix-ui/react-scroll-area\",\n          \"@radix-ui/react-select\",\n          \"@radix-ui/react-separator\",\n          \"@radix-ui/react-slider\",\n          \"@radix-ui/react-slot\",\n          \"@radix-ui/react-switch\",\n          \"@radix-ui/react-tabs\",\n          \"@radix-ui/react-toast\",\n          \"@radix-ui/react-toggle\",\n          \"@radix-ui/react-toggle-group\",\n          \"@radix-ui/react-tooltip\"],\n\n          query: [\"@tanstack/react-query\"]\n        }\n      }\n    }\n  }\n}));","totalLines":304,"truncated":false}
+import { defineConfig, type Plugin, type ViteDevServer } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+import { existsSync, statSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { URL } from "node:url";
+import sourceMapperPlugin from "./source-mapper/src/index";
+import { devToolsPlugin } from "./dev-tools/src/vite-plugin";
+import { fullStoryPlugin } from "./fullstory-plugin";
+import { errorInterceptorPlugin } from "./dev-tools/src/vite-error-interceptor";
+import { mediaVersionsPlugin } from "./dev-tools/src/vite-media-versions-plugin";
+import { formatOverridesPlugin } from "./format-overrides-plugin";
+import { contentPlugin } from "./content-plugin/src/index";
+
+function extractHostname(value: string): string {
+  try {
+    if (value.includes("://")) {
+      return new URL(value).hostname;
+    }
+    return value;
+  } catch {
+    return value;
+  }
+}
+
+function apiDevPlugin(): Plugin {
+  return {
+    name: "api-dev",
+    apply: "serve",
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.startsWith("/api")) return next();
+        try {
+          const mod = await server.ssrLoadModule("/src/server/entry.ts");
+          const handler = mod.default;
+          handler(req, res, next);
+        } catch (err) {
+          if (err instanceof Error) server.ssrFixStacktrace(err);
+          next(err);
+        }
+      });
+    }
+  };
+}
+
+/**
+ * Serves the pre-built output of an automation worktree when the
+ * X-Worktree-Root header is present. Enables automation scan tools to
+ * verify rendered HTML without affecting the user's live preview.
+ *
+ * Flow: dev-supervisor injects the header on requests carrying X-Base-Dir.
+ * When the worktree has been built (dist/client/index.html exists), this
+ * plugin serves the production build. Otherwise returns 503 so the
+ * automation knows a build is needed first.
+ */
+const MIME_TYPES: Record<string, string> = {
+  ".js": "application/javascript",
+  ".mjs": "application/javascript",
+  ".css": "text/css",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".woff2": "font/woff2",
+  ".woff": "font/woff",
+  ".json": "application/json"
+};
+
+function worktreePreviewPlugin(): Plugin {
+  const serverBundleCache = new Map<string, {app: unknown;mtimeMs: number;}>();
+
+  return {
+    name: "worktree-preview",
+    apply: "serve",
+    configureServer(server: ViteDevServer) {
+      server.middlewares.use(async (req, res, next) => {
+        const worktreeRoot = req.headers["x-worktree-root"] as string | undefined;
+        if (!worktreeRoot) return next();
+
+        const clientDir = path.join(worktreeRoot, "dist", "client");
+        const indexPath = path.join(clientDir, "index.html");
+
+        if (!existsSync(indexPath)) {
+          res.setHeader("X-Worktree-Status", "not-built");
+          res.statusCode = 503;
+          res.end(JSON.stringify({ error: "Worktree build not found. Run vite build first." }));
+          return;
+        }
+
+        const url = req.url || "/";
+
+        const ext = path.extname(url.split("?")[0] || "");
+        if (ext && ext !== ".html") {
+          const assetPath = path.resolve(clientDir, "." + (url.split("?")[0] || ""));
+          if (assetPath.startsWith(clientDir + path.sep) && existsSync(assetPath)) {
+            res.setHeader("Content-Type", MIME_TYPES[ext] || "application/octet-stream");
+            res.end(await readFile(assetPath));
+            return;
+          }
+        }
+
+        const bundlePath = path.join(worktreeRoot, "dist", "server.bundle.mjs");
+        if (!existsSync(bundlePath)) {
+          res.setHeader("Content-Type", "text/html");
+          res.end(await readFile(indexPath, "utf-8"));
+          return;
+        }
+
+        try {
+          const bundleMtime: number = statSync(bundlePath).mtimeMs;
+          let cached = serverBundleCache.get(worktreeRoot);
+          if (!cached || cached.mtimeMs < bundleMtime) {
+            const cacheBuster: string = `?t=${bundleMtime}`;
+            const mod = await import(/* @vite-ignore */`${bundlePath}${cacheBuster}`);
+            cached = { app: mod.default, mtimeMs: bundleMtime };
+            serverBundleCache.set(worktreeRoot, cached);
+          }
+
+          const app = cached.app as (
+          req: IncomingMessage,
+          res: ServerResponse,
+          next: () => void)
+          => void;
+
+          app(req, res, () => {
+            readFile(indexPath, "utf-8").then((html) => {
+              res.setHeader("Content-Type", "text/html");
+              res.end(html);
+            }).catch(() => {
+              res.statusCode = 500;
+              res.end("Failed to read index.html");
+            });
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          res.statusCode = 500;
+          res.end(JSON.stringify({ error: `Worktree server bundle failed: ${message}` }));
+        }
+      });
+    }
+  };
+}
+
+const allowedHosts: string[] = [];
+const corsOrigins: string[] = [];
+
+if (process.env.FRONTEND_DOMAIN) {
+  const frontendHost = extractHostname(process.env.FRONTEND_DOMAIN);
+  allowedHosts.push(frontendHost);
+  corsOrigins.push(`http://${frontendHost}`, `https://${frontendHost}`);
+}
+if (process.env.ALLOWED_ORIGINS) {
+  const origins = process.env.ALLOWED_ORIGINS.split(",");
+  allowedHosts.push(...origins.map(extractHostname));
+  corsOrigins.push(...origins);
+}
+if (process.env.VITE_PARENT_ORIGIN) {
+  allowedHosts.push(extractHostname(process.env.VITE_PARENT_ORIGIN));
+  corsOrigins.push(process.env.VITE_PARENT_ORIGIN);
+}
+if (allowedHosts.length === 0) {
+  allowedHosts.push("*");
+}
+if (corsOrigins.length === 0) {
+  corsOrigins.push("*");
+}
+
+export default defineConfig(({ mode, isSsrBuild }) => ({
+  envPrefix: ["VITE_", "SITE_"],
+
+  plugins: [
+  react({
+    babel: {
+      plugins: [sourceMapperPlugin]
+    }
+  }),
+  worktreePreviewPlugin(),
+  apiDevPlugin(),
+  formatOverridesPlugin(__dirname),
+  contentPlugin(),
+  ...(mode === "development" ?
+  [
+  devToolsPlugin() as Plugin,
+  fullStoryPlugin(),
+  errorInterceptorPlugin(),
+  mediaVersionsPlugin() as Plugin] :
+
+  [])],
+
+
+  resolve: {
+    dedupe: ["react", "react-dom", "react-router-dom"],
+    alias: {
+      nothing: "/src/fallbacks/missingModule.ts",
+      "@/api": path.resolve(__dirname, "./src/server/api"),
+      "@": path.resolve(__dirname, "./src")
+    }
+  },
+
+  optimizeDeps: {
+    include: ["react", "react-dom", "react-router-dom", "motion/react"], exclude: ["drizzle-orm", "mysql2"]
+  },
+
+  ssr: {
+    noExternal: isSsrBuild ? true : undefined
+  },
+
+  server: {
+    host: process.env.HOST || "0.0.0.0",
+    port: parseInt(process.env.PORT || "5173"),
+    strictPort: !!process.env.PORT,
+    allowedHosts: true,
+    cors: {
+      origin: corsOrigins,
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "Accept", "User-Agent"]
+    },
+    hmr: {
+      overlay: false
+    },
+    watch: {
+      ignored: ["**/dist/**"]
+    },
+    // Pre-transform the entry chain on dev-server start so the FIRST iframe
+    // request doesn't pay the full cold on-demand transpile cost. Paired with
+    // the container's pre-start `vite optimize` (container-scripts/preview/
+    // nomad_setup.sh), this shrinks the mount→IFRAME_READY window that the
+    // builder's recovery logic waits on.
+    warmup: {
+      clientFiles: ["./src/main.tsx", "./src/App.tsx"]
+    }
+  },
+
+  preview: {
+    host: process.env.HOST || "0.0.0.0",
+    port: parseInt(process.env.PORT || "5173"),
+    strictPort: !!process.env.PORT,
+    allowedHosts,
+    cors: {
+      origin: corsOrigins,
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "Accept", "User-Agent"]
+    }
+  },
+
+  build: isSsrBuild ?
+  {
+    outDir: "dist",
+    emptyOutDir: false,
+    copyPublicDir: false,
+    ssr: "src/server/entry.ts",
+    rollupOptions: {
+      output: {
+        format: "es",
+        entryFileNames: "server.bundle.mjs",
+        chunkFileNames: "bin/[name]-[hash].js",
+        banner: "import { createRequire } from 'module';\nconst require = createRequire(import.meta.url);"
+      }
+    }
+  } :
+  {
+    outDir: "dist/client",
+    emptyOutDir: true,
+    copyPublicDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom"],
+          "radix-ui": [
+          "@radix-ui/react-accordion",
+          "@radix-ui/react-alert-dialog",
+          "@radix-ui/react-aspect-ratio",
+          "@radix-ui/react-avatar",
+          "@radix-ui/react-checkbox",
+          "@radix-ui/react-collapsible",
+          "@radix-ui/react-context-menu",
+          "@radix-ui/react-dialog",
+          "@radix-ui/react-dropdown-menu",
+          "@radix-ui/react-hover-card",
+          "@radix-ui/react-label",
+          "@radix-ui/react-menubar",
+          "@radix-ui/react-navigation-menu",
+          "@radix-ui/react-popover",
+          "@radix-ui/react-progress",
+          "@radix-ui/react-scroll-area",
+          "@radix-ui/react-select",
+          "@radix-ui/react-separator",
+          "@radix-ui/react-slider",
+          "@radix-ui/react-slot",
+          "@radix-ui/react-switch",
+          "@radix-ui/react-tabs",
+          "@radix-ui/react-toast",
+          "@radix-ui/react-toggle",
+          "@radix-ui/react-toggle-group",
+          "@radix-ui/react-tooltip"],
+
+          query: ["@tanstack/react-query"]
+        }
+      }
+    }
+  }
+}));

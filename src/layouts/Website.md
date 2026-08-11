@@ -1,1 +1,123 @@
-{"success":true,"path":"src/layouts/Website.md","content":"# Website Layout Documentation\n\n## Overview\n\nThe Website layout provides the structural container for website pages. For most applications, you should use **RootLayout** instead, which wraps this component and provides centralized header/footer management.\n\n## RECOMMENDED: Use RootLayout Pattern\n\n**For multi-page applications, use RootLayout to maintain consistent navigation across all pages.**\n\n### Correct Implementation ✅\n\n**Step 1: RootLayout is already applied in `App.tsx`** — you don't edit it to set this up. For reference, the routing shape is a single pathless layout route whose `children` are your `routes`:\n\n```tsx\nimport RootLayout from \"./layouts/RootLayout\";\n\nconst router = createBrowserRouter([\n  {\n    element: (\n      <RootLayout>\n        <Outlet />\n      </RootLayout>\n    ),\n    children: routes,\n  },\n]);\n```\n\n**Step 2: Create simple page components**\n\n```tsx\n// src/pages/index.tsx\nexport default function HomePage() {\n  return (\n    <div className=\"container mx-auto px-4 py-16\">\n      <h1>Welcome to MyApp</h1>\n      <p>Your content here...</p>\n    </div>\n  );\n}\n\n// src/pages/about.tsx\nexport default function AboutPage() {\n  return (\n    <div className=\"container mx-auto px-4 py-16\">\n      <h1>About Us</h1>\n      <p>Your content here...</p>\n    </div>\n  );\n}\n```\n\n**Step 3: Customize header and footer by editing the component files**\n\n- **Header**: Edit `src/layouts/parts/Header.tsx`\n- **Footer**: Edit `src/layouts/parts/Footer.tsx`\n\n### Benefits of RootLayout Pattern\n\n1. **Consistency**: Header and footer are centralized in RootLayout\n2. **Maintainability**: Update navigation in one place, applies to all pages\n3. **Simplicity**: Page components focus only on content\n4. **Common Pattern**: Follows React Router and Next.js conventions\n\n## Direct Website Component Usage (Advanced)\n\nFor special cases where you need custom layout behavior, you can use the Website component directly:\n\n```tsx\nimport Website from \"@/layouts/Website\";\nimport Header from \"@/layouts/parts/Header\";\nimport Footer from \"@/layouts/parts/Footer\";\n\nexport default function CustomPage() {\n  return (\n    <Website>\n      <Header />\n      <main>\n        <div>Your custom content</div>\n      </main>\n      <Footer />\n    </Website>\n  );\n}\n```\n\n## Mobile Responsiveness\n\nThe layout automatically handles mobile responsiveness:\n\n- Header navigation collapses into a mobile menu\n- Footer columns stack vertically on small screens\n- Content areas adjust padding and spacing\n\n## Important Notes\n\n1. **Use RootLayout for multi-page apps**: Define header/footer once in RootLayout\n2. **Keep pages simple**: Let RootLayout handle layout concerns\n3. **Centralized customization**: Edit Header.tsx and Footer.tsx directly\n4. **Maintain consistency**: Same header/footer across all pages\n\n## Anti-Patterns to Avoid\n\n❌ **Don't create custom layout structure**\n\n```tsx\n// Bad\n<div className=\"min-h-screen\">\n  <header>...</header>\n  <main>...</main>\n  <footer>...</footer>\n</div>\n```\n\n✅ **Do use provided layout components**\n\n```tsx\n// Good\n<RootLayout>\n  <YourPageContent />\n</RootLayout>\n```\n","totalLines":124,"truncated":false}
+# Website Layout Documentation
+
+## Overview
+
+The Website layout provides the structural container for website pages. For most applications, you should use **RootLayout** instead, which wraps this component and provides centralized header/footer management.
+
+## RECOMMENDED: Use RootLayout Pattern
+
+**For multi-page applications, use RootLayout to maintain consistent navigation across all pages.**
+
+### Correct Implementation ✅
+
+**Step 1: RootLayout is already applied in `App.tsx`** — you don't edit it to set this up. For reference, the routing shape is a single pathless layout route whose `children` are your `routes`:
+
+```tsx
+import RootLayout from "./layouts/RootLayout";
+
+const router = createBrowserRouter([
+  {
+    element: (
+      <RootLayout>
+        <Outlet />
+      </RootLayout>
+    ),
+    children: routes,
+  },
+]);
+```
+
+**Step 2: Create simple page components**
+
+```tsx
+// src/pages/index.tsx
+export default function HomePage() {
+  return (
+    <div className="container mx-auto px-4 py-16">
+      <h1>Welcome to MyApp</h1>
+      <p>Your content here...</p>
+    </div>
+  );
+}
+
+// src/pages/about.tsx
+export default function AboutPage() {
+  return (
+    <div className="container mx-auto px-4 py-16">
+      <h1>About Us</h1>
+      <p>Your content here...</p>
+    </div>
+  );
+}
+```
+
+**Step 3: Customize header and footer by editing the component files**
+
+- **Header**: Edit `src/layouts/parts/Header.tsx`
+- **Footer**: Edit `src/layouts/parts/Footer.tsx`
+
+### Benefits of RootLayout Pattern
+
+1. **Consistency**: Header and footer are centralized in RootLayout
+2. **Maintainability**: Update navigation in one place, applies to all pages
+3. **Simplicity**: Page components focus only on content
+4. **Common Pattern**: Follows React Router and Next.js conventions
+
+## Direct Website Component Usage (Advanced)
+
+For special cases where you need custom layout behavior, you can use the Website component directly:
+
+```tsx
+import Website from "@/layouts/Website";
+import Header from "@/layouts/parts/Header";
+import Footer from "@/layouts/parts/Footer";
+
+export default function CustomPage() {
+  return (
+    <Website>
+      <Header />
+      <main>
+        <div>Your custom content</div>
+      </main>
+      <Footer />
+    </Website>
+  );
+}
+```
+
+## Mobile Responsiveness
+
+The layout automatically handles mobile responsiveness:
+
+- Header navigation collapses into a mobile menu
+- Footer columns stack vertically on small screens
+- Content areas adjust padding and spacing
+
+## Important Notes
+
+1. **Use RootLayout for multi-page apps**: Define header/footer once in RootLayout
+2. **Keep pages simple**: Let RootLayout handle layout concerns
+3. **Centralized customization**: Edit Header.tsx and Footer.tsx directly
+4. **Maintain consistency**: Same header/footer across all pages
+
+## Anti-Patterns to Avoid
+
+❌ **Don't create custom layout structure**
+
+```tsx
+// Bad
+<div className="min-h-screen">
+  <header>...</header>
+  <main>...</main>
+  <footer>...</footer>
+</div>
+```
+
+✅ **Do use provided layout components**
+
+```tsx
+// Good
+<RootLayout>
+  <YourPageContent />
+</RootLayout>
+```

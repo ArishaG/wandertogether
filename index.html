@@ -1,1 +1,28 @@
-{"success":true,"path":"index.html","content":"<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <script>\n      (function () {\n        try {\n          var u = new URL(location.href);\n          if (u.searchParams.has('airoShareToken')) {\n            u.searchParams.delete('airoShareToken');\n            history.replaceState(null, '', u.toString());\n          }\n        } catch (e) {}\n      })();\n    </script>\n    <meta name=\"referrer\" content=\"same-origin\" />\n    <link rel=\"icon\" href=\"/favicon.ico\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <!--app-head-->\n    <script src=\"/airo-video-slots.js\"></script>\n    <script src=\"/airo-logo-orientation.js\"></script>\n  </head>\n  <body class=\"fs-unmask-airo-app-builder\">\n    <div id=\"app\" class=\"fs-unmask-airo-app-builder\"><!--app-html--></div>\n    <script type=\"module\" src=\"/src/main.tsx\"></script>\n    <script src=\"/analytics.js\"></script>\n  </body>\n</html>\n","totalLines":29,"truncated":false}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      (function () {
+        try {
+          var u = new URL(location.href);
+          if (u.searchParams.has('airoShareToken')) {
+            u.searchParams.delete('airoShareToken');
+            history.replaceState(null, '', u.toString());
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <meta name="referrer" content="same-origin" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--app-head-->
+    <script src="/airo-video-slots.js"></script>
+    <script src="/airo-logo-orientation.js"></script>
+  </head>
+  <body class="fs-unmask-airo-app-builder">
+    <div id="app" class="fs-unmask-airo-app-builder"><!--app-html--></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script src="/analytics.js"></script>
+  </body>
+</html>

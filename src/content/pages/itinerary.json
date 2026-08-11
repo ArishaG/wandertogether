@@ -1,1 +1,180 @@
-{"success":true,"path":"src/content/pages/itinerary.json","content":"{\n  \"meta\": {\n    \"title\": \"Lisbon Long Weekend Itinerary — Wander.\",\n    \"description\": \"A shared itinerary and cost summary for Lisbon Long Weekend.\"\n  },\n  \"header\": {\n    \"tripName\": \"Lisbon Long Weekend\",\n    \"dates\": \"Aug 14–16, 2025\",\n    \"travelers\": \"4 travellers\",\n    \"nights\": \"3 nights\",\n    \"board\": \"View board\",\n    \"decisions\": \"2 items still being decided\",\n    \"tags\": [\n      {\n        \"label\": \"Solo-female friendly\",\n        \"id\": \"G1-A2_0VJCndR0rUMpEAV\"\n      },\n      {\n        \"label\": \"Accessible (central)\",\n        \"id\": \"lhjX-i83pO4snTUW36INX\"\n      },\n      {\n        \"label\": \"EU passport\",\n        \"id\": \"l2XHum7YJI5D9iTDth7Jc\"\n      }\n    ]\n  },\n  \"cost\": {\n    \"title\": \"Cost summary\",\n    \"filters\": [\n      {\n        \"label\": \"All\",\n        \"id\": \"P4RymQfTpMA9sRlUqskp2\"\n      },\n      {\n        \"label\": \"Lodging\",\n        \"id\": \"84cIoSFc8cD_WO-hTB72v\"\n      },\n      {\n        \"label\": \"Flights\",\n        \"id\": \"nsP2p0zfwEFz0eETrcaP6\"\n      },\n      {\n        \"label\": \"Food\",\n        \"id\": \"bnPm-23q7T8TAIgw_rIrg\"\n      },\n      {\n        \"label\": \"Activities\",\n        \"id\": \"Mb1TbTAAsN3fO7fCm5-b-\"\n      }\n    ],\n    \"cards\": [\n      {\n        \"label\": \"Total\",\n        \"value\": \"€1,700\",\n        \"detail\": \"per person\",\n        \"id\": \"RT-Dijs1X9m2X8XuFbnHU\"\n      },\n      {\n        \"label\": \"Flights\",\n        \"value\": \"€180\",\n        \"detail\": \"booked\",\n        \"id\": \"omwHn4umHrDwvc1HmI95o\"\n      },\n      {\n        \"label\": \"Lodging\",\n        \"value\": \"€405\",\n        \"detail\": \"3 nights\",\n        \"id\": \"jMmtxDHvFIWKJ2H2mFyQY\"\n      },\n      {\n        \"label\": \"Food & out\",\n        \"value\": \"€280\",\n        \"detail\": \"est.\",\n        \"id\": \"nhgBqILTY-38MZeGxJwvS\"\n      },\n      {\n        \"label\": \"Activities\",\n        \"value\": \"€60\",\n        \"detail\": \"confirmed\",\n        \"id\": \"op-Oh5Prj9GOPa2cPHkMa\"\n      }\n    ]\n  },\n  \"days\": [\n    {\n      \"date\": \"Thu, 14 Aug\",\n      \"items\": [\n        {\n          \"time\": \"11:20\",\n          \"title\": \"Flight TAP 345 — LHR → LIS\",\n          \"cost\": \"€180 pp\",\n          \"status\": \"confirmed\",\n          \"id\": \"SGocNI5aRoTO_mhq3rdBB\"\n        },\n        {\n          \"time\": \"14:30\",\n          \"title\": \"Check in — Airbnb Alfama\",\n          \"cost\": \"€135 pp\",\n          \"status\": \"confirmed\",\n          \"id\": \"OBLR_vUWY8VYjoU7Ct2U2\"\n        },\n        {\n          \"time\": \"18:00\",\n          \"title\": \"Sunset walk, Miradouro da Graça\",\n          \"cost\": \"—\",\n          \"status\": \"confirmed\",\n          \"id\": \"w6w8nZqh0_dtr6MkXzXJv\"\n        },\n        {\n          \"time\": \"20:30\",\n          \"title\": \"Dinner at Zé da Mouraria\",\n          \"cost\": \"~€22 pp\",\n          \"status\": \"confirmed\",\n          \"id\": \"h7R8DHcXqRNw8NPMyHad_\"\n        }\n      ],\n      \"id\": \"UCrOnRjS6eMIMDQnX6eko\"\n    },\n    {\n      \"date\": \"Fri, 15 Aug\",\n      \"items\": [\n        {\n          \"time\": \"09:00\",\n          \"title\": \"Belém Tower + Jerónimos Monastery\",\n          \"cost\": \"€14 pp\",\n          \"status\": \"confirmed\",\n          \"id\": \"BaBoF4Y_MUSG-l3mCT5cD\"\n        },\n        {\n          \"time\": \"12:30\",\n          \"title\": \"Lunch at A Cevicheria\",\n          \"cost\": \"~€28 pp\",\n          \"status\": \"confirmed\",\n          \"id\": \"23Vt0p4tvQGUcQLpRmpgp\"\n        },\n        {\n          \"time\": \"15:00\",\n          \"title\": \"MAAT Museum\",\n          \"cost\": \"€11 pp\",\n          \"status\": \"confirmed\",\n          \"id\": \"1InD1n0_g7YQ1iXYiq5Eh\"\n        },\n        {\n          \"time\": \"19:00\",\n          \"title\": \"Drinks, Pink Street (Rua Nova do Carvalho)\",\n          \"cost\": \"~€15 pp\",\n          \"status\": \"pending\",\n          \"id\": \"LFcvaxNLpzm6sD1HbU6il\"\n        }\n      ],\n      \"id\": \"-Y3IgkEjzz6-F3KFJffpV\"\n    },\n    {\n      \"date\": \"Sat, 16 Aug\",\n      \"items\": [\n        {\n          \"time\": \"10:00\",\n          \"title\": \"Day trip to Sintra (TBD — vote open)\",\n          \"cost\": \"€35 pp\",\n          \"status\": \"pending\",\n          \"id\": \"J0UALGzP2tserYzpCHuLZ\"\n        },\n        {\n          \"time\": \"20:00\",\n          \"title\": \"Farewell dinner at Taberna da Rua das Flores\",\n          \"cost\": \"~€35 pp\",\n          \"status\": \"pending\",\n          \"id\": \"ai8_5PnyPcjGXOyKt3D-0\"\n        }\n      ],\n      \"id\": \"iTHgkypn7jJBmJnW61wLh\"\n    }\n  ],\n  \"footer\": {\n    \"title\": \"2 items still being decided on the board\",\n    \"description\": \"Saturday plans and Pink Street drinks are unconfirmed.\",\n    \"button\": \"Go to board\"\n  }\n}\n","totalLines":181,"truncated":false}
+{
+  "meta": {
+    "title": "Lisbon Long Weekend Itinerary — Wander.",
+    "description": "A shared itinerary and cost summary for Lisbon Long Weekend."
+  },
+  "header": {
+    "tripName": "Lisbon Long Weekend",
+    "dates": "Aug 14–16, 2025",
+    "travelers": "4 travellers",
+    "nights": "3 nights",
+    "board": "View board",
+    "decisions": "2 items still being decided",
+    "tags": [
+      {
+        "label": "Solo-female friendly",
+        "id": "G1-A2_0VJCndR0rUMpEAV"
+      },
+      {
+        "label": "Accessible (central)",
+        "id": "lhjX-i83pO4snTUW36INX"
+      },
+      {
+        "label": "EU passport",
+        "id": "l2XHum7YJI5D9iTDth7Jc"
+      }
+    ]
+  },
+  "cost": {
+    "title": "Cost summary",
+    "filters": [
+      {
+        "label": "All",
+        "id": "P4RymQfTpMA9sRlUqskp2"
+      },
+      {
+        "label": "Lodging",
+        "id": "84cIoSFc8cD_WO-hTB72v"
+      },
+      {
+        "label": "Flights",
+        "id": "nsP2p0zfwEFz0eETrcaP6"
+      },
+      {
+        "label": "Food",
+        "id": "bnPm-23q7T8TAIgw_rIrg"
+      },
+      {
+        "label": "Activities",
+        "id": "Mb1TbTAAsN3fO7fCm5-b-"
+      }
+    ],
+    "cards": [
+      {
+        "label": "Total",
+        "value": "€1,700",
+        "detail": "per person",
+        "id": "RT-Dijs1X9m2X8XuFbnHU"
+      },
+      {
+        "label": "Flights",
+        "value": "€180",
+        "detail": "booked",
+        "id": "omwHn4umHrDwvc1HmI95o"
+      },
+      {
+        "label": "Lodging",
+        "value": "€405",
+        "detail": "3 nights",
+        "id": "jMmtxDHvFIWKJ2H2mFyQY"
+      },
+      {
+        "label": "Food & out",
+        "value": "€280",
+        "detail": "est.",
+        "id": "nhgBqILTY-38MZeGxJwvS"
+      },
+      {
+        "label": "Activities",
+        "value": "€60",
+        "detail": "confirmed",
+        "id": "op-Oh5Prj9GOPa2cPHkMa"
+      }
+    ]
+  },
+  "days": [
+    {
+      "date": "Thu, 14 Aug",
+      "items": [
+        {
+          "time": "11:20",
+          "title": "Flight TAP 345 — LHR → LIS",
+          "cost": "€180 pp",
+          "status": "confirmed",
+          "id": "SGocNI5aRoTO_mhq3rdBB"
+        },
+        {
+          "time": "14:30",
+          "title": "Check in — Airbnb Alfama",
+          "cost": "€135 pp",
+          "status": "confirmed",
+          "id": "OBLR_vUWY8VYjoU7Ct2U2"
+        },
+        {
+          "time": "18:00",
+          "title": "Sunset walk, Miradouro da Graça",
+          "cost": "—",
+          "status": "confirmed",
+          "id": "w6w8nZqh0_dtr6MkXzXJv"
+        },
+        {
+          "time": "20:30",
+          "title": "Dinner at Zé da Mouraria",
+          "cost": "~€22 pp",
+          "status": "confirmed",
+          "id": "h7R8DHcXqRNw8NPMyHad_"
+        }
+      ],
+      "id": "UCrOnRjS6eMIMDQnX6eko"
+    },
+    {
+      "date": "Fri, 15 Aug",
+      "items": [
+        {
+          "time": "09:00",
+          "title": "Belém Tower + Jerónimos Monastery",
+          "cost": "€14 pp",
+          "status": "confirmed",
+          "id": "BaBoF4Y_MUSG-l3mCT5cD"
+        },
+        {
+          "time": "12:30",
+          "title": "Lunch at A Cevicheria",
+          "cost": "~€28 pp",
+          "status": "confirmed",
+          "id": "23Vt0p4tvQGUcQLpRmpgp"
+        },
+        {
+          "time": "15:00",
+          "title": "MAAT Museum",
+          "cost": "€11 pp",
+          "status": "confirmed",
+          "id": "1InD1n0_g7YQ1iXYiq5Eh"
+        },
+        {
+          "time": "19:00",
+          "title": "Drinks, Pink Street (Rua Nova do Carvalho)",
+          "cost": "~€15 pp",
+          "status": "pending",
+          "id": "LFcvaxNLpzm6sD1HbU6il"
+        }
+      ],
+      "id": "-Y3IgkEjzz6-F3KFJffpV"
+    },
+    {
+      "date": "Sat, 16 Aug",
+      "items": [
+        {
+          "time": "10:00",
+          "title": "Day trip to Sintra (TBD — vote open)",
+          "cost": "€35 pp",
+          "status": "pending",
+          "id": "J0UALGzP2tserYzpCHuLZ"
+        },
+        {
+          "time": "20:00",
+          "title": "Farewell dinner at Taberna da Rua das Flores",
+          "cost": "~€35 pp",
+          "status": "pending",
+          "id": "ai8_5PnyPcjGXOyKt3D-0"
+        }
+      ],
+      "id": "iTHgkypn7jJBmJnW61wLh"
+    }
+  ],
+  "footer": {
+    "title": "2 items still being decided on the board",
+    "description": "Saturday plans and Pink Street drinks are unconfirmed.",
+    "button": "Go to board"
+  }
+}

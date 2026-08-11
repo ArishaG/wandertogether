@@ -1,1 +1,48 @@
-{"success":true,"path":"src/components/FormattedBoundText.tsx","content":"import type { ReactNode } from 'react'\n\nimport {\n  buildFormatOverrideStyle,\n  findApplicableFormatOverride,\n  type FormatOverrideTarget,\n} from '@/lib/format-overrides'\nimport { useFormatOverrideBundle } from '@/lib/format-overrides-store'\n\ninterface FormattedBoundTextProps {\n  devId: string\n  guard: FormatOverrideTarget\n  children: ReactNode\n}\n\nexport function FormattedBoundText({ devId, guard, children }: FormattedBoundTextProps) {\n  const formatOverrideBundle = useFormatOverrideBundle()\n  const result = findApplicableFormatOverride(formatOverrideBundle, devId, guard)\n\n  if (result.status === 'missing') {\n    return <>{children}</>\n  }\n\n  if (result.status === 'guard-mismatch') {\n    if (import.meta.env.DEV) {\n      console.warn('[format-overrides] Ignoring stale override for bound text.', {\n        devId,\n        expected: result.expected,\n        actual: result.actual,\n      })\n    }\n    return <>{children}</>\n  }\n\n  const marks = result.marks\n\n  return (\n    <span\n      data-airo-formatted-bound-text=\"true\"\n      data-airo-format-bold={marks.bold ? 'true' : undefined}\n      data-airo-format-italic={marks.italic ? 'true' : undefined}\n      data-airo-format-color={marks.color || undefined}\n      style={buildFormatOverrideStyle(marks)}\n    >\n      {children}\n    </span>\n  )\n}\n","totalLines":49,"truncated":false}
+import type { ReactNode } from 'react'
+
+import {
+  buildFormatOverrideStyle,
+  findApplicableFormatOverride,
+  type FormatOverrideTarget,
+} from '@/lib/format-overrides'
+import { useFormatOverrideBundle } from '@/lib/format-overrides-store'
+
+interface FormattedBoundTextProps {
+  devId: string
+  guard: FormatOverrideTarget
+  children: ReactNode
+}
+
+export function FormattedBoundText({ devId, guard, children }: FormattedBoundTextProps) {
+  const formatOverrideBundle = useFormatOverrideBundle()
+  const result = findApplicableFormatOverride(formatOverrideBundle, devId, guard)
+
+  if (result.status === 'missing') {
+    return <>{children}</>
+  }
+
+  if (result.status === 'guard-mismatch') {
+    if (import.meta.env.DEV) {
+      console.warn('[format-overrides] Ignoring stale override for bound text.', {
+        devId,
+        expected: result.expected,
+        actual: result.actual,
+      })
+    }
+    return <>{children}</>
+  }
+
+  const marks = result.marks
+
+  return (
+    <span
+      data-airo-formatted-bound-text="true"
+      data-airo-format-bold={marks.bold ? 'true' : undefined}
+      data-airo-format-italic={marks.italic ? 'true' : undefined}
+      data-airo-format-color={marks.color || undefined}
+      style={buildFormatOverrideStyle(marks)}
+    >
+      {children}
+    </span>
+  )
+}

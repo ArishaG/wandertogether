@@ -1,1 +1,118 @@
-{"success":true,"path":"src/server/adsense-manifest.ts","content":"import { existsSync, readFileSync } from \"node:fs\";\nimport { normalize, resolve, sep } from \"node:path\";\n\nexport interface AdSenseRuntimeConfig {\n\tpublisherId: string | null;\n\tscriptHtml: string;\n\tadsTxt: string | null;\n\tappAdsTxt: string | null;\n}\n\ninterface AdSenseTextFileManifest {\n\tenabled: boolean;\n\tcontent: string;\n}\n\ninterface AdSenseRuntimeManifest {\n\tversion: 1;\n\tenabled: boolean;\n\tpublisherId: string | null;\n\tscriptSnippet: string;\n\tadsTxt: AdSenseTextFileManifest;\n\tappAdsTxt: AdSenseTextFileManifest;\n}\n\nconst ADSENSE_MANIFEST_FILENAME = \"airo-adsense.json\";\nconst ADSENSE_PUBLISHER_ID_PATTERN = /^ca-pub-\\d{16}$/;\n\nexport const EMPTY_ADSENSE_RUNTIME_CONFIG: AdSenseRuntimeConfig = {\n\tpublisherId: null,\n\tscriptHtml: \"\",\n\tadsTxt: null,\n\tappAdsTxt: null,\n};\n\nexport function buildCanonicalAdSenseScript(publisherId: string): string {\n\tif (!ADSENSE_PUBLISHER_ID_PATTERN.test(publisherId)) return \"\";\n\treturn `<script async src=\"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${publisherId}\" crossorigin=\"anonymous\"></script>`;\n}\n\nexport function loadAdSenseRuntimeConfig(baseDir: string): AdSenseRuntimeConfig {\n\tconst manifestPath = resolveRuntimeManifestPath(baseDir);\n\tif (manifestPath === null) return EMPTY_ADSENSE_RUNTIME_CONFIG;\n\tif (!existsSync(manifestPath)) return EMPTY_ADSENSE_RUNTIME_CONFIG;\n\n\ttry {\n\t\tconst parsed = JSON.parse(readFileSync(manifestPath, \"utf8\")) as unknown;\n\t\treturn normalizeRuntimeManifest(parsed);\n\t} catch (error) {\n\t\tconsole.error(\"adsense.manifest.load_failed\", {\n\t\t\terror: error instanceof Error ? error.message : String(error),\n\t\t});\n\t\treturn EMPTY_ADSENSE_RUNTIME_CONFIG;\n\t}\n}\n\nfunction resolveRuntimeManifestPath(baseDir: string): string | null {\n\tif (baseDir.includes(\"\\0\")) return null;\n\tif (baseDir.split(/[\\\\/]+/).includes(\"..\")) return null;\n\tconst normalizedBaseDir = normalize(baseDir);\n\n\tconst resolvedBaseDir = resolve(normalizedBaseDir);\n\tconst resolvedManifestPath = resolve(resolvedBaseDir, ADSENSE_MANIFEST_FILENAME);\n\tconst basePrefix = resolvedBaseDir.endsWith(sep) ? resolvedBaseDir : `${resolvedBaseDir}${sep}`;\n\tif (resolvedManifestPath !== resolvedBaseDir && !resolvedManifestPath.startsWith(basePrefix)) {\n\t\treturn null;\n\t}\n\treturn resolvedManifestPath;\n}\n\nexport function resolveAdSenseTextFile(\n\tconfig: AdSenseRuntimeConfig,\n\tkey: \"adsTxt\" | \"appAdsTxt\",\n): string | null {\n\treturn config[key];\n}\n\nfunction normalizeRuntimeManifest(value: unknown): AdSenseRuntimeConfig {\n\tif (!isRuntimeManifestShape(value)) return EMPTY_ADSENSE_RUNTIME_CONFIG;\n\n\tif (!value.enabled) return EMPTY_ADSENSE_RUNTIME_CONFIG;\n\n\tconst publisherId = isValidPublisherId(value.publisherId) ? value.publisherId : null;\n\treturn {\n\t\tpublisherId,\n\t\tscriptHtml: publisherId ? buildCanonicalAdSenseScript(publisherId) : \"\",\n\t\tadsTxt: normalizeTextFile(value.adsTxt),\n\t\tappAdsTxt: normalizeTextFile(value.appAdsTxt),\n\t};\n}\n\nfunction isRuntimeManifestShape(value: unknown): value is AdSenseRuntimeManifest {\n\tif (typeof value !== \"object\" || value === null) return false;\n\tconst candidate = value as Partial<AdSenseRuntimeManifest>;\n\treturn (\n\t\tcandidate.version === 1 &&\n\t\ttypeof candidate.enabled === \"boolean\" &&\n\t\t(candidate.publisherId === null || typeof candidate.publisherId === \"string\") &&\n\t\ttypeof candidate.scriptSnippet === \"string\" &&\n\t\tisTextFileManifest(candidate.adsTxt) &&\n\t\tisTextFileManifest(candidate.appAdsTxt)\n\t);\n}\n\nfunction isTextFileManifest(value: unknown): value is AdSenseTextFileManifest {\n\tif (typeof value !== \"object\" || value === null) return false;\n\tconst candidate = value as Partial<AdSenseTextFileManifest>;\n\treturn typeof candidate.enabled === \"boolean\" && typeof candidate.content === \"string\";\n}\n\nfunction isValidPublisherId(value: string | null): value is string {\n\treturn typeof value === \"string\" && ADSENSE_PUBLISHER_ID_PATTERN.test(value);\n}\n\nfunction normalizeTextFile(value: AdSenseTextFileManifest): string | null {\n\tif (!value.enabled) return null;\n\tconst content = value.content.trim();\n\treturn content ? value.content : null;\n}\n","totalLines":119,"truncated":false}
+import { existsSync, readFileSync } from "node:fs";
+import { normalize, resolve, sep } from "node:path";
+
+export interface AdSenseRuntimeConfig {
+	publisherId: string | null;
+	scriptHtml: string;
+	adsTxt: string | null;
+	appAdsTxt: string | null;
+}
+
+interface AdSenseTextFileManifest {
+	enabled: boolean;
+	content: string;
+}
+
+interface AdSenseRuntimeManifest {
+	version: 1;
+	enabled: boolean;
+	publisherId: string | null;
+	scriptSnippet: string;
+	adsTxt: AdSenseTextFileManifest;
+	appAdsTxt: AdSenseTextFileManifest;
+}
+
+const ADSENSE_MANIFEST_FILENAME = "airo-adsense.json";
+const ADSENSE_PUBLISHER_ID_PATTERN = /^ca-pub-\d{16}$/;
+
+export const EMPTY_ADSENSE_RUNTIME_CONFIG: AdSenseRuntimeConfig = {
+	publisherId: null,
+	scriptHtml: "",
+	adsTxt: null,
+	appAdsTxt: null,
+};
+
+export function buildCanonicalAdSenseScript(publisherId: string): string {
+	if (!ADSENSE_PUBLISHER_ID_PATTERN.test(publisherId)) return "";
+	return `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${publisherId}" crossorigin="anonymous"></script>`;
+}
+
+export function loadAdSenseRuntimeConfig(baseDir: string): AdSenseRuntimeConfig {
+	const manifestPath = resolveRuntimeManifestPath(baseDir);
+	if (manifestPath === null) return EMPTY_ADSENSE_RUNTIME_CONFIG;
+	if (!existsSync(manifestPath)) return EMPTY_ADSENSE_RUNTIME_CONFIG;
+
+	try {
+		const parsed = JSON.parse(readFileSync(manifestPath, "utf8")) as unknown;
+		return normalizeRuntimeManifest(parsed);
+	} catch (error) {
+		console.error("adsense.manifest.load_failed", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+		return EMPTY_ADSENSE_RUNTIME_CONFIG;
+	}
+}
+
+function resolveRuntimeManifestPath(baseDir: string): string | null {
+	if (baseDir.includes("\0")) return null;
+	if (baseDir.split(/[\\/]+/).includes("..")) return null;
+	const normalizedBaseDir = normalize(baseDir);
+
+	const resolvedBaseDir = resolve(normalizedBaseDir);
+	const resolvedManifestPath = resolve(resolvedBaseDir, ADSENSE_MANIFEST_FILENAME);
+	const basePrefix = resolvedBaseDir.endsWith(sep) ? resolvedBaseDir : `${resolvedBaseDir}${sep}`;
+	if (resolvedManifestPath !== resolvedBaseDir && !resolvedManifestPath.startsWith(basePrefix)) {
+		return null;
+	}
+	return resolvedManifestPath;
+}
+
+export function resolveAdSenseTextFile(
+	config: AdSenseRuntimeConfig,
+	key: "adsTxt" | "appAdsTxt",
+): string | null {
+	return config[key];
+}
+
+function normalizeRuntimeManifest(value: unknown): AdSenseRuntimeConfig {
+	if (!isRuntimeManifestShape(value)) return EMPTY_ADSENSE_RUNTIME_CONFIG;
+
+	if (!value.enabled) return EMPTY_ADSENSE_RUNTIME_CONFIG;
+
+	const publisherId = isValidPublisherId(value.publisherId) ? value.publisherId : null;
+	return {
+		publisherId,
+		scriptHtml: publisherId ? buildCanonicalAdSenseScript(publisherId) : "",
+		adsTxt: normalizeTextFile(value.adsTxt),
+		appAdsTxt: normalizeTextFile(value.appAdsTxt),
+	};
+}
+
+function isRuntimeManifestShape(value: unknown): value is AdSenseRuntimeManifest {
+	if (typeof value !== "object" || value === null) return false;
+	const candidate = value as Partial<AdSenseRuntimeManifest>;
+	return (
+		candidate.version === 1 &&
+		typeof candidate.enabled === "boolean" &&
+		(candidate.publisherId === null || typeof candidate.publisherId === "string") &&
+		typeof candidate.scriptSnippet === "string" &&
+		isTextFileManifest(candidate.adsTxt) &&
+		isTextFileManifest(candidate.appAdsTxt)
+	);
+}
+
+function isTextFileManifest(value: unknown): value is AdSenseTextFileManifest {
+	if (typeof value !== "object" || value === null) return false;
+	const candidate = value as Partial<AdSenseTextFileManifest>;
+	return typeof candidate.enabled === "boolean" && typeof candidate.content === "string";
+}
+
+function isValidPublisherId(value: string | null): value is string {
+	return typeof value === "string" && ADSENSE_PUBLISHER_ID_PATTERN.test(value);
+}
+
+function normalizeTextFile(value: AdSenseTextFileManifest): string | null {
+	if (!value.enabled) return null;
+	const content = value.content.trim();
+	return content ? value.content : null;
+}

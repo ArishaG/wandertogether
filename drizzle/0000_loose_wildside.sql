@@ -1,1 +1,55 @@
-{"success":true,"path":"drizzle/0000_loose_wildside.sql","content":"CREATE TABLE `account` (\n\t`id` varchar(36) NOT NULL,\n\t`account_id` varchar(255) NOT NULL,\n\t`provider_id` varchar(255) NOT NULL,\n\t`user_id` varchar(36) NOT NULL,\n\t`access_token` text,\n\t`refresh_token` text,\n\t`id_token` text,\n\t`access_token_expires_at` timestamp,\n\t`refresh_token_expires_at` timestamp,\n\t`scope` text,\n\t`password` varchar(255),\n\t`created_at` timestamp DEFAULT (now()),\n\t`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `account_id` PRIMARY KEY(`id`)\n);\n--> statement-breakpoint\nCREATE TABLE `session` (\n\t`id` varchar(36) NOT NULL,\n\t`expires_at` timestamp NOT NULL,\n\t`token` varchar(255) NOT NULL,\n\t`ip_address` varchar(45),\n\t`user_agent` text,\n\t`user_id` varchar(36) NOT NULL,\n\t`created_at` timestamp DEFAULT (now()),\n\t`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `session_id` PRIMARY KEY(`id`),\n\tCONSTRAINT `session_token_unique` UNIQUE(`token`)\n);\n--> statement-breakpoint\nCREATE TABLE `user` (\n\t`id` varchar(36) NOT NULL,\n\t`name` varchar(255),\n\t`email` varchar(255) NOT NULL,\n\t`email_verified` boolean DEFAULT false,\n\t`image` text,\n\t`is_admin` boolean DEFAULT false,\n\t`created_at` timestamp DEFAULT (now()),\n\t`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `user_id` PRIMARY KEY(`id`),\n\tCONSTRAINT `user_email_unique` UNIQUE(`email`)\n);\n--> statement-breakpoint\nCREATE TABLE `verification` (\n\t`id` varchar(36) NOT NULL,\n\t`identifier` varchar(255) NOT NULL,\n\t`value` varchar(255) NOT NULL,\n\t`expires_at` timestamp NOT NULL,\n\t`created_at` timestamp DEFAULT (now()),\n\t`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,\n\tCONSTRAINT `verification_id` PRIMARY KEY(`id`)\n);\n--> statement-breakpoint\nALTER TABLE `account` ADD CONSTRAINT `account_user_id_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint\nALTER TABLE `session` ADD CONSTRAINT `session_user_id_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE cascade ON UPDATE no action;","totalLines":55,"truncated":false}
+CREATE TABLE `account` (
+	`id` varchar(36) NOT NULL,
+	`account_id` varchar(255) NOT NULL,
+	`provider_id` varchar(255) NOT NULL,
+	`user_id` varchar(36) NOT NULL,
+	`access_token` text,
+	`refresh_token` text,
+	`id_token` text,
+	`access_token_expires_at` timestamp,
+	`refresh_token_expires_at` timestamp,
+	`scope` text,
+	`password` varchar(255),
+	`created_at` timestamp DEFAULT (now()),
+	`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `account_id` PRIMARY KEY(`id`)
+);
+--> statement-breakpoint
+CREATE TABLE `session` (
+	`id` varchar(36) NOT NULL,
+	`expires_at` timestamp NOT NULL,
+	`token` varchar(255) NOT NULL,
+	`ip_address` varchar(45),
+	`user_agent` text,
+	`user_id` varchar(36) NOT NULL,
+	`created_at` timestamp DEFAULT (now()),
+	`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `session_id` PRIMARY KEY(`id`),
+	CONSTRAINT `session_token_unique` UNIQUE(`token`)
+);
+--> statement-breakpoint
+CREATE TABLE `user` (
+	`id` varchar(36) NOT NULL,
+	`name` varchar(255),
+	`email` varchar(255) NOT NULL,
+	`email_verified` boolean DEFAULT false,
+	`image` text,
+	`is_admin` boolean DEFAULT false,
+	`created_at` timestamp DEFAULT (now()),
+	`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `user_id` PRIMARY KEY(`id`),
+	CONSTRAINT `user_email_unique` UNIQUE(`email`)
+);
+--> statement-breakpoint
+CREATE TABLE `verification` (
+	`id` varchar(36) NOT NULL,
+	`identifier` varchar(255) NOT NULL,
+	`value` varchar(255) NOT NULL,
+	`expires_at` timestamp NOT NULL,
+	`created_at` timestamp DEFAULT (now()),
+	`updated_at` timestamp DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `verification_id` PRIMARY KEY(`id`)
+);
+--> statement-breakpoint
+ALTER TABLE `account` ADD CONSTRAINT `account_user_id_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `session` ADD CONSTRAINT `session_user_id_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE cascade ON UPDATE no action;

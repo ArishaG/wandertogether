@@ -1,1 +1,4 @@
-{"success":true,"path":"src/fallbacks/missingModule.ts","content":"export const errorFallback = () => {\n    throw new Error(\"Missing module: nothing\");\n  };\n  ","totalLines":4,"truncated":false}
+export const errorFallback = () => {
+    throw new Error("Missing module: nothing");
+  };
+  

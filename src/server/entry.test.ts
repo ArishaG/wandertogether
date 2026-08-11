@@ -1,1 +1,131 @@
-{"success":true,"path":"src/server/entry.test.ts","content":"import express from \"express\";\nimport type { Server } from \"node:http\";\nimport { describe, expect, it } from \"vitest\";\n\nimport { renderSsrDocument, registerAdSenseTextRoutes } from \"./entry\";\n\nconst publisherId = \"ca-pub-1234567890123456\";\nconst canonicalScript = `<script async src=\"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${publisherId}\" crossorigin=\"anonymous\"></script>`;\n\nasync function withServer<T>(\n\tapp: express.Express,\n\trun: (baseUrl: string) => Promise<T>,\n): Promise<T> {\n\tlet server: Server | null = null;\n\ttry {\n\t\tserver = await new Promise<Server>((resolve) => {\n\t\t\tconst listening = app.listen(0, \"127.0.0.1\", () => resolve(listening));\n\t\t});\n\t\tconst address = server.address();\n\t\tif (!address || typeof address === \"string\") {\n\t\t\tthrow new Error(\"Expected TCP listener\");\n\t\t}\n\t\treturn await run(`http://127.0.0.1:${address.port}`);\n\t} finally {\n\t\tif (server) {\n\t\t\tconst listeningServer = server;\n\t\t\tawait new Promise<void>((resolve, reject) => {\n\t\t\t\tlisteningServer.close((error) => (error ? reject(error) : resolve()));\n\t\t\t});\n\t\t}\n\t}\n}\n\ndescribe(\"entry AdSense text routes\", () => {\n\tit(\"serves enabled ads.txt as text/plain with no-cache\", async () => {\n\t\tconst app = express();\n\t\tregisterAdSenseTextRoutes(app, {\n\t\t\tpublisherId: null,\n\t\t\tscriptHtml: \"\",\n\t\t\tadsTxt: \"google.com, pub-123, DIRECT, f08c47fec0942fa0\",\n\t\t\tappAdsTxt: null,\n\t\t});\n\n\t\tawait withServer(app, async (baseUrl) => {\n\t\t\tconst response = await fetch(`${baseUrl}/ads.txt`);\n\n\t\t\texpect(response.status).toBe(200);\n\t\t\texpect(response.headers.get(\"content-type\")).toContain(\"text/plain\");\n\t\t\texpect(response.headers.get(\"cache-control\")).toBe(\"no-cache\");\n\t\t\texpect(await response.text()).toBe(\"google.com, pub-123, DIRECT, f08c47fec0942fa0\");\n\t\t});\n\t});\n\n\tit(\"serves enabled app-ads.txt as text/plain with no-cache\", async () => {\n\t\tconst app = express();\n\t\tregisterAdSenseTextRoutes(app, {\n\t\t\tpublisherId: null,\n\t\t\tscriptHtml: \"\",\n\t\t\tadsTxt: null,\n\t\t\tappAdsTxt: \"google.com, pub-456, DIRECT, f08c47fec0942fa0\",\n\t\t});\n\n\t\tawait withServer(app, async (baseUrl) => {\n\t\t\tconst response = await fetch(`${baseUrl}/app-ads.txt`);\n\n\t\t\texpect(response.status).toBe(200);\n\t\t\texpect(response.headers.get(\"content-type\")).toContain(\"text/plain\");\n\t\t\texpect(response.headers.get(\"cache-control\")).toBe(\"no-cache\");\n\t\t\texpect(await response.text()).toBe(\"google.com, pub-456, DIRECT, f08c47fec0942fa0\");\n\t\t});\n\t});\n\n\tit(\"returns 404 for disabled AdSense text routes\", async () => {\n\t\tconst app = express();\n\t\tregisterAdSenseTextRoutes(app, {\n\t\t\tpublisherId: null,\n\t\t\tscriptHtml: \"\",\n\t\t\tadsTxt: null,\n\t\t\tappAdsTxt: null,\n\t\t});\n\n\t\tawait withServer(app, async (baseUrl) => {\n\t\t\tconst adsTxt = await fetch(`${baseUrl}/ads.txt`);\n\t\t\tconst appAdsTxt = await fetch(`${baseUrl}/app-ads.txt`);\n\n\t\t\texpect(adsTxt.status).toBe(404);\n\t\t\texpect(adsTxt.headers.get(\"content-type\")).toContain(\"text/plain\");\n\t\t\texpect(adsTxt.headers.get(\"cache-control\")).toBe(\"no-cache\");\n\t\t\texpect(appAdsTxt.status).toBe(404);\n\t\t\texpect(appAdsTxt.headers.get(\"content-type\")).toContain(\"text/plain\");\n\t\t\texpect(appAdsTxt.headers.get(\"cache-control\")).toBe(\"no-cache\");\n\t\t});\n\t});\n});\n\ndescribe(\"entry SSR rendering\", () => {\n\tit(\"appends the canonical AdSense script to existing head output\", () => {\n\t\tconst html = renderSsrDocument(\n\t\t\t\"<html><head><!--app-head--></head><body><!--app-html--></body></html>\",\n\t\t\t{\n\t\t\t\thead: \"<title>Generated Site</title>\",\n\t\t\t\thtml: \"<main>Rendered app</main>\",\n\t\t\t},\n\t\t\t{\n\t\t\t\tscriptHtml: canonicalScript,\n\t\t\t},\n\t\t);\n\n\t\texpect(html).toContain(`<title>Generated Site</title>\\n${canonicalScript}`);\n\t\texpect(html).toContain(\"<main>Rendered app</main>\");\n\t\texpect(html).not.toContain(\"<!--app-head-->\");\n\t\texpect(html).not.toContain(\"<!--app-html-->\");\n\t});\n\n\tit(\"keeps SSR head output unchanged when AdSense script output is disabled\", () => {\n\t\tconst html = renderSsrDocument(\n\t\t\t\"<html><head><!--app-head--></head><body><!--app-html--></body></html>\",\n\t\t\t{\n\t\t\t\thead: \"<title>Generated Site</title>\",\n\t\t\t\thtml: \"<main>Rendered app</main>\",\n\t\t\t},\n\t\t\t{\n\t\t\t\tscriptHtml: \"\",\n\t\t\t},\n\t\t);\n\n\t\texpect(html).toContain(\"<title>Generated Site</title>\");\n\t\texpect(html).not.toContain(\"pagead2.googlesyndication.com\");\n\t\texpect(html).toContain(\"<main>Rendered app</main>\");\n\t});\n});\n","totalLines":132,"truncated":false}
+import express from "express";
+import type { Server } from "node:http";
+import { describe, expect, it } from "vitest";
+
+import { renderSsrDocument, registerAdSenseTextRoutes } from "./entry";
+
+const publisherId = "ca-pub-1234567890123456";
+const canonicalScript = `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${publisherId}" crossorigin="anonymous"></script>`;
+
+async function withServer<T>(
+	app: express.Express,
+	run: (baseUrl: string) => Promise<T>,
+): Promise<T> {
+	let server: Server | null = null;
+	try {
+		server = await new Promise<Server>((resolve) => {
+			const listening = app.listen(0, "127.0.0.1", () => resolve(listening));
+		});
+		const address = server.address();
+		if (!address || typeof address === "string") {
+			throw new Error("Expected TCP listener");
+		}
+		return await run(`http://127.0.0.1:${address.port}`);
+	} finally {
+		if (server) {
+			const listeningServer = server;
+			await new Promise<void>((resolve, reject) => {
+				listeningServer.close((error) => (error ? reject(error) : resolve()));
+			});
+		}
+	}
+}
+
+describe("entry AdSense text routes", () => {
+	it("serves enabled ads.txt as text/plain with no-cache", async () => {
+		const app = express();
+		registerAdSenseTextRoutes(app, {
+			publisherId: null,
+			scriptHtml: "",
+			adsTxt: "google.com, pub-123, DIRECT, f08c47fec0942fa0",
+			appAdsTxt: null,
+		});
+
+		await withServer(app, async (baseUrl) => {
+			const response = await fetch(`${baseUrl}/ads.txt`);
+
+			expect(response.status).toBe(200);
+			expect(response.headers.get("content-type")).toContain("text/plain");
+			expect(response.headers.get("cache-control")).toBe("no-cache");
+			expect(await response.text()).toBe("google.com, pub-123, DIRECT, f08c47fec0942fa0");
+		});
+	});
+
+	it("serves enabled app-ads.txt as text/plain with no-cache", async () => {
+		const app = express();
+		registerAdSenseTextRoutes(app, {
+			publisherId: null,
+			scriptHtml: "",
+			adsTxt: null,
+			appAdsTxt: "google.com, pub-456, DIRECT, f08c47fec0942fa0",
+		});
+
+		await withServer(app, async (baseUrl) => {
+			const response = await fetch(`${baseUrl}/app-ads.txt`);
+
+			expect(response.status).toBe(200);
+			expect(response.headers.get("content-type")).toContain("text/plain");
+			expect(response.headers.get("cache-control")).toBe("no-cache");
+			expect(await response.text()).toBe("google.com, pub-456, DIRECT, f08c47fec0942fa0");
+		});
+	});
+
+	it("returns 404 for disabled AdSense text routes", async () => {
+		const app = express();
+		registerAdSenseTextRoutes(app, {
+			publisherId: null,
+			scriptHtml: "",
+			adsTxt: null,
+			appAdsTxt: null,
+		});
+
+		await withServer(app, async (baseUrl) => {
+			const adsTxt = await fetch(`${baseUrl}/ads.txt`);
+			const appAdsTxt = await fetch(`${baseUrl}/app-ads.txt`);
+
+			expect(adsTxt.status).toBe(404);
+			expect(adsTxt.headers.get("content-type")).toContain("text/plain");
+			expect(adsTxt.headers.get("cache-control")).toBe("no-cache");
+			expect(appAdsTxt.status).toBe(404);
+			expect(appAdsTxt.headers.get("content-type")).toContain("text/plain");
+			expect(appAdsTxt.headers.get("cache-control")).toBe("no-cache");
+		});
+	});
+});
+
+describe("entry SSR rendering", () => {
+	it("appends the canonical AdSense script to existing head output", () => {
+		const html = renderSsrDocument(
+			"<html><head><!--app-head--></head><body><!--app-html--></body></html>",
+			{
+				head: "<title>Generated Site</title>",
+				html: "<main>Rendered app</main>",
+			},
+			{
+				scriptHtml: canonicalScript,
+			},
+		);
+
+		expect(html).toContain(`<title>Generated Site</title>\n${canonicalScript}`);
+		expect(html).toContain("<main>Rendered app</main>");
+		expect(html).not.toContain("<!--app-head-->");
+		expect(html).not.toContain("<!--app-html-->");
+	});
+
+	it("keeps SSR head output unchanged when AdSense script output is disabled", () => {
+		const html = renderSsrDocument(
+			"<html><head><!--app-head--></head><body><!--app-html--></body></html>",
+			{
+				head: "<title>Generated Site</title>",
+				html: "<main>Rendered app</main>",
+			},
+			{
+				scriptHtml: "",
+			},
+		);
+
+		expect(html).toContain("<title>Generated Site</title>");
+		expect(html).not.toContain("pagead2.googlesyndication.com");
+		expect(html).toContain("<main>Rendered app</main>");
+	});
+});

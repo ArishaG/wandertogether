@@ -1,1 +1,163 @@
-{"success":true,"path":"src/pages/chatbot/ChatbotPage.tsx","content":"/**\n * Chatbot Page\n *\n * Streaming AI chat interface using native fetch + ReadableStream.\n * Connects to POST /api/chat which streams raw text via AI SDK's\n * pipeTextStreamToResponse (see src/server/api/chat/POST.ts).\n *\n * No @ai-sdk/react dependency needed — uses standard browser APIs only.\n *\n * To add this page to your app, add to src/routes.tsx:\n *   const ChatbotPage = lazy(() => import('./pages/chatbot/ChatbotPage'));\n *   { path: '/chat', element: <ChatbotPage /> }\n */\n\nimport { useState, useRef, useEffect, type FormEvent } from 'react';\n\ninterface Message {\n  id: string;\n  role: 'user' | 'assistant';\n  content: string;\n}\n\nexport default function ChatbotPage() {\n  const [messages, setMessages] = useState<Message[]>([]);\n  const [input, setInput] = useState('');\n  const [isLoading, setIsLoading] = useState(false);\n  const [error, setError] = useState<string | null>(null);\n  const bottomRef = useRef<HTMLDivElement>(null);\n\n  // Auto-scroll to the latest message\n  useEffect(() => {\n    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });\n  }, [messages]);\n\n  async function handleSubmit(e: FormEvent<HTMLFormElement>) {\n    e.preventDefault();\n    const text = input.trim();\n    if (!text || isLoading) return;\n\n    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: text };\n    const assistantId = `assistant-${Date.now()}`;\n\n    setMessages((prev) => [...prev, userMessage, { id: assistantId, role: 'assistant', content: '' }]);\n    setInput('');\n    setIsLoading(true);\n    setError(null);\n\n    try {\n      // Build history to send — plain { role, content } objects that\n      // POST.ts passes directly to streamText as CoreMessage[].\n      const history = [...messages, userMessage].map((m) => ({\n        role: m.role,\n        content: m.content,\n      }));\n\n      const response = await fetch('/api/chat', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify({ messages: history }),\n      });\n\n      if (!response.ok) {\n        throw new Error(`Server error: HTTP ${response.status}`);\n      }\n      if (!response.body) {\n        throw new Error('No response body');\n      }\n\n      // Read the raw text stream chunk by chunk and append to the assistant message.\n      const reader = response.body.getReader();\n      const decoder = new TextDecoder();\n\n      for (let result = await reader.read(); !result.done; result = await reader.read()) {\n        const chunk = decoder.decode(result.value, { stream: true });\n        setMessages((prev) =>\n          prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk } : m))\n        );\n      }\n    } catch (err) {\n      const msg = err instanceof Error ? err.message : 'Unknown error';\n      setError(msg);\n      // Remove the empty assistant message placeholder on failure\n      setMessages((prev) => prev.filter((m) => m.id !== assistantId));\n    } finally {\n      setIsLoading(false);\n    }\n  }\n\n  const lastMessage = messages[messages.length - 1];\n  const showTypingIndicator = isLoading && lastMessage?.role === 'assistant' && lastMessage.content === '';\n\n  return (\n    <div className=\"flex flex-col h-screen max-w-2xl mx-auto p-4\">\n      <h1 className=\"text-2xl font-bold mb-4 text-center\">Chat</h1>\n\n      {/* Message list */}\n      <div className=\"flex-1 overflow-y-auto space-y-4 pb-4\">\n        {messages.map((message) => (\n          <MessageBubble key={message.id} message={message} />\n        ))}\n\n        {/* Animated typing indicator before first chunk arrives */}\n        {showTypingIndicator && (\n          <div className=\"flex justify-start\">\n            <div className=\"bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3\">\n              <div className=\"flex gap-1 items-center h-4\">\n                <span className=\"w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]\" />\n                <span className=\"w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]\" />\n                <span className=\"w-2 h-2 bg-gray-400 rounded-full animate-bounce\" />\n              </div>\n            </div>\n          </div>\n        )}\n\n        <div ref={bottomRef} />\n      </div>\n\n      {/* Input form */}\n      <form onSubmit={handleSubmit} className=\"flex gap-2 mt-2\">\n        <input\n          value={input}\n          onChange={(e) => setInput(e.target.value)}\n          type=\"text\"\n          placeholder=\"Type a message...\"\n          disabled={isLoading}\n          className=\"flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400\"\n          autoComplete=\"off\"\n          autoFocus\n        />\n        <button\n          type=\"submit\"\n          disabled={isLoading || !input.trim()}\n          className=\"px-5 py-2 bg-blue-600 text-white rounded-full font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors\"\n        >\n          {isLoading ? '...' : 'Send'}\n        </button>\n      </form>\n\n      {error && (\n        <p className=\"mt-2 text-sm text-red-600 text-center\">{error}</p>\n      )}\n    </div>\n  );\n}\n\nfunction MessageBubble({ message }: { message: Message }) {\n  const isUser = message.role === 'user';\n  if (!message.content) return null;\n\n  return (\n    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>\n      <div\n        className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${\n          isUser\n            ? 'bg-blue-600 text-white rounded-tr-sm'\n            : 'bg-gray-100 text-gray-900 rounded-tl-sm'\n        }`}\n      >\n        {message.content}\n      </div>\n    </div>\n  );\n}\n","totalLines":164,"truncated":false}
+/**
+ * Chatbot Page
+ *
+ * Streaming AI chat interface using native fetch + ReadableStream.
+ * Connects to POST /api/chat which streams raw text via AI SDK's
+ * pipeTextStreamToResponse (see src/server/api/chat/POST.ts).
+ *
+ * No @ai-sdk/react dependency needed — uses standard browser APIs only.
+ *
+ * To add this page to your app, add to src/routes.tsx:
+ *   const ChatbotPage = lazy(() => import('./pages/chatbot/ChatbotPage'));
+ *   { path: '/chat', element: <ChatbotPage /> }
+ */
+
+import { useState, useRef, useEffect, type FormEvent } from 'react';
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export default function ChatbotPage() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to the latest message
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const text = input.trim();
+    if (!text || isLoading) return;
+
+    const userMessage: Message = { id: `user-${Date.now()}`, role: 'user', content: text };
+    const assistantId = `assistant-${Date.now()}`;
+
+    setMessages((prev) => [...prev, userMessage, { id: assistantId, role: 'assistant', content: '' }]);
+    setInput('');
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Build history to send — plain { role, content } objects that
+      // POST.ts passes directly to streamText as CoreMessage[].
+      const history = [...messages, userMessage].map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server error: HTTP ${response.status}`);
+      }
+      if (!response.body) {
+        throw new Error('No response body');
+      }
+
+      // Read the raw text stream chunk by chunk and append to the assistant message.
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      for (let result = await reader.read(); !result.done; result = await reader.read()) {
+        const chunk = decoder.decode(result.value, { stream: true });
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + chunk } : m))
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setError(msg);
+      // Remove the empty assistant message placeholder on failure
+      setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const lastMessage = messages[messages.length - 1];
+  const showTypingIndicator = isLoading && lastMessage?.role === 'assistant' && lastMessage.content === '';
+
+  return (
+    <div className="flex flex-col h-screen max-w-2xl mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4 text-center">Chat</h1>
+
+      {/* Message list */}
+      <div className="flex-1 overflow-y-auto space-y-4 pb-4">
+        {messages.map((message) => (
+          <MessageBubble key={message.id} message={message} />
+        ))}
+
+        {/* Animated typing indicator before first chunk arrives */}
+        {showTypingIndicator && (
+          <div className="flex justify-start">
+            <div className="bg-gray-100 rounded-2xl rounded-tl-sm px-4 py-3">
+              <div className="flex gap-1 items-center h-4">
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input form */}
+      <form onSubmit={handleSubmit} className="flex gap-2 mt-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          type="text"
+          placeholder="Type a message..."
+          disabled={isLoading}
+          className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+          autoComplete="off"
+          autoFocus
+        />
+        <button
+          type="submit"
+          disabled={isLoading || !input.trim()}
+          className="px-5 py-2 bg-blue-600 text-white rounded-full font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {isLoading ? '...' : 'Send'}
+        </button>
+      </form>
+
+      {error && (
+        <p className="mt-2 text-sm text-red-600 text-center">{error}</p>
+      )}
+    </div>
+  );
+}
+
+function MessageBubble({ message }: { message: Message }) {
+  const isUser = message.role === 'user';
+  if (!message.content) return null;
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-[75%] rounded-2xl px-4 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
+          isUser
+            ? 'bg-blue-600 text-white rounded-tr-sm'
+            : 'bg-gray-100 text-gray-900 rounded-tl-sm'
+        }`}
+      >
+        {message.content}
+      </div>
+    </div>
+  );
+}

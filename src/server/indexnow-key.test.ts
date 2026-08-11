@@ -1,1 +1,56 @@
-{"success":true,"path":"src/server/indexnow-key.test.ts","content":"import { mkdtempSync, rmSync, writeFileSync } from \"node:fs\";\nimport { tmpdir } from \"node:os\";\nimport { join } from \"node:path\";\nimport { afterEach, beforeEach, describe, expect, it } from \"vitest\";\nimport { loadIndexNowKey } from \"./indexnow-key\";\n\nconst VALID_KEY = \"a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\";\n\nlet tmpDir: string;\n\ndescribe(\"loadIndexNowKey\", () => {\n\tbeforeEach(() => {\n\t\ttmpDir = mkdtempSync(join(tmpdir(), \"indexnow-test-\"));\n\t});\n\n\tafterEach(() => {\n\t\trmSync(tmpDir, { recursive: true, force: true });\n\t});\n\n\tit(\"returns the key from a valid manifest\", () => {\n\t\twriteFileSync(join(tmpDir, \"airo-indexnow.json\"), JSON.stringify({ key: VALID_KEY }));\n\t\texpect(loadIndexNowKey(tmpDir)).toBe(VALID_KEY);\n\t});\n\n\tit(\"returns null when the file does not exist\", () => {\n\t\texpect(loadIndexNowKey(tmpDir)).toBeNull();\n\t});\n\n\tit(\"returns null when JSON is malformed\", () => {\n\t\twriteFileSync(join(tmpDir, \"airo-indexnow.json\"), \"not json\");\n\t\texpect(loadIndexNowKey(tmpDir)).toBeNull();\n\t});\n\n\tit(\"returns null when key is missing from manifest\", () => {\n\t\twriteFileSync(join(tmpDir, \"airo-indexnow.json\"), JSON.stringify({}));\n\t\texpect(loadIndexNowKey(tmpDir)).toBeNull();\n\t});\n\n\tit(\"returns null when key is not a 32-char hex string\", () => {\n\t\twriteFileSync(join(tmpDir, \"airo-indexnow.json\"), JSON.stringify({ key: \"tooshort\" }));\n\t\texpect(loadIndexNowKey(tmpDir)).toBeNull();\n\t});\n\n\tit(\"returns null when key contains non-hex characters\", () => {\n\t\twriteFileSync(join(tmpDir, \"airo-indexnow.json\"), JSON.stringify({ key: \"z1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\" }));\n\t\texpect(loadIndexNowKey(tmpDir)).toBeNull();\n\t});\n\n\tit(\"returns null for path traversal via null byte\", () => {\n\t\texpect(loadIndexNowKey(`${tmpDir}\\0evil`)).toBeNull();\n\t});\n\n\tit(\"returns null for path traversal via .. segment\", () => {\n\t\texpect(loadIndexNowKey(`${tmpDir}/../etc`)).toBeNull();\n\t});\n});\n","totalLines":57,"truncated":false}
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { loadIndexNowKey } from "./indexnow-key";
+
+const VALID_KEY = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4";
+
+let tmpDir: string;
+
+describe("loadIndexNowKey", () => {
+	beforeEach(() => {
+		tmpDir = mkdtempSync(join(tmpdir(), "indexnow-test-"));
+	});
+
+	afterEach(() => {
+		rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it("returns the key from a valid manifest", () => {
+		writeFileSync(join(tmpDir, "airo-indexnow.json"), JSON.stringify({ key: VALID_KEY }));
+		expect(loadIndexNowKey(tmpDir)).toBe(VALID_KEY);
+	});
+
+	it("returns null when the file does not exist", () => {
+		expect(loadIndexNowKey(tmpDir)).toBeNull();
+	});
+
+	it("returns null when JSON is malformed", () => {
+		writeFileSync(join(tmpDir, "airo-indexnow.json"), "not json");
+		expect(loadIndexNowKey(tmpDir)).toBeNull();
+	});
+
+	it("returns null when key is missing from manifest", () => {
+		writeFileSync(join(tmpDir, "airo-indexnow.json"), JSON.stringify({}));
+		expect(loadIndexNowKey(tmpDir)).toBeNull();
+	});
+
+	it("returns null when key is not a 32-char hex string", () => {
+		writeFileSync(join(tmpDir, "airo-indexnow.json"), JSON.stringify({ key: "tooshort" }));
+		expect(loadIndexNowKey(tmpDir)).toBeNull();
+	});
+
+	it("returns null when key contains non-hex characters", () => {
+		writeFileSync(join(tmpDir, "airo-indexnow.json"), JSON.stringify({ key: "z1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4" }));
+		expect(loadIndexNowKey(tmpDir)).toBeNull();
+	});
+
+	it("returns null for path traversal via null byte", () => {
+		expect(loadIndexNowKey(`${tmpDir}\0evil`)).toBeNull();
+	});
+
+	it("returns null for path traversal via .. segment", () => {
+		expect(loadIndexNowKey(`${tmpDir}/../etc`)).toBeNull();
+	});
+});

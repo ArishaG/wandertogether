@@ -1,1 +1,217 @@
-{"success":true,"path":"src/lib/__tests__/format-overrides-plugin.test.ts","content":"import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'\nimport { EventEmitter } from 'node:events'\nimport { tmpdir } from 'node:os'\nimport { join } from 'node:path'\n\nimport { afterEach, describe, expect, it, vi } from 'vitest'\nimport type { Plugin } from 'vite'\n\nimport { FORMAT_OVERRIDES_MODULE_ID, formatOverridesPlugin } from '../../../format-overrides-plugin'\n\ninterface DirectPluginHooks {\n  resolveId: (id: string) => unknown\n  load: (id: string) => unknown | Promise<unknown>\n  configureServer?: (server: unknown) => void\n}\n\nfunction directHooks(plugin: Plugin): DirectPluginHooks {\n  return plugin as Plugin & DirectPluginHooks\n}\n\nfunction fakeViteServer() {\n  const watcher = new EventEmitter() as EventEmitter & { add: ReturnType<typeof vi.fn> }\n  watcher.add = vi.fn()\n  const moduleNode = { id: '\\0virtual:format-overrides' }\n  return {\n    watcher,\n    moduleGraph: {\n      getModuleById: vi.fn(() => moduleNode),\n      invalidateModule: vi.fn(),\n    },\n    ws: {\n      send: vi.fn(),\n    },\n  }\n}\n\nasync function withTempRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {\n  const root = await mkdtemp(join(tmpdir(), 'format-overrides-'))\n  try {\n    return await fn(root)\n  } finally {\n    await rm(root, { recursive: true, force: true })\n  }\n}\n\ndescribe('formatOverridesPlugin', () => {\n  afterEach(() => {\n    vi.useRealTimers()\n    vi.restoreAllMocks()\n  })\n\n  it('returns an empty sidecar bundle when format-overrides/ is missing', async () => {\n    await withTempRoot(async (root) => {\n      const plugin = directHooks(formatOverridesPlugin(root))\n      const resolved = plugin.resolveId(FORMAT_OVERRIDES_MODULE_ID)\n      expect(resolved).toBe('\\0virtual:format-overrides')\n\n      const loaded = await plugin.load('\\0virtual:format-overrides')\n      expect(String(loaded)).toContain('\"version\":1')\n      expect(String(loaded)).toContain('\"scopes\":{}')\n    })\n  })\n\n  it('embeds scoped sidecar JSON when a page sidecar exists', async () => {\n    await withTempRoot(async (root) => {\n      const expressionHash = `sha256:${'a'.repeat(64)}`\n\n      await mkdir(join(root, 'format-overrides/pages'), { recursive: true })\n      await writeFile(\n        join(root, 'format-overrides/pages/index.json'),\n        JSON.stringify({\n          version: 1,\n          overrides: {\n            abc123: {\n              target: {\n                file: 'src/pages/index.tsx',\n                tagName: 'h1',\n                sourceKind: 'bound-expression',\n                contentKey: null,\n                contentKeyTemplate: null,\n                expressionHash,\n              },\n              marks: { bold: true, italic: false, color: '#123abc' },\n              updatedAt: '2026-05-28T12:00:00.000Z',\n            },\n          },\n        }),\n      )\n\n      const plugin = directHooks(formatOverridesPlugin(root))\n      const loaded = await plugin.load('\\0virtual:format-overrides')\n\n      expect(String(loaded)).toContain('\"pages/index\"')\n      expect(String(loaded)).toContain('abc123')\n      expect(String(loaded)).toContain('#123abc')\n      expect(String(loaded)).toContain('export default')\n    })\n  })\n\n  it('falls back to an empty scoped sidecar when JSON is invalid', async () => {\n    await withTempRoot(async (root) => {\n      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)\n      await mkdir(join(root, 'format-overrides/pages'), { recursive: true })\n      await writeFile(join(root, 'format-overrides/pages/index.json'), '{not json')\n\n      const plugin = directHooks(formatOverridesPlugin(root))\n      const loaded = await plugin.load('\\0virtual:format-overrides')\n\n      expect(String(loaded)).toContain('\"version\":1')\n      expect(String(loaded)).toContain('\"pages/index\"')\n      expect(String(loaded)).toContain('\"overrides\":{}')\n      expect(JSON.parse(String(warn.mock.calls[0][0]))).toMatchObject({\n        event: 'format-overrides.sidecar.invalid',\n        scope: 'pages/index',\n      })\n    })\n  })\n\n  it('falls back to an empty scoped sidecar when the sidecar version is unsupported', async () => {\n    await withTempRoot(async (root) => {\n      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)\n      await mkdir(join(root, 'format-overrides'), { recursive: true })\n      await writeFile(\n        join(root, 'format-overrides/shared.json'),\n        JSON.stringify({ version: 2, overrides: { abc123: {} } }),\n      )\n\n      const plugin = directHooks(formatOverridesPlugin(root))\n      const loaded = await plugin.load('\\0virtual:format-overrides')\n\n      expect(String(loaded)).toContain('\"version\":1')\n      expect(String(loaded)).toContain('\"shared\"')\n      expect(String(loaded)).toContain('\"overrides\":{}')\n      expect(String(loaded)).not.toContain('abc123')\n      expect(JSON.parse(String(warn.mock.calls[0][0]))).toMatchObject({\n        event: 'format-overrides.sidecar.invalid',\n        scope: 'shared',\n      })\n    })\n  })\n\n  it('warns about invalid sidecars during production builds', async () => {\n    const previousNodeEnv = process.env.NODE_ENV\n    process.env.NODE_ENV = 'production'\n\n    try {\n      await withTempRoot(async (root) => {\n        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)\n        await mkdir(join(root, 'format-overrides/pages'), { recursive: true })\n        await writeFile(join(root, 'format-overrides/pages/index.json'), '{not json')\n\n        const plugin = directHooks(formatOverridesPlugin(root))\n        await plugin.load('\\0virtual:format-overrides')\n\n        expect(JSON.parse(String(warn.mock.calls[0][0]))).toMatchObject({\n          event: 'format-overrides.sidecar.invalid',\n          scope: 'pages/index',\n        })\n      })\n    } finally {\n      if (previousNodeEnv === undefined) {\n        delete process.env.NODE_ENV\n      } else {\n        process.env.NODE_ENV = previousNodeEnv\n      }\n    }\n  })\n\n  it('pushes sidecar updates through custom HMR without full page reload', async () => {\n    await withTempRoot(async (root) => {\n      const expressionHash = `sha256:${'a'.repeat(64)}`\n      const sidecarPath = join(root, 'format-overrides/pages/index.json')\n      await mkdir(join(root, 'format-overrides/pages'), { recursive: true })\n      await writeFile(\n        sidecarPath,\n        JSON.stringify({\n          version: 1,\n          overrides: {\n            abc123: {\n              target: {\n                file: 'src/pages/index.tsx',\n                tagName: 'h1',\n                sourceKind: 'bound-expression',\n                contentKey: null,\n                contentKeyTemplate: null,\n                expressionHash,\n              },\n              marks: { bold: true },\n              updatedAt: '2026-05-28T12:00:00.000Z',\n            },\n          },\n        }),\n      )\n\n      const plugin = directHooks(formatOverridesPlugin(root))\n      const server = fakeViteServer()\n      plugin.configureServer?.(server)\n\n      server.watcher.emit('change', sidecarPath)\n\n      expect(server.moduleGraph.invalidateModule).toHaveBeenCalled()\n      expect(server.ws.send).toHaveBeenCalledWith('format-overrides:update', expect.objectContaining({\n        version: 1,\n        scopes: expect.objectContaining({\n          'pages/index': expect.objectContaining({\n            overrides: expect.objectContaining({\n              abc123: expect.objectContaining({\n                marks: { bold: true },\n              }),\n            }),\n          }),\n        }),\n      }))\n      expect(server.ws.send).not.toHaveBeenCalledWith({ type: 'full-reload' })\n    })\n  })\n})\n","totalLines":218,"truncated":false}
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { EventEmitter } from 'node:events'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Plugin } from 'vite'
+
+import { FORMAT_OVERRIDES_MODULE_ID, formatOverridesPlugin } from '../../../format-overrides-plugin'
+
+interface DirectPluginHooks {
+  resolveId: (id: string) => unknown
+  load: (id: string) => unknown | Promise<unknown>
+  configureServer?: (server: unknown) => void
+}
+
+function directHooks(plugin: Plugin): DirectPluginHooks {
+  return plugin as Plugin & DirectPluginHooks
+}
+
+function fakeViteServer() {
+  const watcher = new EventEmitter() as EventEmitter & { add: ReturnType<typeof vi.fn> }
+  watcher.add = vi.fn()
+  const moduleNode = { id: '\0virtual:format-overrides' }
+  return {
+    watcher,
+    moduleGraph: {
+      getModuleById: vi.fn(() => moduleNode),
+      invalidateModule: vi.fn(),
+    },
+    ws: {
+      send: vi.fn(),
+    },
+  }
+}
+
+async function withTempRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
+  const root = await mkdtemp(join(tmpdir(), 'format-overrides-'))
+  try {
+    return await fn(root)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+}
+
+describe('formatOverridesPlugin', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('returns an empty sidecar bundle when format-overrides/ is missing', async () => {
+    await withTempRoot(async (root) => {
+      const plugin = directHooks(formatOverridesPlugin(root))
+      const resolved = plugin.resolveId(FORMAT_OVERRIDES_MODULE_ID)
+      expect(resolved).toBe('\0virtual:format-overrides')
+
+      const loaded = await plugin.load('\0virtual:format-overrides')
+      expect(String(loaded)).toContain('"version":1')
+      expect(String(loaded)).toContain('"scopes":{}')
+    })
+  })
+
+  it('embeds scoped sidecar JSON when a page sidecar exists', async () => {
+    await withTempRoot(async (root) => {
+      const expressionHash = `sha256:${'a'.repeat(64)}`
+
+      await mkdir(join(root, 'format-overrides/pages'), { recursive: true })
+      await writeFile(
+        join(root, 'format-overrides/pages/index.json'),
+        JSON.stringify({
+          version: 1,
+          overrides: {
+            abc123: {
+              target: {
+                file: 'src/pages/index.tsx',
+                tagName: 'h1',
+                sourceKind: 'bound-expression',
+                contentKey: null,
+                contentKeyTemplate: null,
+                expressionHash,
+              },
+              marks: { bold: true, italic: false, color: '#123abc' },
+              updatedAt: '2026-05-28T12:00:00.000Z',
+            },
+          },
+        }),
+      )
+
+      const plugin = directHooks(formatOverridesPlugin(root))
+      const loaded = await plugin.load('\0virtual:format-overrides')
+
+      expect(String(loaded)).toContain('"pages/index"')
+      expect(String(loaded)).toContain('abc123')
+      expect(String(loaded)).toContain('#123abc')
+      expect(String(loaded)).toContain('export default')
+    })
+  })
+
+  it('falls back to an empty scoped sidecar when JSON is invalid', async () => {
+    await withTempRoot(async (root) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      await mkdir(join(root, 'format-overrides/pages'), { recursive: true })
+      await writeFile(join(root, 'format-overrides/pages/index.json'), '{not json')
+
+      const plugin = directHooks(formatOverridesPlugin(root))
+      const loaded = await plugin.load('\0virtual:format-overrides')
+
+      expect(String(loaded)).toContain('"version":1')
+      expect(String(loaded)).toContain('"pages/index"')
+      expect(String(loaded)).toContain('"overrides":{}')
+      expect(JSON.parse(String(warn.mock.calls[0][0]))).toMatchObject({
+        event: 'format-overrides.sidecar.invalid',
+        scope: 'pages/index',
+      })
+    })
+  })
+
+  it('falls back to an empty scoped sidecar when the sidecar version is unsupported', async () => {
+    await withTempRoot(async (root) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      await mkdir(join(root, 'format-overrides'), { recursive: true })
+      await writeFile(
+        join(root, 'format-overrides/shared.json'),
+        JSON.stringify({ version: 2, overrides: { abc123: {} } }),
+      )
+
+      const plugin = directHooks(formatOverridesPlugin(root))
+      const loaded = await plugin.load('\0virtual:format-overrides')
+
+      expect(String(loaded)).toContain('"version":1')
+      expect(String(loaded)).toContain('"shared"')
+      expect(String(loaded)).toContain('"overrides":{}')
+      expect(String(loaded)).not.toContain('abc123')
+      expect(JSON.parse(String(warn.mock.calls[0][0]))).toMatchObject({
+        event: 'format-overrides.sidecar.invalid',
+        scope: 'shared',
+      })
+    })
+  })
+
+  it('warns about invalid sidecars during production builds', async () => {
+    const previousNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'production'
+
+    try {
+      await withTempRoot(async (root) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+        await mkdir(join(root, 'format-overrides/pages'), { recursive: true })
+        await writeFile(join(root, 'format-overrides/pages/index.json'), '{not json')
+
+        const plugin = directHooks(formatOverridesPlugin(root))
+        await plugin.load('\0virtual:format-overrides')
+
+        expect(JSON.parse(String(warn.mock.calls[0][0]))).toMatchObject({
+          event: 'format-overrides.sidecar.invalid',
+          scope: 'pages/index',
+        })
+      })
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV
+      } else {
+        process.env.NODE_ENV = previousNodeEnv
+      }
+    }
+  })
+
+  it('pushes sidecar updates through custom HMR without full page reload', async () => {
+    await withTempRoot(async (root) => {
+      const expressionHash = `sha256:${'a'.repeat(64)}`
+      const sidecarPath = join(root, 'format-overrides/pages/index.json')
+      await mkdir(join(root, 'format-overrides/pages'), { recursive: true })
+      await writeFile(
+        sidecarPath,
+        JSON.stringify({
+          version: 1,
+          overrides: {
+            abc123: {
+              target: {
+                file: 'src/pages/index.tsx',
+                tagName: 'h1',
+                sourceKind: 'bound-expression',
+                contentKey: null,
+                contentKeyTemplate: null,
+                expressionHash,
+              },
+              marks: { bold: true },
+              updatedAt: '2026-05-28T12:00:00.000Z',
+            },
+          },
+        }),
+      )
+
+      const plugin = directHooks(formatOverridesPlugin(root))
+      const server = fakeViteServer()
+      plugin.configureServer?.(server)
+
+      server.watcher.emit('change', sidecarPath)
+
+      expect(server.moduleGraph.invalidateModule).toHaveBeenCalled()
+      expect(server.ws.send).toHaveBeenCalledWith('format-overrides:update', expect.objectContaining({
+        version: 1,
+        scopes: expect.objectContaining({
+          'pages/index': expect.objectContaining({
+            overrides: expect.objectContaining({
+              abc123: expect.objectContaining({
+                marks: { bold: true },
+              }),
+            }),
+          }),
+        }),
+      }))
+      expect(server.ws.send).not.toHaveBeenCalledWith({ type: 'full-reload' })
+    })
+  })
+})

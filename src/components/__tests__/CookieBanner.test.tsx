@@ -1,1 +1,199 @@
-{"success":true,"path":"src/components/__tests__/CookieBanner.test.tsx","content":"/**\n * @vitest-environment jsdom\n */\nimport { act, render, screen } from '@testing-library/react'\nimport userEvent from '@testing-library/user-event'\nimport { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'\n\nimport CookieBanner from '../CookieBanner'\n\nconst CONSENT_KEY = 'c2_analytics_consent'\n\ndescribe('CookieBanner', () => {\n  beforeEach(() => {\n    localStorage.clear()\n    sessionStorage.clear()\n    vi.clearAllMocks()\n  })\n\n  afterEach(() => {\n    localStorage.clear()\n    sessionStorage.clear()\n  })\n\n  describe('standalone context (window.parent === window)', () => {\n    it('renders banner when no consent is stored', () => {\n      render(<CookieBanner />)\n      expect(screen.getByRole('alertdialog')).toBeInTheDocument()\n      expect(screen.getByText(/Cookie Consent/)).toBeInTheDocument()\n    })\n\n    it('saves consent and fires event on accept', async () => {\n      const user = userEvent.setup()\n      const eventListener = vi.fn()\n      window.addEventListener('cookie-consent-changed', eventListener)\n\n      render(<CookieBanner />)\n      const acceptButton = screen.getByRole('button', { name: /Accept/ })\n\n      await act(async () => {\n        await user.click(acceptButton)\n      })\n\n      const storedConsent = JSON.parse(localStorage.getItem(CONSENT_KEY) || '{}')\n      expect(storedConsent.analytics).toBe(true)\n      expect(storedConsent.timestamp).toBeDefined()\n      expect(eventListener).toHaveBeenCalledWith(\n        expect.objectContaining({\n          detail: { consented: true },\n        })\n      )\n\n      window.removeEventListener('cookie-consent-changed', eventListener)\n    })\n\n    it('saves non-consent and fires event on decline', async () => {\n      const user = userEvent.setup()\n      const eventListener = vi.fn()\n      window.addEventListener('cookie-consent-changed', eventListener)\n\n      render(<CookieBanner />)\n      const declineButton = screen.getByRole('button', { name: /Decline/ })\n\n      await act(async () => {\n        await user.click(declineButton)\n      })\n\n      const storedConsent = JSON.parse(localStorage.getItem(CONSENT_KEY) || '{}')\n      expect(storedConsent.analytics).toBe(false)\n      expect(storedConsent.timestamp).toBeDefined()\n      expect(eventListener).toHaveBeenCalledWith(\n        expect.objectContaining({\n          detail: { consented: false },\n        })\n      )\n\n      window.removeEventListener('cookie-consent-changed', eventListener)\n    })\n\n    it('does not show banner when valid consent already stored', () => {\n      localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics: true, timestamp: Date.now() }))\n      render(<CookieBanner />)\n      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()\n    })\n  })\n\n  describe('embedded context (window.parent !== window)', () => {\n    let mockParent: MessageEventSource\n\n    beforeEach(() => {\n      mockParent = {} as MessageEventSource\n      Object.defineProperty(window, 'parent', {\n        value: mockParent,\n        configurable: true,\n      })\n    })\n\n    afterEach(() => {\n      Object.defineProperty(window, 'parent', {\n        value: window,\n        configurable: true,\n      })\n    })\n\n    it('banner starts hidden (no consent, no reset message)', () => {\n      render(<CookieBanner />)\n      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()\n    })\n\n    it('banner shows after receiving RESET_INITIAL_BUILD_HIDE from parent', () => {\n      render(<CookieBanner />)\n      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()\n\n      act(() => {\n        const event = new MessageEvent('message', {\n          data: { type: 'RESET_INITIAL_BUILD_HIDE' },\n          source: mockParent,\n        })\n        window.dispatchEvent(event)\n      })\n\n      expect(screen.getByRole('alertdialog')).toBeInTheDocument()\n    })\n\n    it('ignores RESET_INITIAL_BUILD_HIDE from non-parent source', () => {\n      render(<CookieBanner />)\n      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()\n\n      act(() => {\n        const event = new MessageEvent('message', {\n          data: { type: 'RESET_INITIAL_BUILD_HIDE' },\n          source: window, // Wrong source\n        })\n        window.dispatchEvent(event)\n      })\n\n      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()\n    })\n\n    it('ignores other message types', () => {\n      render(<CookieBanner />)\n      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()\n\n      act(() => {\n        const event = new MessageEvent('message', {\n          data: { type: 'SOME_OTHER_MESSAGE' },\n          source: mockParent,\n        })\n        window.dispatchEvent(event)\n      })\n\n      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()\n    })\n\n    it('stays visible across a remount after RESET_INITIAL_BUILD_HIDE (survives iframe remount)', () => {\n      const { unmount } = render(<CookieBanner />)\n\n      act(() => {\n        const event = new MessageEvent('message', {\n          data: { type: 'RESET_INITIAL_BUILD_HIDE' },\n          source: mockParent,\n        })\n        window.dispatchEvent(event)\n      })\n      expect(screen.getByRole('alertdialog')).toBeInTheDocument()\n\n      unmount()\n      render(<CookieBanner />)\n\n      expect(screen.getByRole('alertdialog')).toBeInTheDocument()\n    })\n\n    it('starts hidden on a fresh mount after INITIAL_BUILD_COMPLETE, even across a remount', () => {\n      const { unmount } = render(<CookieBanner />)\n\n      act(() => {\n        const resetEvent = new MessageEvent('message', {\n          data: { type: 'RESET_INITIAL_BUILD_HIDE' },\n          source: mockParent,\n        })\n        window.dispatchEvent(resetEvent)\n      })\n      expect(screen.getByRole('alertdialog')).toBeInTheDocument()\n\n      act(() => {\n        const completeEvent = new MessageEvent('message', {\n          data: { type: 'INITIAL_BUILD_COMPLETE' },\n          source: mockParent,\n        })\n        window.dispatchEvent(completeEvent)\n      })\n      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()\n\n      unmount()\n      render(<CookieBanner />)\n\n      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()\n    })\n  })\n})\n","totalLines":200,"truncated":false}
+/**
+ * @vitest-environment jsdom
+ */
+import { act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import CookieBanner from '../CookieBanner'
+
+const CONSENT_KEY = 'c2_analytics_consent'
+
+describe('CookieBanner', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+  })
+
+  describe('standalone context (window.parent === window)', () => {
+    it('renders banner when no consent is stored', () => {
+      render(<CookieBanner />)
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+      expect(screen.getByText(/Cookie Consent/)).toBeInTheDocument()
+    })
+
+    it('saves consent and fires event on accept', async () => {
+      const user = userEvent.setup()
+      const eventListener = vi.fn()
+      window.addEventListener('cookie-consent-changed', eventListener)
+
+      render(<CookieBanner />)
+      const acceptButton = screen.getByRole('button', { name: /Accept/ })
+
+      await act(async () => {
+        await user.click(acceptButton)
+      })
+
+      const storedConsent = JSON.parse(localStorage.getItem(CONSENT_KEY) || '{}')
+      expect(storedConsent.analytics).toBe(true)
+      expect(storedConsent.timestamp).toBeDefined()
+      expect(eventListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { consented: true },
+        })
+      )
+
+      window.removeEventListener('cookie-consent-changed', eventListener)
+    })
+
+    it('saves non-consent and fires event on decline', async () => {
+      const user = userEvent.setup()
+      const eventListener = vi.fn()
+      window.addEventListener('cookie-consent-changed', eventListener)
+
+      render(<CookieBanner />)
+      const declineButton = screen.getByRole('button', { name: /Decline/ })
+
+      await act(async () => {
+        await user.click(declineButton)
+      })
+
+      const storedConsent = JSON.parse(localStorage.getItem(CONSENT_KEY) || '{}')
+      expect(storedConsent.analytics).toBe(false)
+      expect(storedConsent.timestamp).toBeDefined()
+      expect(eventListener).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detail: { consented: false },
+        })
+      )
+
+      window.removeEventListener('cookie-consent-changed', eventListener)
+    })
+
+    it('does not show banner when valid consent already stored', () => {
+      localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics: true, timestamp: Date.now() }))
+      render(<CookieBanner />)
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('embedded context (window.parent !== window)', () => {
+    let mockParent: MessageEventSource
+
+    beforeEach(() => {
+      mockParent = {} as MessageEventSource
+      Object.defineProperty(window, 'parent', {
+        value: mockParent,
+        configurable: true,
+      })
+    })
+
+    afterEach(() => {
+      Object.defineProperty(window, 'parent', {
+        value: window,
+        configurable: true,
+      })
+    })
+
+    it('banner starts hidden (no consent, no reset message)', () => {
+      render(<CookieBanner />)
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    })
+
+    it('banner shows after receiving RESET_INITIAL_BUILD_HIDE from parent', () => {
+      render(<CookieBanner />)
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+      act(() => {
+        const event = new MessageEvent('message', {
+          data: { type: 'RESET_INITIAL_BUILD_HIDE' },
+          source: mockParent,
+        })
+        window.dispatchEvent(event)
+      })
+
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    })
+
+    it('ignores RESET_INITIAL_BUILD_HIDE from non-parent source', () => {
+      render(<CookieBanner />)
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+      act(() => {
+        const event = new MessageEvent('message', {
+          data: { type: 'RESET_INITIAL_BUILD_HIDE' },
+          source: window, // Wrong source
+        })
+        window.dispatchEvent(event)
+      })
+
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    })
+
+    it('ignores other message types', () => {
+      render(<CookieBanner />)
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+      act(() => {
+        const event = new MessageEvent('message', {
+          data: { type: 'SOME_OTHER_MESSAGE' },
+          source: mockParent,
+        })
+        window.dispatchEvent(event)
+      })
+
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    })
+
+    it('stays visible across a remount after RESET_INITIAL_BUILD_HIDE (survives iframe remount)', () => {
+      const { unmount } = render(<CookieBanner />)
+
+      act(() => {
+        const event = new MessageEvent('message', {
+          data: { type: 'RESET_INITIAL_BUILD_HIDE' },
+          source: mockParent,
+        })
+        window.dispatchEvent(event)
+      })
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+
+      unmount()
+      render(<CookieBanner />)
+
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    })
+
+    it('starts hidden on a fresh mount after INITIAL_BUILD_COMPLETE, even across a remount', () => {
+      const { unmount } = render(<CookieBanner />)
+
+      act(() => {
+        const resetEvent = new MessageEvent('message', {
+          data: { type: 'RESET_INITIAL_BUILD_HIDE' },
+          source: mockParent,
+        })
+        window.dispatchEvent(resetEvent)
+      })
+      expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+
+      act(() => {
+        const completeEvent = new MessageEvent('message', {
+          data: { type: 'INITIAL_BUILD_COMPLETE' },
+          source: mockParent,
+        })
+        window.dispatchEvent(completeEvent)
+      })
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+      unmount()
+      render(<CookieBanner />)
+
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    })
+  })
+})

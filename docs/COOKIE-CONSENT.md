@@ -1,1 +1,263 @@
-{"success":true,"path":"docs/COOKIE-CONSENT.md","content":"# Cookie Consent Implementation Guide\n\n## Overview\n\n**GDPR and privacy laws require explicit user consent before loading tracking/analytics scripts.** This guide shows the universal pattern for implementing ANY tracking feature with proper consent gating.\n\nAll v8 apps include a cookie consent banner (`src/components/CookieBanner.tsx`) and consent API (`src/lib/analytics-consent.ts`) that handle consent management automatically.\n\n## The Universal Pattern\n\nAll tracking implementations follow the same pattern:\n\n```typescript\nimport { getAnalyticsConsent, onConsentChange } from '@/lib/analytics-consent';\n\nfunction loadTrackingScript(): void {\n  if (document.getElementById('tracking-script')) return; // Check if already loaded\n\n  // Initialize any required globals\n  // Load the tracking script dynamically\n  const script = document.createElement('script');\n  script.id = 'tracking-script';\n  script.src = 'https://tracking-provider.com/script.js';\n  script.async = true;\n  document.head.appendChild(script);\n}\n\nexport default function TrackingComponent() {\n  useEffect(() => {\n    // Check consent on mount\n    if (getAnalyticsConsent()) {\n      loadTrackingScript();\n    }\n\n    // Listen for consent changes\n    const cleanup = onConsentChange((consented) => {\n      if (consented) {\n        loadTrackingScript();\n      }\n    });\n\n    return cleanup;\n  }, []);\n\n  return null;\n}\n```\n\n**Key principles:**\n1. **Never load immediately** — always check `getAnalyticsConsent()` first\n2. **Subscribe to changes** — use `onConsentChange()` for mid-session consent changes\n3. **Lazy load scripts** — use `document.createElement()` to load scripts conditionally\n4. **Clean up** — return cleanup function from `onConsentChange()`\n5. **Idempotent** — check if script already exists before adding\n\n## Cookie Consent API\n\n```typescript\nimport { getAnalyticsConsent, onConsentChange } from '@/lib/analytics-consent';\n\n// Check current consent (returns boolean)\nconst hasConsent = getAnalyticsConsent();\n\n// Listen for changes (returns cleanup function)\nconst cleanup = onConsentChange((consented: boolean) => {\n  if (consented) {\n    // User accepted - load tracking\n  } else {\n    // User declined/revoked - disable tracking\n  }\n});\n```\n\n**How it works:**\n- Consent stored in `localStorage` as `c2_analytics_consent`\n- Cookie banner dispatches `cookie-consent-changed` event on accept/decline\n- `onConsentChange()` subscribes to this event\n- Consent expires after 365 days\n\n## When Consent Is Required\n\nApply consent gating for ANY script that:\n\n- Tracks user behavior (analytics, heatmaps, session replay)\n- Sets tracking cookies (advertising pixels, conversion tracking)\n- Sends visitor data to third-party domains\n- Contains keywords: `analytics`, `tracking`, `pixel`, `ads`, `tag`\n\n**Common tracking domains:**\n- `googletagmanager.com`, `google-analytics.com`\n- `facebook.net`, `connect.facebook.net`\n- `analytics.tiktok.com`, `linkedin.com/px`\n- `hotjar.com`, `fullstory.com`, `logrocket.com`\n\n**User intent phrases:**\n- \"add analytics\", \"track visitors\", \"website stats\"\n- \"GTM\", \"Google Tag Manager\", \"Facebook Pixel\"\n- \"session recording\", \"heatmap\", \"conversion tracking\"\n\n**Rule of thumb**: If you're unsure whether something tracks users, apply consent gating.\n\n## Reference Implementation: Google Analytics\n\nThe GoogleAnalytics component demonstrates all best practices:\n\n```typescript\nimport { useEffect, useRef } from 'react';\nimport { useLocation } from 'react-router';\nimport { getAnalyticsConsent, onConsentChange } from '@/lib/analytics-consent';\n\ndeclare global {\n  interface Window {\n    dataLayer: unknown[];\n    gtag: (...args: unknown[]) => void;\n    [key: `ga-disable-${string}`]: boolean;\n  }\n}\n\nfunction loadGtag(measurementId: string): void {\n  delete window[`ga-disable-${measurementId}`]; // Clear opt-out flag\n  if (document.getElementById('gtag-script')) return;\n\n  window.dataLayer = window.dataLayer ?? [];\n  window.gtag = (...args: unknown[]): void => {\n    window.dataLayer.push(args);\n  };\n  window.gtag('js', new Date());\n  window.gtag('config', measurementId);\n\n  const script = document.createElement('script');\n  script.id = 'gtag-script';\n  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;\n  script.async = true;\n  document.head.appendChild(script);\n}\n\nfunction disableGtag(measurementId: string): void {\n  window[`ga-disable-${measurementId}`] = true; // Official GA4 opt-out\n}\n\nexport default function GoogleAnalytics() {\n  const location = useLocation();\n  const measurementIdRef = useRef<string | null>(null);\n  const consentedRef = useRef<boolean>(false);\n\n  useEffect(() => {\n    let cancelled = false;\n\n    async function init(): Promise<void> {\n      try {\n        const res = await fetch('/api/analytics/config');\n        if (!res.ok || cancelled) return;\n        const data = (await res.json()) as { measurementId?: string };\n        if (!data.measurementId || cancelled) return;\n\n        measurementIdRef.current = data.measurementId;\n        if (getAnalyticsConsent()) {\n          consentedRef.current = true;\n          loadGtag(data.measurementId);\n        }\n      } catch {\n        // Analytics must never break the app\n      }\n    }\n\n    void init();\n\n    const cleanup = onConsentChange((consented) => {\n      const id = measurementIdRef.current;\n      if (!id) return;\n\n      if (consented) {\n        consentedRef.current = true;\n        loadGtag(id);\n      } else {\n        consentedRef.current = false;\n        disableGtag(id);\n      }\n    });\n\n    return () => {\n      cancelled = true;\n      cleanup();\n    };\n  }, []);\n\n  // Track SPA page changes\n  useEffect(() => {\n    if (!consentedRef.current || typeof window.gtag !== 'function') return;\n    window.gtag('event', 'page_view', { page_path: location.pathname });\n  }, [location.pathname]);\n\n  return null;\n}\n```\n\n**What makes this a good reference:**\n1. ✅ Lazy loading after consent check\n2. ✅ Consent change handling with `onConsentChange()`\n3. ✅ Proper cleanup on unmount\n4. ✅ Revocation support via GA4 opt-out flag\n5. ✅ Error resilience (try/catch, silent failures)\n6. ✅ SPA page tracking with React Router\n7. ✅ Idempotent script loading\n\n**Apply this pattern to ANY tracking tool** — just replace the script URL, initialization code, and optional disable mechanism.\n\n## Anti-Patterns\n\n### ❌ DON'T: Load immediately\n\n```html\n<!-- WRONG -->\n<script src=\"https://tracking.com/script.js\"></script>\n```\n\n### ❌ DON'T: Use inline scripts\n\n```tsx\n// WRONG\n<script dangerouslySetInnerHTML={{__html: '...'}} />\n```\n\n### ❌ DON'T: Skip consent checks\n\n```typescript\n// WRONG\nfunction loadAnalytics() {\n  const script = document.createElement('script');\n  script.src = 'https://tracking.com/script.js';\n  document.head.appendChild(script);\n}\n```\n\n### ✅ DO: Follow the pattern\n\n```typescript\n// CORRECT\nif (getAnalyticsConsent()) {\n  loadAnalytics();\n}\nonConsentChange((consented) => {\n  if (consented) loadAnalytics();\n});\n```\n\n## Testing\n\n**Manual:**\n1. Clear `localStorage`\n2. Load app → cookie banner appears\n3. Click \"Decline\" → tracking scripts NOT loaded (check Network tab)\n4. Refresh, click \"Accept\" → tracking scripts load\n\n**Automated:**\n- E2E test coverage via `analytics-consent.test.ts` in the template library\n- Gosym-probe scenario: `evals/gosym-probe/src/scenarios/cookie-consent-gtm.ts`\n\n## Resources\n\n- Cookie banner: `src/components/CookieBanner.tsx`\n- Consent API: `src/lib/analytics-consent.ts`\n- Google Analytics skill: Complete GA4 setup via skill system\n","totalLines":264,"truncated":false}
+# Cookie Consent Implementation Guide
+
+## Overview
+
+**GDPR and privacy laws require explicit user consent before loading tracking/analytics scripts.** This guide shows the universal pattern for implementing ANY tracking feature with proper consent gating.
+
+All v8 apps include a cookie consent banner (`src/components/CookieBanner.tsx`) and consent API (`src/lib/analytics-consent.ts`) that handle consent management automatically.
+
+## The Universal Pattern
+
+All tracking implementations follow the same pattern:
+
+```typescript
+import { getAnalyticsConsent, onConsentChange } from '@/lib/analytics-consent';
+
+function loadTrackingScript(): void {
+  if (document.getElementById('tracking-script')) return; // Check if already loaded
+
+  // Initialize any required globals
+  // Load the tracking script dynamically
+  const script = document.createElement('script');
+  script.id = 'tracking-script';
+  script.src = 'https://tracking-provider.com/script.js';
+  script.async = true;
+  document.head.appendChild(script);
+}
+
+export default function TrackingComponent() {
+  useEffect(() => {
+    // Check consent on mount
+    if (getAnalyticsConsent()) {
+      loadTrackingScript();
+    }
+
+    // Listen for consent changes
+    const cleanup = onConsentChange((consented) => {
+      if (consented) {
+        loadTrackingScript();
+      }
+    });
+
+    return cleanup;
+  }, []);
+
+  return null;
+}
+```
+
+**Key principles:**
+1. **Never load immediately** — always check `getAnalyticsConsent()` first
+2. **Subscribe to changes** — use `onConsentChange()` for mid-session consent changes
+3. **Lazy load scripts** — use `document.createElement()` to load scripts conditionally
+4. **Clean up** — return cleanup function from `onConsentChange()`
+5. **Idempotent** — check if script already exists before adding
+
+## Cookie Consent API
+
+```typescript
+import { getAnalyticsConsent, onConsentChange } from '@/lib/analytics-consent';
+
+// Check current consent (returns boolean)
+const hasConsent = getAnalyticsConsent();
+
+// Listen for changes (returns cleanup function)
+const cleanup = onConsentChange((consented: boolean) => {
+  if (consented) {
+    // User accepted - load tracking
+  } else {
+    // User declined/revoked - disable tracking
+  }
+});
+```
+
+**How it works:**
+- Consent stored in `localStorage` as `c2_analytics_consent`
+- Cookie banner dispatches `cookie-consent-changed` event on accept/decline
+- `onConsentChange()` subscribes to this event
+- Consent expires after 365 days
+
+## When Consent Is Required
+
+Apply consent gating for ANY script that:
+
+- Tracks user behavior (analytics, heatmaps, session replay)
+- Sets tracking cookies (advertising pixels, conversion tracking)
+- Sends visitor data to third-party domains
+- Contains keywords: `analytics`, `tracking`, `pixel`, `ads`, `tag`
+
+**Common tracking domains:**
+- `googletagmanager.com`, `google-analytics.com`
+- `facebook.net`, `connect.facebook.net`
+- `analytics.tiktok.com`, `linkedin.com/px`
+- `hotjar.com`, `fullstory.com`, `logrocket.com`
+
+**User intent phrases:**
+- "add analytics", "track visitors", "website stats"
+- "GTM", "Google Tag Manager", "Facebook Pixel"
+- "session recording", "heatmap", "conversion tracking"
+
+**Rule of thumb**: If you're unsure whether something tracks users, apply consent gating.
+
+## Reference Implementation: Google Analytics
+
+The GoogleAnalytics component demonstrates all best practices:
+
+```typescript
+import { useEffect, useRef } from 'react';
+import { useLocation } from 'react-router';
+import { getAnalyticsConsent, onConsentChange } from '@/lib/analytics-consent';
+
+declare global {
+  interface Window {
+    dataLayer: unknown[];
+    gtag: (...args: unknown[]) => void;
+    [key: `ga-disable-${string}`]: boolean;
+  }
+}
+
+function loadGtag(measurementId: string): void {
+  delete window[`ga-disable-${measurementId}`]; // Clear opt-out flag
+  if (document.getElementById('gtag-script')) return;
+
+  window.dataLayer = window.dataLayer ?? [];
+  window.gtag = (...args: unknown[]): void => {
+    window.dataLayer.push(args);
+  };
+  window.gtag('js', new Date());
+  window.gtag('config', measurementId);
+
+  const script = document.createElement('script');
+  script.id = 'gtag-script';
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
+  script.async = true;
+  document.head.appendChild(script);
+}
+
+function disableGtag(measurementId: string): void {
+  window[`ga-disable-${measurementId}`] = true; // Official GA4 opt-out
+}
+
+export default function GoogleAnalytics() {
+  const location = useLocation();
+  const measurementIdRef = useRef<string | null>(null);
+  const consentedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function init(): Promise<void> {
+      try {
+        const res = await fetch('/api/analytics/config');
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { measurementId?: string };
+        if (!data.measurementId || cancelled) return;
+
+        measurementIdRef.current = data.measurementId;
+        if (getAnalyticsConsent()) {
+          consentedRef.current = true;
+          loadGtag(data.measurementId);
+        }
+      } catch {
+        // Analytics must never break the app
+      }
+    }
+
+    void init();
+
+    const cleanup = onConsentChange((consented) => {
+      const id = measurementIdRef.current;
+      if (!id) return;
+
+      if (consented) {
+        consentedRef.current = true;
+        loadGtag(id);
+      } else {
+        consentedRef.current = false;
+        disableGtag(id);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, []);
+
+  // Track SPA page changes
+  useEffect(() => {
+    if (!consentedRef.current || typeof window.gtag !== 'function') return;
+    window.gtag('event', 'page_view', { page_path: location.pathname });
+  }, [location.pathname]);
+
+  return null;
+}
+```
+
+**What makes this a good reference:**
+1. ✅ Lazy loading after consent check
+2. ✅ Consent change handling with `onConsentChange()`
+3. ✅ Proper cleanup on unmount
+4. ✅ Revocation support via GA4 opt-out flag
+5. ✅ Error resilience (try/catch, silent failures)
+6. ✅ SPA page tracking with React Router
+7. ✅ Idempotent script loading
+
+**Apply this pattern to ANY tracking tool** — just replace the script URL, initialization code, and optional disable mechanism.
+
+## Anti-Patterns
+
+### ❌ DON'T: Load immediately
+
+```html
+<!-- WRONG -->
+<script src="https://tracking.com/script.js"></script>
+```
+
+### ❌ DON'T: Use inline scripts
+
+```tsx
+// WRONG
+<script dangerouslySetInnerHTML={{__html: '...'}} />
+```
+
+### ❌ DON'T: Skip consent checks
+
+```typescript
+// WRONG
+function loadAnalytics() {
+  const script = document.createElement('script');
+  script.src = 'https://tracking.com/script.js';
+  document.head.appendChild(script);
+}
+```
+
+### ✅ DO: Follow the pattern
+
+```typescript
+// CORRECT
+if (getAnalyticsConsent()) {
+  loadAnalytics();
+}
+onConsentChange((consented) => {
+  if (consented) loadAnalytics();
+});
+```
+
+## Testing
+
+**Manual:**
+1. Clear `localStorage`
+2. Load app → cookie banner appears
+3. Click "Decline" → tracking scripts NOT loaded (check Network tab)
+4. Refresh, click "Accept" → tracking scripts load
+
+**Automated:**
+- E2E test coverage via `analytics-consent.test.ts` in the template library
+- Gosym-probe scenario: `evals/gosym-probe/src/scenarios/cookie-consent-gtm.ts`
+
+## Resources
+
+- Cookie banner: `src/components/CookieBanner.tsx`
+- Consent API: `src/lib/analytics-consent.ts`
+- Google Analytics skill: Complete GA4 setup via skill system
