@@ -38,7 +38,7 @@ export default function Header() {
               </Button>
             )}
             <Button asChild className="rounded-full bg-primary px-5 text-primary-foreground hover:bg-primary/90">
-              <Link to="/start-trip">Start Planning</Link>
+              <Link to="/my-trips">Start Planning</Link>
             </Button>
           </div>
 

@@ -6,6 +6,7 @@ import StartTripPage from './pages/start-trip';
 import PollsPage from './pages/polls';
 import ItineraryPage from './pages/itinerary';
 import TripsPage from './pages/trips';
+import MyTripsPage from './pages/my-trips';
 import AuthPage from './pages/auth/AuthPage';
 import { ProtectedRoute } from './lib/auth/auth-client';
 // Eager import so renderToString doesn't hit a Suspense boundary on 404 routes
@@ -40,6 +41,10 @@ export const routes: RouteObject[] = [
     element: <ProtectedRoute><TripsPage /></ProtectedRoute>,
   },
   {
+    path: '/my-trips',
+    element: <MyTripsPage />,
+  },
+  {
     path: '/start-trip',
     element: <StartTripPage />,
   },
@@ -58,6 +63,6 @@ export const routes: RouteObject[] = [
 ];
 
 // Types for type-safe navigation
-export type Path = '/' | '/login' | '/signup' | '/dashboard' | '/trips' | '/start-trip' | '/polls' | '/itinerary';
+export type Path = '/' | '/login' | '/signup' | '/dashboard' | '/trips' | '/my-trips' | '/start-trip' | '/polls' | '/itinerary';
 
 export type Params = Record<string, string | undefined>;
