@@ -1,0 +1,1 @@
+{"success":true,"path":"src/components/ui/aspect-ratio.tsx","content":"\"use client\"\n\nimport * as AspectRatioPrimitive from \"@radix-ui/react-aspect-ratio\"\n\nconst AspectRatio = AspectRatioPrimitive.Root\n\nexport { AspectRatio }\n","totalLines":8,"truncated":false}

@@ -1,0 +1,1 @@
+{"success":true,"path":"content-plugin/src/parse.ts","content":"export function parseJson(source: string): unknown {\n  return JSON.parse(source);\n}\n","totalLines":4,"truncated":false}

@@ -1,0 +1,1 @@
+{"success":true,"path":"airo-media-folders.json","content":"[\n  {\n    \"id\": \"310ddfe3-f115-4f62-aa1c-5fe1e7f0d258\",\n    \"name\": \"Logos\",\n    \"createdAt\": \"2026-07-23T20:46:58.594Z\",\n    \"slots\": [\n      \"logo/horizontal\",\n      \"logo/favicon\"\n    ]\n  }\n]","totalLines":11,"truncated":false}

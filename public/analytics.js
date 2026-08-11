@@ -1,0 +1,1 @@
+{"success":true,"path":"public/analytics.js","content":"// Analytics initialization\n// C2 analytics loading is now managed by CookieBanner component\n// to ensure GDPR/CCPA compliance with user consent.\n// The script will only load after user accepts analytics cookies.\n(window._signalsDataLayer=window._signalsDataLayer||[]);\n\n","totalLines":7,"truncated":false}
