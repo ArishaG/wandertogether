@@ -1,6 +1,6 @@
-import { boolean, json, mysqlTable, timestamp, varchar } from 'drizzle-orm/mysql-core';
+import { boolean, json, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
 
-export const user = mysqlTable('user', {
+export const user = pgTable('user', {
   id: varchar('id', { length: 36 }).primaryKey(),
   name: varchar('name', { length: 255 }),
   email: varchar('email', { length: 255 }).notNull().unique(),
@@ -8,10 +8,10 @@ export const user = mysqlTable('user', {
   image: varchar('image', { length: 2048 }),
   isAdmin: boolean('is_admin').default(false),
   createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
-export const session = mysqlTable('session', {
+export const session = pgTable('session', {
   id: varchar('id', { length: 36 }).primaryKey(),
   expiresAt: timestamp('expires_at').notNull(),
   token: varchar('token', { length: 255 }).notNull().unique(),
@@ -19,10 +19,10 @@ export const session = mysqlTable('session', {
   userAgent: varchar('user_agent', { length: 2048 }),
   userId: varchar('user_id', { length: 36 }).notNull().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
-export const account = mysqlTable('account', {
+export const account = pgTable('account', {
   id: varchar('id', { length: 36 }).primaryKey(),
   accountId: varchar('account_id', { length: 255 }).notNull(),
   providerId: varchar('provider_id', { length: 255 }).notNull(),
@@ -35,19 +35,19 @@ export const account = mysqlTable('account', {
   scope: varchar('scope', { length: 2048 }),
   password: varchar('password', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
-export const verification = mysqlTable('verification', {
+export const verification = pgTable('verification', {
   id: varchar('id', { length: 36 }).primaryKey(),
   identifier: varchar('identifier', { length: 255 }).notNull(),
   value: varchar('value', { length: 255 }).notNull(),
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
-export const trips = mysqlTable('trips', {
+export const trips = pgTable('trips', {
   id: varchar('id', { length: 36 }).primaryKey(),
   ownerId: varchar('owner_id', { length: 36 }).notNull().references(() => user.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
@@ -55,10 +55,10 @@ export const trips = mysqlTable('trips', {
   joinCode: varchar('join_code', { length: 16 }).notNull().unique(),
   state: json('state').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+  updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });
 
-export const tripMembers = mysqlTable('trip_members', {
+export const tripMembers = pgTable('trip_members', {
   id: varchar('id', { length: 36 }).primaryKey(),
   tripId: varchar('trip_id', { length: 36 }).notNull().references(() => trips.id, { onDelete: 'cascade' }),
   userId: varchar('user_id', { length: 36 }).references(() => user.id, { onDelete: 'cascade' }),

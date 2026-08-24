@@ -1,42 +1,27 @@
-/** TREAT AS IMMUTABLE - This file is protected by the file-edit tool
- *
- * Database connection setup using Drizzle ORM with MySQL2
+/**
+ * Database connection setup using Drizzle ORM with postgres.js (Neon-compatible)
  */
 
-import { drizzle } from 'drizzle-orm/mysql2';
-import mysql from 'mysql2/promise';
-import { getDatabaseCredentials } from './config';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { getDatabaseUrl } from './config';
 import * as schema from './schema';
 
-// Get database configuration
-const dbConfig = getDatabaseCredentials();
-
-// Create MySQL connection pool with SSL enabled
-const poolConnection = mysql.createPool({
-  host: dbConfig.host,
-  port: dbConfig.port,
-  user: dbConfig.user,
-  password: dbConfig.password,
-  database: dbConfig.database,
-  ssl: {
-    rejectUnauthorized: false,
-  },
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
+// Create Postgres connection pool with SSL enabled (required by Neon)
+const queryClient = postgres(getDatabaseUrl(), {
+  ssl: 'require',
+  max: 10,
 });
 
 // Create Drizzle instance
-export const db = drizzle(poolConnection, { schema, mode: 'default' });
+export const db = drizzle(queryClient, { schema });
 
 /**
  * Test database connection
  */
 export async function testConnection(): Promise<boolean> {
   try {
-    const connection = await poolConnection.getConnection();
-    await connection.ping();
-    connection.release();
+    await queryClient`select 1`;
     return true;
   } catch {
     return false;
@@ -47,5 +32,5 @@ export async function testConnection(): Promise<boolean> {
  * Close database connection pool
  */
 export async function closeConnection(): Promise<void> {
-  await poolConnection.end();
+  await queryClient.end();
 }

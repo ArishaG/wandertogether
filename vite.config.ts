@@ -198,7 +198,7 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
   },
 
   optimizeDeps: {
-    include: ["react", "react-dom", "react-router", "motion/react"], exclude: ["drizzle-orm", "mysql2"]
+    include: ["react", "react-dom", "react-router", "motion/react"], exclude: ["drizzle-orm", "postgres"]
   },
 
   ssr: {

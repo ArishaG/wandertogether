@@ -25,7 +25,7 @@ import { getSecret } from '#airo/secrets';
 // auth instance must be constructed after the secrets are available (i.e. on
 // the first HTTP request, not at import time).
 //
-// Pattern mirrors how db/client.ts defers the actual MySQL connection — the
+// Pattern mirrors how db/client.ts defers the actual Postgres connection — the
 // pool object is safe to create at init, but anything that reads schema state
 // or secrets must be deferred to request time.
 let _auth: ReturnType<typeof betterAuth> | null = null;
@@ -45,7 +45,7 @@ export function getAuth() {
   const auth = betterAuth({
     // Schema passed explicitly — avoids BetterAuth's runtime schema inference.
     database: drizzleAdapter(db, {
-      provider: 'mysql',
+      provider: 'pg',
       schema: { user, session, account, verification },
     }),
 
