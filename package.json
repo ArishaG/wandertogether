@@ -136,7 +136,7 @@
     "vitest": "^4.1.9"
   },
   "engines": {
-    "node": ">=22.22.0"
+    "node": ">=22"
   },
   "overrides": {
     "cmdk": "^1.1.1",
