@@ -5,13 +5,13 @@ import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { URL } from "node:url";
-import sourceMapperPlugin from "./source-mapper/src/index";
-import { devToolsPlugin } from "./dev-tools/src/vite-plugin";
-import { fullStoryPlugin } from "./fullstory-plugin";
-import { errorInterceptorPlugin } from "./dev-tools/src/vite-error-interceptor";
-import { mediaVersionsPlugin } from "./dev-tools/src/vite-media-versions-plugin";
-import { formatOverridesPlugin } from "./format-overrides-plugin";
-import { contentPlugin } from "./content-plugin/src/index";
+
+
+
+
+
+import { formatOverridesPlugin } from "./export-plugins/format-overrides-plugin.ts";
+import { contentPlugin } from "./export-plugins/content-plugin/index.ts";import { mediaAssetsPlugin } from "./export-plugins/media-assets-plugin.ts";
 
 function extractHostname(value: string): string {
   try {
@@ -171,25 +171,25 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
   plugins: [
   react({
     babel: {
-      plugins: [sourceMapperPlugin]
+      plugins: []
     }
   }),
   worktreePreviewPlugin(),
-  apiDevPlugin(),
+  apiDevPlugin(), mediaAssetsPlugin(),
   formatOverridesPlugin(__dirname),
-  contentPlugin(),
-  ...(mode === "development" ?
-  [
-  devToolsPlugin() as Plugin,
-  fullStoryPlugin(),
-  errorInterceptorPlugin(),
-  mediaVersionsPlugin() as Plugin] :
+  contentPlugin()],
 
-  [])],
+
+
+
+
+
+
+
 
 
   resolve: {
-    dedupe: ["react", "react-dom", "react-router-dom"],
+    dedupe: ["react", "react-dom", "react-router"],
     alias: {
       nothing: "/src/fallbacks/missingModule.ts",
       "@/api": path.resolve(__dirname, "./src/server/api"),
@@ -198,7 +198,7 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
   },
 
   optimizeDeps: {
-    include: ["react", "react-dom", "react-router-dom", "motion/react"], exclude: ["drizzle-orm", "mysql2"]
+    include: ["react", "react-dom", "react-router", "motion/react"], exclude: ["drizzle-orm", "mysql2"]
   },
 
   ssr: {

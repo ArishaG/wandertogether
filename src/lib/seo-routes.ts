@@ -33,9 +33,6 @@ export const seoRoutes: SeoRoute[] = [
   { path: "/", changefreq: "weekly", priority: 1.0 },
   { path: "/login", changefreq: "monthly", priority: 0.8 },
   { path: "/signup", changefreq: "monthly", priority: 0.8 },
-  { path: "/dashboard", changefreq: "monthly", priority: 0.8 },
-  { path: "/trips", changefreq: "monthly", priority: 0.8 },
-  { path: "/start-trip", changefreq: "monthly", priority: 0.8 },
-  { path: "/polls", changefreq: "monthly", priority: 0.8 },
-  { path: "/itinerary", changefreq: "monthly", priority: 0.8 },
+  { path: "/profile", changefreq: "monthly", priority: 0.8 },
+  { path: "/new-trip", changefreq: "monthly", priority: 0.8 },
 ];

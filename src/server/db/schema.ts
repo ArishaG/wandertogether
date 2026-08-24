@@ -1,11 +1,11 @@
-import { boolean, mysqlTable, text, timestamp, varchar } from 'drizzle-orm/mysql-core';
+import { boolean, json, mysqlTable, timestamp, varchar } from 'drizzle-orm/mysql-core';
 
 export const user = mysqlTable('user', {
   id: varchar('id', { length: 36 }).primaryKey(),
   name: varchar('name', { length: 255 }),
   email: varchar('email', { length: 255 }).notNull().unique(),
   emailVerified: boolean('email_verified').default(false),
-  image: text('image'),
+  image: varchar('image', { length: 2048 }),
   isAdmin: boolean('is_admin').default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
@@ -16,7 +16,7 @@ export const session = mysqlTable('session', {
   expiresAt: timestamp('expires_at').notNull(),
   token: varchar('token', { length: 255 }).notNull().unique(),
   ipAddress: varchar('ip_address', { length: 45 }),
-  userAgent: text('user_agent'),
+  userAgent: varchar('user_agent', { length: 2048 }),
   userId: varchar('user_id', { length: 36 }).notNull().references(() => user.id, { onDelete: 'cascade' }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
@@ -27,12 +27,12 @@ export const account = mysqlTable('account', {
   accountId: varchar('account_id', { length: 255 }).notNull(),
   providerId: varchar('provider_id', { length: 255 }).notNull(),
   userId: varchar('user_id', { length: 36 }).notNull().references(() => user.id, { onDelete: 'cascade' }),
-  accessToken: text('access_token'),
-  refreshToken: text('refresh_token'),
-  idToken: text('id_token'),
+  accessToken: varchar('access_token', { length: 4096 }),
+  refreshToken: varchar('refresh_token', { length: 4096 }),
+  idToken: varchar('id_token', { length: 4096 }),
   accessTokenExpiresAt: timestamp('access_token_expires_at'),
   refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
-  scope: text('scope'),
+  scope: varchar('scope', { length: 2048 }),
   password: varchar('password', { length: 255 }),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
@@ -47,13 +47,22 @@ export const verification = mysqlTable('verification', {
   updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
 });
 
-export const trip = mysqlTable('trip', {
+export const trips = mysqlTable('trips', {
   id: varchar('id', { length: 36 }).primaryKey(),
   ownerId: varchar('owner_id', { length: 36 }).notNull().references(() => user.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
-  destination: varchar('destination', { length: 255 }).notNull(),
-  tripType: varchar('trip_type', { length: 32 }).notNull(),
-  status: varchar('status', { length: 32 }).notNull().default('Planning'),
+  destination: varchar('destination', { length: 255 }),
+  joinCode: varchar('join_code', { length: 16 }).notNull().unique(),
+  state: json('state').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow().onUpdateNow(),
+});
+
+export const tripMembers = mysqlTable('trip_members', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  tripId: varchar('trip_id', { length: 36 }).notNull().references(() => trips.id, { onDelete: 'cascade' }),
+  userId: varchar('user_id', { length: 36 }).references(() => user.id, { onDelete: 'cascade' }),
+  guestName: varchar('guest_name', { length: 255 }),
+  role: varchar('role', { length: 32 }).notNull().default('guest'),
+  createdAt: timestamp('created_at').defaultNow(),
 });

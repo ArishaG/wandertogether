@@ -43,8 +43,6 @@ export function getAuth() {
   }
 
   const auth = betterAuth({
-    baseURL: process.env.BETTER_AUTH_URL,
-
     // Schema passed explicitly — avoids BetterAuth's runtime schema inference.
     database: drizzleAdapter(db, {
       provider: 'mysql',

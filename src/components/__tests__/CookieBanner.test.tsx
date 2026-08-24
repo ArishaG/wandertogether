@@ -195,5 +195,62 @@ describe('CookieBanner', () => {
 
       expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     })
+
+    it('grants analytics consent when INITIAL_BUILD_COMPLETE hides the banner', () => {
+      const eventListener = vi.fn()
+      window.addEventListener('cookie-consent-changed', eventListener)
+
+      render(<CookieBanner />)
+
+      act(() => {
+        const resetEvent = new MessageEvent('message', {
+          data: { type: 'RESET_INITIAL_BUILD_HIDE' },
+          source: mockParent,
+        })
+        window.dispatchEvent(resetEvent)
+      })
+
+      act(() => {
+        const completeEvent = new MessageEvent('message', {
+          data: { type: 'INITIAL_BUILD_COMPLETE' },
+          source: mockParent,
+        })
+        window.dispatchEvent(completeEvent)
+      })
+
+      const storedConsent = JSON.parse(localStorage.getItem(CONSENT_KEY) || '{}')
+      expect(storedConsent.analytics).toBe(true)
+      expect(eventListener).toHaveBeenCalledWith(
+        expect.objectContaining({ detail: { consented: true } })
+      )
+
+      window.removeEventListener('cookie-consent-changed', eventListener)
+    })
+
+    it('consent persists across remounts so consent-gated widgets load without the banner', () => {
+      const { unmount } = render(<CookieBanner />)
+
+      act(() => {
+        const resetEvent = new MessageEvent('message', {
+          data: { type: 'RESET_INITIAL_BUILD_HIDE' },
+          source: mockParent,
+        })
+        window.dispatchEvent(resetEvent)
+      })
+
+      act(() => {
+        const completeEvent = new MessageEvent('message', {
+          data: { type: 'INITIAL_BUILD_COMPLETE' },
+          source: mockParent,
+        })
+        window.dispatchEvent(completeEvent)
+      })
+
+      unmount()
+      render(<CookieBanner />)
+
+      const storedConsent = JSON.parse(localStorage.getItem(CONSENT_KEY) || '{}')
+      expect(storedConsent.analytics).toBe(true)
+    })
   })
 })

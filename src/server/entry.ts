@@ -4,14 +4,21 @@ import { dirname, extname, join } from "node:path";
 import { readFileSync } from "node:fs";
 
 // <api-imports>
-import auth_action_get_0 from "./api/auth/[action]/GET";
-import auth_action_post_1 from "./api/auth/[action]/POST";
-import auth_action_detail_get_2 from "./api/auth/[action]/[detail]/GET";
-import auth_action_detail_post_3 from "./api/auth/[action]/[detail]/POST";
-import chat_post_4 from "./api/chat/POST";
-import health_get_5 from "./api/health/GET";
-import trips_get_6 from "./api/trips/GET";
-import trips_post_7 from "./api/trips/POST";
+import ai_provider_check_post_0 from "./api/ai-provider-check/POST";
+import auth_action_get_1 from "./api/auth/[action]/GET";
+import auth_action_post_2 from "./api/auth/[action]/POST";
+import auth_action_detail_get_3 from "./api/auth/[action]/[detail]/GET";
+import auth_action_detail_post_4 from "./api/auth/[action]/[detail]/POST";
+import chat_post_5 from "./api/chat/POST";
+import health_get_6 from "./api/health/GET";
+import itinerary_post_7 from "./api/itinerary/POST";
+import maps_config_get_8 from "./api/maps/config/GET";
+import trips_get_9 from "./api/trips/GET";
+import trips_post_10 from "./api/trips/POST";
+import trips_join_post_11 from "./api/trips/join/POST";
+import trips_id_delete_12 from "./api/trips/[id]/DELETE";
+import trips_id_get_13 from "./api/trips/[id]/GET";
+import trips_id_put_14 from "./api/trips/[id]/PUT";
 // </api-imports>
 import { seoRoutes } from "../lib/seo-routes";
 import {
@@ -92,14 +99,21 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // <api-registrations>
-app.get("/api/auth/:action", auth_action_get_0);
-app.post("/api/auth/:action", auth_action_post_1);
-app.get("/api/auth/:action/:detail", auth_action_detail_get_2);
-app.post("/api/auth/:action/:detail", auth_action_detail_post_3);
-app.post("/api/chat", chat_post_4);
-app.get("/api/health", health_get_5);
-app.get("/api/trips", trips_get_6);
-app.post("/api/trips", trips_post_7);
+app.post("/api/ai-provider-check", ai_provider_check_post_0);
+app.get("/api/auth/:action", auth_action_get_1);
+app.post("/api/auth/:action", auth_action_post_2);
+app.get("/api/auth/:action/:detail", auth_action_detail_get_3);
+app.post("/api/auth/:action/:detail", auth_action_detail_post_4);
+app.post("/api/chat", chat_post_5);
+app.get("/api/health", health_get_6);
+app.post("/api/itinerary", itinerary_post_7);
+app.get("/api/maps/config", maps_config_get_8);
+app.get("/api/trips", trips_get_9);
+app.post("/api/trips", trips_post_10);
+app.post("/api/trips/join", trips_join_post_11);
+app.delete("/api/trips/:id", trips_id_delete_12);
+app.get("/api/trips/:id", trips_id_get_13);
+app.put("/api/trips/:id", trips_id_put_14);
 // </api-registrations>
 
 // Error middleware must be registered AFTER the routes it protects; Express

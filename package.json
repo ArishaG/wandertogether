@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "imports": {
-    "#airo/secrets": "./airo-secrets/src/index.ts"
+    "#airo/secrets": "./export-plugins/airo-secrets.ts"
   },
   "scripts": {
     "dev": "vite",
@@ -12,16 +12,19 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
+    "audit": "better-npm-audit audit --level high --registry=https://registry.npmjs.org",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
     "clean": "rm -rf dist node_modules/.vite",
-    "reset": "npm run clean && npm install",
-    "audit": "better-npm-audit audit --level high --registry=https://registry.npmjs.org"
+    "reset": "npm run clean && npm install"
   },
   "dependencies": {
-    "@dr.pogodin/react-helmet": "^3.0.5",
+    "@ai-sdk/anthropic": "^4.0.38",
+    "@ai-sdk/google": "^4.0.43",
+    "@ai-sdk/openai": "^4.0.41",
+    "@dr.pogodin/react-helmet": "~3.1.1",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^3.10.0",
     "@lexical/html": "^0.43.0",
@@ -58,7 +61,8 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@tanstack/react-query": "^5.95.2",
-    "ai": "^7.0.58",
+    "@vis.gl/react-google-maps": "^1.9.0",
+    "ai": "^7.0.64",
     "better-auth": "^1.6.15",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -75,13 +79,12 @@
     "lucide-react": "^0.454.0",
     "motion": "^12.29.2",
     "mysql2": "^3.23.3",
-    "react": "^19.2.4",
+    "react": "^19.2.7",
     "react-day-picker": "^9.9.0",
-    "react-dom": "^19.2.4",
+    "react-dom": "^19.2.7",
     "react-hook-form": "^7.62.0",
     "react-markdown": "^9.0.1",
     "react-resizable-panels": "^3.0.5",
-    "react-router-dom": "^7.18.0",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
     "rrweb-snapshot": "^2.0.0-alpha.18",
@@ -89,7 +92,8 @@
     "tailwind-merge": "^2.6.1",
     "vaul": "^1.1.2",
     "zod": "^3.25.76",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "react-router": "^8.3.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.6",
@@ -122,7 +126,7 @@
     "eslint-plugin-security": "^3.0.1",
     "jsdom": "^29.0.2",
     "lockfile-lint": "~4.13.2",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.18",
     "prettier": "^3.4.2",
     "tailwindcss": "^3.4.19",
     "tailwindcss-animate": "^1.0.7",
@@ -132,16 +136,10 @@
     "vitest": "^4.1.9"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.0"
   },
   "overrides": {
     "cmdk": "^1.1.1",
     "react-day-picker": "^9.9.0"
-  },
-  "allowScripts": {
-    "esbuild@0.18.20": true,
-    "esbuild@0.25.12": true,
-    "esbuild@0.28.2": true,
-    "fsevents@2.3.3": true
   }
 }

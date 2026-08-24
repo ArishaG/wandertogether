@@ -2,7 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot, hydrateRoot } from 'react-dom/client';
 import { HelmetProvider } from '@dr.pogodin/react-helmet';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import AiroErrorBoundary from '../dev-tools/src/AiroErrorBoundary';
+import AiroErrorBoundary from '../export-plugins/AiroErrorBoundary';
 import App from './App';
 import './styles/globals.css';
 

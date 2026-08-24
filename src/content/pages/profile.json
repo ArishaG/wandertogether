@@ -1,0 +1,11 @@
+{
+  "title": "Your trips",
+  "description": "Plans you created and trips you joined.",
+  "newTrip": "New trip",
+  "createdByYou": "Created by you",
+  "joinedTrip": "Joined trip",
+  "destinationFallback": "Destination to be decided",
+  "tripCode": "Trip code:",
+  "emptyTitle": "No trips yet",
+  "emptyBody": "Create a trip to start planning with your group."
+}

@@ -1,91 +1,63 @@
 {
-  "hero": {
-    "heading": "Plan trips together, stress-free.",
-    "subheading": "Wander brings your crew into one place — vote on destinations, split expenses, sync calendars, and let AI handle the heavy lifting.",
-    "ctaPrimary": "Start a Trip",
-    "ctaSecondary": "See how it works"
+  "landing": {
+    "eyebrow": "Trip planning, in your own order",
+    "title": "Turn the planning swirl into a shared plan.",
+    "body": "Trips rarely come together in a straight line. Wander gives every idea, question, vote, and must-see stop a place to land—then helps your group shape it into a plan that works for everyone.",
+    "cta": "Start planning"
   },
-  "tripTypes": {
-    "heading": "What kind of adventure are you planning?",
-    "local": {
-      "title": "Local Adventure",
-      "description": "Discover hidden gems in your city or nearby. Perfect for weekend getaways and day trips with friends.",
-      "badge": "No passport needed"
+  "profile": {
+    "title": "Your trips",
+    "newTrip": "New trip",
+    "emptyTitle": "Nothing planned yet",
+    "emptyBody": "Start a trip when the idea is still taking shape. You can figure out the details together."
+  },
+  "whiteboard": {
+    "checklist": [
+      { "id": "vAIZW-EvI-OUyGZq5eBxn", "label": "Choose a destination", "hint": "Pick a place to start exploring." },
+      { "id": "XJKeN-oDFGQEm_CQay3mw", "label": "Confirm dates", "hint": "Find days that work for everyone." },
+      { "id": "YhfRKQPM2zvMcO38DploM", "label": "Save activities", "hint": "Collect enough ideas for each day." }
+    ],
+    "checklistTitle": "Build your trip",
+    "createItinerary": "Create itinerary"
+  },
+  "itinerary": {
+    "title": "Your itinerary",
+    "back": "Back to board",
+    "emptyTitle": "Your itinerary is taking shape",
+    "emptyBody": "Save a few activities and confirm your dates to build a plan."
+  },
+  "onboarding": {
+    "step1": {
+      "title": "What are you planning?",
+      "body": "Give your trip a name and choose the kind of getaway it is.",
+      "inputLabel": "Trip name",
+      "inputPlaceholder": "e.g. Long weekend in Lisbon",
+      "types": [
+        {
+          "label": "Day trip",
+          "description": "A quick escape close to home.",
+          "id": "iRZhujv4YchtKO-afsqT1"
+        },
+        {
+          "label": "Road trip",
+          "description": "A route with room for detours.",
+          "id": "Rk30RTTGg5oLgYgMg4D4Q"
+        },
+        {
+          "label": "Getaway",
+          "description": "A destination worth gathering for.",
+          "id": "7OtlZhsc-r0_3RT7tlkbM"
+        }
+      ],
+      "caption": "You can change these details later."
     },
-    "overseas": {
-      "title": "Overseas Escape",
-      "description": "Plan your dream international trip with everything from flights to local experiences, all in one place.",
-      "badge": "Passport ready"
+    "step2": {
+      "title": "Where are you headed?",
+      "inputPlaceholder": "Search a city, region, country, or park"
+    },
+    "step3": {
+      "title": "Invite your people",
+      "inputPlaceholder": "Add an email address"
     }
-  },
-  "features": {
-    "heading": "Everything your group needs to plan the perfect trip",
-    "subheading": "From the first idea to the final recap — Wandertogether has every tool your crew needs.",
-    "items": [
-      {
-        "id": "feat-1",
-        "title": "Collaborative Planning",
-        "description": "Invite your whole crew and plan together in real time. Everyone has a voice.",
-        "size": "large"
-      },
-      {
-        "id": "feat-2",
-        "title": "Polls & Voting",
-        "description": "Create polls for destinations, activities, or restaurants. Set a time limit and let the votes roll in.",
-        "size": "small"
-      },
-      {
-        "id": "feat-3",
-        "title": "Expense Tracker",
-        "description": "Track every cost and see exactly what each person owes. Filter by food, flights, hotels, and more.",
-        "size": "small"
-      },
-      {
-        "id": "feat-4",
-        "title": "AI Trip Assistant",
-        "description": "Get smart suggestions to save time and money. Flag weather issues, events, and trip blockers before they happen.",
-        "size": "small"
-      },
-      {
-        "id": "feat-5",
-        "title": "Calendar Availability",
-        "description": "Find the best dates for everyone with a When2Meet-style availability grid.",
-        "size": "small"
-      },
-      {
-        "id": "feat-6",
-        "title": "Trip Memories",
-        "description": "Upload photos and videos during your trip. Get a beautiful post-trip recap when you're back home.",
-        "size": "small"
-      }
-    ]
-  },
-  "howItWorks": {
-    "heading": "Planning a trip has never been this easy",
-    "steps": [
-      {
-        "id": "step-1",
-        "number": "01",
-        "title": "Create your trip",
-        "description": "Choose local or overseas, set your dates, and give your adventure a name."
-      },
-      {
-        "id": "step-2",
-        "number": "02",
-        "title": "Invite your crew",
-        "description": "Send invites to friends and family. Everyone joins in seconds."
-      },
-      {
-        "id": "step-3",
-        "number": "03",
-        "title": "Plan together",
-        "description": "Vote on places, split costs, sync calendars, and let AI optimize the rest."
-      }
-    ]
-  },
-  "cta": {
-    "heading": "Your next adventure is one invite away.",
-    "subheading": "Join thousands of groups already planning their dream trips on Wandertogether.",
-    "button": "Start Planning for Free"
   }
 }
