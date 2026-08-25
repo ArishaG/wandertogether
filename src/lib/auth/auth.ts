@@ -63,13 +63,22 @@ export function getAuth() {
       },
     },
 
-    // CORS: Trusts .airoapp.ai subdomains and localhost by default.
-    // If your app has a custom domain, add it here or set BETTER_AUTH_TRUSTED_ORIGINS.
+    // CORS: Trusts .airoapp.ai and .vercel.app subdomains, localhost, and any
+    // origin listed in BETTER_AUTH_TRUSTED_ORIGINS (comma-separated) by default.
+    // Add a custom domain to BETTER_AUTH_TRUSTED_ORIGINS if you attach one.
     trustedOrigins: (request?: Request) => {
       if (!request) return [];
 
       const origin = request.headers.get('origin');
       if (!origin) return [];
+
+      const extraOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? '')
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean);
+      if (extraOrigins.includes(origin)) {
+        return [origin];
+      }
 
       try {
         const originUrl = new URL(origin);
@@ -77,6 +86,11 @@ export function getAuth() {
 
         // Trust all airoapp.ai subdomains
         if (hostname.endsWith('.airoapp.ai') || hostname.endsWith('.test-airoapp.ai')) {
+          return [origin];
+        }
+
+        // Trust Vercel's own preview/production subdomains for this project
+        if (hostname.endsWith('.vercel.app')) {
           return [origin];
         }
 

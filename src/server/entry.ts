@@ -182,7 +182,17 @@ app.get("/sitemap.xml", (req, res) => {
 
 app.get("/llms.txt", llmsTxtHandler);
 
-if (import.meta.env.PROD) {
+// On Vercel this module runs inside a Serverless Function per request, not as
+// a long-lived process — static assets are already served by Vercel's CDN
+// from `dist/client`, so the SSR template/asset-serving/listen/shutdown setup
+// below (built for the persistent-container deployment target) doesn't apply
+// and must be skipped. `VERCEL` is set automatically in that runtime.
+//
+// `!process.env.VERCEL` must come first: this file is bundled directly by
+// Vercel's Node builder (not Vite) when deployed as a function, so
+// `import.meta.env` is undefined there — the short-circuit keeps the right
+// side from ever evaluating in that case.
+if (!process.env.VERCEL && import.meta.env.PROD) {
 	const __dirname = dirname(fileURLToPath(import.meta.url));
 	const clientDir = join(__dirname, "client");
 	const adSenseRuntimeConfig = loadAdSenseRuntimeConfig(__dirname);
