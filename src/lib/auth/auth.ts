@@ -12,6 +12,7 @@
  * - Only trusts origins matching the server's hostname
  */
 
+import { getTrustedOrigins } from './trusted-origins';
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 
@@ -35,7 +36,7 @@ export function getAuth() {
 
   const authSecret = getSecret('BETTER_AUTH_SECRET');
   if (!authSecret || typeof authSecret !== 'string') {
-    throw new Error('BETTER_AUTH_SECRET is not set or invalid — run requestSecrets() first');
+    throw new Error('BETTER_AUTH_SECRET is not set or invalid — configure it in your server environment');
   }
 
   if (!db) {
@@ -63,47 +64,7 @@ export function getAuth() {
       },
     },
 
-    // CORS: Trusts .airoapp.ai and .vercel.app subdomains, localhost, and any
-    // origin listed in BETTER_AUTH_TRUSTED_ORIGINS (comma-separated) by default.
-    // Add a custom domain to BETTER_AUTH_TRUSTED_ORIGINS if you attach one.
-    trustedOrigins: (request?: Request) => {
-      if (!request) return [];
-
-      const origin = request.headers.get('origin');
-      if (!origin) return [];
-
-      const extraOrigins = (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? '')
-        .split(',')
-        .map((o) => o.trim())
-        .filter(Boolean);
-      if (extraOrigins.includes(origin)) {
-        return [origin];
-      }
-
-      try {
-        const originUrl = new URL(origin);
-        const hostname = originUrl.hostname;
-
-        // Trust all airoapp.ai subdomains
-        if (hostname.endsWith('.airoapp.ai') || hostname.endsWith('.test-airoapp.ai')) {
-          return [origin];
-        }
-
-        // Trust Vercel's own preview/production subdomains for this project
-        if (hostname.endsWith('.vercel.app')) {
-          return [origin];
-        }
-
-        // Trust localhost for development
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-          return [origin];
-        }
-
-        return [];
-      } catch {
-        return [];
-      }
-    },
+    trustedOrigins: getTrustedOrigins(),
 
     // In preview mode the site runs in an iframe embedded by the builder on a different
     // origin, so cookies need SameSite=None + Secure + Partitioned (CHIPS) for cross-site

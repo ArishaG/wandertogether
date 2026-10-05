@@ -116,6 +116,10 @@ app.get("/api/trips/:id", trips_id_get_13);
 app.put("/api/trips/:id", trips_id_put_14);
 // </api-registrations>
 
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'API route not found' });
+});
+
 // Error middleware must be registered AFTER the routes it protects; Express
 // only passes errors to middleware defined later in the stack.
 app.use("/api", (err: unknown, req: Request, res: Response, _next: NextFunction) => {
@@ -192,7 +196,7 @@ app.get("/llms.txt", llmsTxtHandler);
 // Vercel's Node builder (not Vite) when deployed as a function, so
 // `import.meta.env` is undefined there — the short-circuit keeps the right
 // side from ever evaluating in that case.
-if (!process.env.VERCEL && import.meta.env.PROD) {
+if (!process.env.VERCEL && import.meta.env?.PROD) {
 	const __dirname = dirname(fileURLToPath(import.meta.url));
 	const clientDir = join(__dirname, "client");
 	const adSenseRuntimeConfig = loadAdSenseRuntimeConfig(__dirname);

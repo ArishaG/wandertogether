@@ -1,5 +1,5 @@
 import { RouteObject } from "react-router";
-import { lazy } from 'react';
+
 import HomePage from './pages/index';
 import ProfilePage from './pages/ProfilePage';
 import AuthPage from './pages/auth/AuthPage';

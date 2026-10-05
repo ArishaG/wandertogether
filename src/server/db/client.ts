@@ -1,36 +1,45 @@
-/**
- * Database connection setup using Drizzle ORM with postgres.js (Neon-compatible)
- */
-
+/** Only initialize database configuration when a database operation is requested. */
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { getDatabaseUrl } from './config';
 import * as schema from './schema';
 
-// Create Postgres connection pool with SSL enabled (required by Neon)
-const queryClient = postgres(getDatabaseUrl(), {
-  ssl: 'require',
-  max: 10,
+let queryClient: ReturnType<typeof postgres> | undefined;
+let database: ReturnType<typeof drizzle<typeof schema>> | undefined;
+
+function getDatabase() {
+  if (!database) {
+    queryClient = postgres(getDatabaseUrl(), {
+      ssl: 'require',
+      max: 5,
+      connect_timeout: 10,
+      idle_timeout: 20,
+    });
+    database = drizzle(queryClient, { schema });
+  }
+  return database;
+}
+
+export const db = new Proxy({} as ReturnType<typeof getDatabase>, {
+  get(_target, property) {
+    const instance = getDatabase();
+    const value = Reflect.get(instance, property, instance);
+    return typeof value === 'function' ? value.bind(instance) : value;
+  },
 });
 
-// Create Drizzle instance
-export const db = drizzle(queryClient, { schema });
-
-/**
- * Test database connection
- */
 export async function testConnection(): Promise<boolean> {
   try {
-    await queryClient`select 1`;
+    getDatabase();
+    await queryClient!`select 1`;
     return true;
   } catch {
     return false;
   }
 }
 
-/**
- * Close database connection pool
- */
 export async function closeConnection(): Promise<void> {
-  await queryClient.end();
+  await queryClient?.end();
+  queryClient = undefined;
+  database = undefined;
 }

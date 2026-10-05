@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin, type ViteDevServer } from "vite";
+import { defineConfig, loadEnv, type Plugin, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { existsSync, statSync } from "node:fs";
@@ -165,7 +165,13 @@ if (corsOrigins.length === 0) {
   corsOrigins.push("*");
 }
 
-export default defineConfig(({ mode, isSsrBuild }) => ({
+export default defineConfig(({ mode, isSsrBuild }) => {
+  // Server modules need local secrets; Vite only exposes prefixed values to the browser.
+  const localEnv = loadEnv(mode, process.cwd(), '');
+  for (const [key, value] of Object.entries(localEnv)) {
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+  return ({
   envPrefix: ["VITE_", "SITE_"],
 
   plugins: [
@@ -301,4 +307,4 @@ export default defineConfig(({ mode, isSsrBuild }) => ({
       }
     }
   }
-}));
+}); });
