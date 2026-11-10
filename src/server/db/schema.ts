@@ -1,4 +1,4 @@
-import { boolean, json, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { boolean, index, json, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
   id: varchar('id', { length: 36 }).primaryKey(),
@@ -71,3 +71,17 @@ export const accountPreferences = pgTable('account_preferences', {
   userId: varchar('user_id', { length: 36 }).primaryKey().references(() => user.id, { onDelete: 'cascade' }),
   preferences: json('preferences').notNull(),
 });
+
+export const tripInvitations = pgTable('trip_invitations', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  tripId: varchar('trip_id', { length: 36 }).notNull().references(() => trips.id, { onDelete: 'cascade' }),
+  email: varchar('email', { length: 255 }).notNull(),
+  invitedBy: varchar('invited_by', { length: 36 }).references(() => user.id, { onDelete: 'set null' }),
+  // SHA-256 of the emailed token; the raw token is never stored.
+  tokenHash: varchar('token_hash', { length: 64 }).notNull().unique(),
+  status: varchar('status', { length: 16 }).notNull().default('pending'),
+  expiresAt: timestamp('expires_at').notNull(),
+  acceptedBy: varchar('accepted_by', { length: 36 }).references(() => user.id, { onDelete: 'set null' }),
+  acceptedAt: timestamp('accepted_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+}, table => [index('trip_invitations_trip_email_idx').on(table.tripId, table.email)]);

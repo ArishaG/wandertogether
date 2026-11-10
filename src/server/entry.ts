@@ -4,6 +4,8 @@ import { dirname, extname, join } from "node:path";
 import { readFileSync } from "node:fs";
 
 import invite_post from "./api/trips/invite/POST";
+import invitation_get from "./api/invitations/[token]/GET";
+import invitation_accept_post from "./api/invitations/[token]/accept/POST";
 import preferences_get from "./api/preferences/GET";
 import preferences_put from "./api/preferences/PUT";
 import profile_get from "./api/profiles/GET";
@@ -105,6 +107,8 @@ app.use(express.urlencoded({ extended: true }));
 
 app.get("/api/places", places_get);
 app.post("/api/trips/:id/invite", invite_post);
+app.get("/api/invitations/:token", invitation_get);
+app.post("/api/invitations/:token/accept", invitation_accept_post);
 app.get("/api/preferences", preferences_get);
 app.put("/api/preferences", preferences_put);
 app.get("/api/profiles/:id", profile_get);

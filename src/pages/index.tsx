@@ -69,6 +69,7 @@ type Trip = {
   name: string;
   destination: string | null;
   joinCode?: string;
+  pendingInvitations?: { id: string; email: string; expiresAt: string }[];
   members: TripMember[];
   availability: {
     proposedDays: string[];
@@ -2109,13 +2110,17 @@ function InviteModal({
   const [email, setEmail] = useState('');
   const [inviteStatus, setInviteStatus] = useState('');
   const [sending, setSending] = useState(false);
+  const [pending, setPending] = useState(trip.pendingInvitations ?? []);
+  useEffect(() => { setPending(trip.pendingInvitations ?? []); }, [trip.pendingInvitations]);
   const send = async () => {
     setSending(true); setInviteStatus('');
     try {
       const response = await fetch(`/api/trips/${trip.id}/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
-      const data = await response.json();
+      const data = (await response.json()) as { error?: string; invitation?: { id: string; email: string; expiresAt: string } };
       if (!response.ok) throw new Error(data.error || 'Unable to send invitation.');
-      setInviteStatus('Invitation sent. They can sign in or create an account to join.'); setEmail('');
+      setInviteStatus(`Invitation sent to ${data.invitation?.email ?? email}. They can accept it from their inbox.`); setEmail('');
+      const sent = data.invitation;
+      if (sent) setPending(current => [sent, ...current.filter(item => item.email !== sent.email)]);
     } catch (error) { setInviteStatus(error instanceof Error ? error.message : 'Unable to send invitation.'); }
     finally { setSending(false); }
   };
@@ -2129,5 +2134,5 @@ function InviteModal({
       setCopyError(true);
     }
   };
-  return <ModalShell onClose={onClose}><IconTile solid><Users size={19} /></IconTile><h2 className="mt-5 text-xl font-semibold">Board key</h2>{notice && <p role="status" className="mt-3 text-sm">{notice}</p>}<p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">Share this six-character key. Anyone who enters it while signed in can join this board with their account.</p><div className="mt-6 rounded-xl border border-border bg-muted px-4 py-5 text-center"><p className="text-xs font-semibold text-muted-foreground">Your board key</p><p className="mt-2 font-mono text-3xl font-bold tracking-[0.24em] text-foreground">{boardKey}</p></div><button disabled={!trip.joinCode} onClick={() => void copyBoardKey()} className={`mt-4 inline-flex items-center gap-2 text-sm font-semibold disabled:opacity-45 ${copied ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>{copied ? <Check size={16} /> : <Copy size={16} />}{keyCopied ? 'Board key copied' : 'Copy board key'}</button>{copyError && <p className="mt-2 text-xs text-muted-foreground">Copying is unavailable here. Select the board key above to copy it.</p>}<button onClick={copyInvite} className="mt-4 ml-4 text-sm font-semibold text-primary">{copied ? 'Invite link copied' : 'Copy invite link'}</button><label className="mt-5 block text-sm">Invite by email<input type="email" value={email} onChange={event => setEmail(event.target.value)} className="mt-2 h-10 w-full rounded-lg border border-border bg-background px-3" /></label><PrimaryButton disabled={sending || !emailPattern.test(email)} onClick={() => void send()} className="mt-3 w-full">{sending ? 'Sending…' : 'Send invitation'}</PrimaryButton>{inviteStatus && <p role="status" className="mt-3 text-sm">{inviteStatus}</p>}<PrimaryButton onClick={onClose} className="mt-6 w-full">Done</PrimaryButton></ModalShell>;
+  return <ModalShell onClose={onClose}><IconTile solid><Users size={19} /></IconTile><h2 className="mt-5 text-xl font-semibold">Board key</h2>{notice && <p role="status" className="mt-3 text-sm">{notice}</p>}<p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">Share this six-character key. Anyone who enters it while signed in can join this board with their account.</p><div className="mt-6 rounded-xl border border-border bg-muted px-4 py-5 text-center"><p className="text-xs font-semibold text-muted-foreground">Your board key</p><p className="mt-2 font-mono text-3xl font-bold tracking-[0.24em] text-foreground">{boardKey}</p></div><button disabled={!trip.joinCode} onClick={() => void copyBoardKey()} className={`mt-4 inline-flex items-center gap-2 text-sm font-semibold disabled:opacity-45 ${copied ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>{copied ? <Check size={16} /> : <Copy size={16} />}{keyCopied ? 'Board key copied' : 'Copy board key'}</button>{copyError && <p className="mt-2 text-xs text-muted-foreground">Copying is unavailable here. Select the board key above to copy it.</p>}<button onClick={copyInvite} className="mt-4 ml-4 text-sm font-semibold text-primary">{copied ? 'Invite link copied' : 'Copy invite link'}</button><label className="mt-5 block text-sm">Invite by email<input type="email" value={email} onChange={event => setEmail(event.target.value)} className="mt-2 h-10 w-full rounded-lg border border-border bg-background px-3" /></label><PrimaryButton disabled={sending || !emailPattern.test(email)} onClick={() => void send()} className="mt-3 w-full">{sending ? 'Sending…' : 'Send invitation'}</PrimaryButton>{inviteStatus && <p role="status" className="mt-3 text-sm">{inviteStatus}</p>}{pending.length > 0 && <div className="mt-5"><p className="text-xs font-semibold text-muted-foreground">Waiting to accept</p><ul className="mt-2 space-y-1.5">{pending.map(item => <li key={item.id} className="flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2 text-sm"><span className="truncate">{item.email}</span><span className="shrink-0 text-xs text-muted-foreground">Invited</span></li>)}</ul></div>}<PrimaryButton onClick={onClose} className="mt-6 w-full">Done</PrimaryButton></ModalShell>;
 }

@@ -1,8 +1,8 @@
 import type { Request, Response } from 'express';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, gt } from 'drizzle-orm';
 import { getAuth } from '../../../../lib/auth/auth.js';
 import { db } from '../../../db/client.js';
-import { tripMembers, trips, user } from '../../../db/schema.js';
+import { tripInvitations, tripMembers, trips, user } from '../../../db/schema.js';
 
 export default async function handler(req: Request, res: Response) {
   try {
@@ -16,6 +16,7 @@ export default async function handler(req: Request, res: Response) {
     const isMember = memberRows.some((member) => member.userId === session.user.id);
     if (!isMember) return res.status(403).json({ error: 'You do not have access to this trip.' });
 
+    const pendingInvitations = await db.select({ id: tripInvitations.id, email: tripInvitations.email, expiresAt: tripInvitations.expiresAt, createdAt: tripInvitations.createdAt }).from(tripInvitations).where(and(eq(tripInvitations.tripId, tripId), eq(tripInvitations.status, 'pending'), gt(tripInvitations.expiresAt, new Date()))).orderBy(desc(tripInvitations.createdAt));
     const state = trip.state as { notifications?: { actor: string; action: string; target: string; timestamp: string }[]; members?: { id?: string; name?: string; email?: string; availability?: string[]; hasSubmittedAvailability?: boolean }[] };
     res.json({
       trip: {
@@ -25,6 +26,7 @@ export default async function handler(req: Request, res: Response) {
         name: trip.name,
         destination: trip.destination,
         joinCode: trip.joinCode,
+        pendingInvitations: pendingInvitations.map(item => ({ id: item.id, email: item.email, expiresAt: item.expiresAt.toISOString() })),
         members: memberRows.map((member) => {
           const id = member.userId ?? 'member';
           const saved = (state.members ?? []).find((item) => item.id === id);

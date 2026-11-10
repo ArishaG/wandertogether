@@ -24,7 +24,9 @@ export default async function handler(req: Request, res: Response) {
     const memberRows = await db.select({ userId: tripMembers.userId, role: tripMembers.role, accountName: user.name, email: user.email, image: user.image }).from(tripMembers).leftJoin(user, eq(tripMembers.userId, user.id)).where(eq(tripMembers.tripId, tripId));
     const persistedMembers = memberRows.map((member) => { const identity = member.userId ?? 'member'; const incoming = (currentState.members ?? []).find((item) => item.id === identity); const saved = (storedState.members ?? []).find((item) => item.id === identity); const availability = identity === actorId && incoming ? (incoming.availability ?? []) : (saved?.availability ?? incoming?.availability ?? []); const hasSubmittedAvailability = identity === actorId && incoming ? incoming.hasSubmittedAvailability === true || availability.length > 0 : saved?.hasSubmittedAvailability === true || incoming?.hasSubmittedAvailability === true || availability.length > 0; return { id: identity, name: member.accountName ?? member.email ?? 'Member', email: member.email ?? '', image: member.image, role: member.role, availability, hasSubmittedAvailability }; });
     const mergedMembers = persistedMembers;
-    const mergedState = { ...storedState, ...currentState, members: mergedMembers, notifications };
+    // pendingInvitations is derived from trip_invitations on read; never persist the client's copy.
+    const mergedState: Record<string, unknown> = { ...storedState, ...currentState, members: mergedMembers, notifications };
+    delete mergedState.pendingInvitations;
     await db.update(trips).set({ name: name?.trim() || 'Untitled trip', destination: destination || null, state: mergedState }).where(eq(trips.id, tripId));
     res.json({
       ok: true,
