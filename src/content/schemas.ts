@@ -31,21 +31,9 @@ export const schemas = {
       "onboarding": z.object({
         "step1": z.object({
           "title": z.string(),
-          "body": z.string(),
-          "inputLabel": z.string(),
-          "inputPlaceholder": z.string(),
-          "types": z.array(z.object({
-            "label": z.string(),
-            "description": z.string(),
-            "id": z.string()
-          })),
-          "caption": z.string()
-        }),
-        "step2": z.object({
-          "title": z.string(),
           "inputPlaceholder": z.string()
         }),
-        "step3": z.object({
+        "step2": z.object({
           "title": z.string(),
           "inputPlaceholder": z.string()
         })

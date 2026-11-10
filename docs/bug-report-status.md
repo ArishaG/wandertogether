@@ -16,7 +16,6 @@ used as a bug list, not as an instruction to change credentials or production da
 | Cannot edit confirmed dates | Date fields remain available after confirmation. |
 | Confirm button clipped | Availability widget content scrolls within its card. |
 | Destination dropdown remains after selection | Selection closes the dropdown; typing reopens it. |
-| Local/day/road destinations | Location permission or explicit starting coordinates restrict results to 400 miles, including after changing the board destination. This is a radius rule, not a national-border rule. |
 | Cannot reopen availability | The widget always offers Add/Update availability and restores the user's actual selected days, including gaps. |
 | Notifications always say Just now | New events store ISO timestamps. The drawer computes elapsed time and refreshes it every minute. Old literal timestamps display Time unavailable because their original dates cannot be recovered. |
 | Poll edit text clipped | Polls grow on entry to edit mode and while options are added, scroll internally, and move into view. |

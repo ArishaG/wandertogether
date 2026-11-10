@@ -28,34 +28,10 @@
   },
   "onboarding": {
     "step1": {
-      "title": "What are you planning?",
-      "body": "Give your trip a name and choose the kind of getaway it is.",
-      "inputLabel": "Trip name",
-      "inputPlaceholder": "e.g. Long weekend in Lisbon",
-      "types": [
-        {
-          "label": "Day trip",
-          "description": "A quick escape close to home.",
-          "id": "iRZhujv4YchtKO-afsqT1"
-        },
-        {
-          "label": "Road trip",
-          "description": "A route with room for detours.",
-          "id": "Rk30RTTGg5oLgYgMg4D4Q"
-        },
-        {
-          "label": "Getaway",
-          "description": "A destination worth gathering for.",
-          "id": "7OtlZhsc-r0_3RT7tlkbM"
-        }
-      ],
-      "caption": "You can change these details later."
-    },
-    "step2": {
       "title": "Where are you headed?",
       "inputPlaceholder": "Search a city, region, country, or park"
     },
-    "step3": {
+    "step2": {
       "title": "Invite your people",
       "inputPlaceholder": "Add an email address"
     }

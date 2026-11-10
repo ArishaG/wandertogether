@@ -15,12 +15,6 @@ export function coordinates(value: string): { latitude: number; longitude: numbe
   return Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180 ? { latitude, longitude } : null;
 }
 
-export function distanceMiles(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }) {
-  const rad = (n: number) => n * Math.PI / 180;
-  const v = Math.sin(rad(b.latitude - a.latitude) / 2) ** 2 + Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(rad(b.longitude - a.longitude) / 2) ** 2;
-  return 3958.8 * 2 * Math.atan2(Math.sqrt(v), Math.sqrt(1 - v));
-}
-
 export function avatarStyle(identity: string) {
   const colors = ['#657954', '#92744d', '#776786', '#547887', '#9b6670', '#557d73'];
   const hash = Array.from(identity).reduce((n, c) => ((n * 31 + c.charCodeAt(0)) >>> 0), 0);

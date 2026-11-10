@@ -10,9 +10,7 @@ import StaticMap from '@/components/StaticMap';
 import { connectionRoute, type BoardRect } from '@/lib/connection-route';
 import { avatarStyle, coordinates, relativeTime } from '@/lib/planning';
 import { usePlaces } from '@/lib/use-places';
-import { useNearbyOrigin } from '@/lib/use-nearby-origin';
 type Screen = 'landing' | 'profile' | 'onboarding' | 'whiteboard' | 'itinerary';
-type TripType = 'day' | 'road' | 'flight';
 type Modal = 'signup' | 'join' | 'availability' | 'activity' | 'invite' | 'widget' | null;
 type WidgetType = 'availability' | 'note' | 'vote' | 'map' | 'activities';
 type NoteColor = 'yellow' | 'peach' | 'lilac' | 'sky' | 'mint';
@@ -69,7 +67,6 @@ type TripMember = {
 type Trip = {
   id: string;
   name: string;
-  type: TripType | null;
   destination: string | null;
   joinCode?: string;
   members: TripMember[];
@@ -101,10 +98,29 @@ type Trip = {
   links?: WidgetLink[];
 };
 const makeBoardKey = () => Math.random().toString(36).slice(2, 8).toUpperCase().padEnd(6, 'X');
+// New trips aren't named during onboarding: use the destination if one was picked,
+// otherwise the next free "Trip #N" after the numbered trips the user already has.
+const defaultTripName = (destination: string | null, existingNames: string[]) => {
+  if (destination?.trim()) return destination.trim();
+  const highest = existingNames.reduce((max, name) => {
+    const match = /^trip #(\d+)$/i.exec(name.trim());
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0);
+  return `Trip #${highest + 1}`;
+};
+const fetchExistingTripNames = async () => {
+  try {
+    const response = await fetch('/api/trips');
+    if (!response.ok) return [];
+    const data = (await response.json()) as { trips?: { name: string }[] };
+    return (data.trips || []).map(item => item.name);
+  } catch {
+    return [];
+  }
+};
 const blankTrip: Trip = {
   id: 'new-trip',
   name: '',
-  type: null,
   destination: null,
   joinCode: makeBoardKey(),
   members: [],
@@ -283,7 +299,6 @@ export default function HomePage() {
   const boardSignature = (value: Trip) => JSON.stringify({
     name: value.name,
     destination: value.destination,
-    type: value.type,
     members: value.members,
     availability: value.availability,
     widgets: value.widgets,
@@ -365,8 +380,10 @@ export default function HomePage() {
       navigate('/signup');
       return;
     }
+    const name = trip.name.trim() || defaultTripName(trip.destination, trip.destination ? [] : await fetchExistingTripNames());
     const nextTrip = {
       ...trip,
+      name,
       notifications: [{
         actor: user?.name || user?.email || 'A collaborator',
         action: 'created',
@@ -701,44 +718,26 @@ function Onboarding({
   onBackToProfile: () => void;
 }) {
   const [destinationOpen, setDestinationOpen] = useState(true);
-  const localTrip = trip.type === 'day' || trip.type === 'road';
-  const { nearby, setNearby, error: nearbyError } = useNearbyOrigin(localTrip);
-  const livePlaces = usePlaces(localTrip && !nearby ? '' : locationQuery, '', localTrip ? nearby : null);
+  const livePlaces = usePlaces(locationQuery);
   const normalizedLocationQuery = locationQuery.trim().toLowerCase();
-  const destinationResults = localTrip && !nearby ? [] : livePlaces.results.length ? livePlaces.results : localTrip ? [] : coordinates(locationQuery) ? [{ name: locationQuery, detail: 'Coordinates' }] : destinationCatalog.filter(place => place.name.toLowerCase().split(/[ ,]+/).some(word => word.startsWith(normalizedLocationQuery))).slice(0, 8);
+  const destinationResults = livePlaces.results.length ? livePlaces.results : coordinates(locationQuery) ? [{ name: locationQuery, detail: 'Coordinates' }] : destinationCatalog.filter(place => place.name.toLowerCase().split(/[ ,]+/).some(word => word.startsWith(normalizedLocationQuery))).slice(0, 8);
   const next = () => {
-    if (step === 1 && trip.name.trim() && trip.type) setStep(2);else if (step === 2) setStep(3);else if (step === 3) onCreate();
+    if (step === 1) setStep(2);else if (step === 2) onCreate();
   };
   const keyAdvance = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' && step !== 3) {
+    if (event.key === 'Enter' && step !== 2) {
       event.preventDefault();
       next();
     }
   };
-  const typeData: Record<TripType, React.ReactNode> = {
-    day: <Sparkles size={19} />,
-    road: <Route size={19} />,
-    flight: <Send size={19} />
-  };
-  return <section className="dot-canvas flex min-h-[calc(100vh-1px)] items-center justify-center px-5 py-10" onKeyDown={keyAdvance}><div className="w-full max-w-[560px] rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"><div className="flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Step {step} of 3</p><div className="flex gap-1.5" aria-label={`Step ${step} of 3`}>{[1, 2, 3].map(dot => <span key={dot} className={`h-2 w-2 rounded-full ${dot <= step ? 'bg-primary' : 'bg-border'}`} />)}</div></div>{step === 1 && <><h1 className="mt-7 text-[32px] font-semibold leading-10 tracking-[-0.03em]">{home.onboarding.step1.title}</h1><p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">{home.onboarding.step1.body}</p><label className="mt-7 block text-sm font-medium">{home.onboarding.step1.inputLabel}<input autoFocus value={trip.name} onChange={event => setTrip(current => ({
-            ...current,
-            name: event.target.value
-          }))} placeholder={home.onboarding.step1.inputPlaceholder} className="mt-2 h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" /></label><div className="mt-5 grid gap-3">{home.onboarding.step1.types.map((item, index) => {
-            const type = (['day', 'road', 'flight'] as TripType[])[index];
-            const selected = trip.type === type;
-            return <button key={item.label} onClick={() => setTrip(current => ({
-              ...current,
-              type,
-              destination: current.type === type ? current.destination : null
-            }))} className={`flex items-center gap-4 rounded-xl border-2 p-4 text-left transition ${selected ? 'border-primary bg-[hsl(var(--green-50))]' : 'border-border bg-background hover:border-primary/40'}`}><IconTile>{typeData[type]}</IconTile><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{item.label}</span><span className="mt-1 block text-[13px] leading-[18px] text-muted-foreground">{item.description}</span></span>{selected && <Check size={18} className="text-primary" />}</button>;
-          })}</div><p className="mt-4 text-[13px] leading-[18px] text-muted-foreground">{home.onboarding.step1.caption}</p></>}{step === 2 && <><h1 className="mt-7 text-[32px] font-semibold leading-10 tracking-[-0.03em]">{home.onboarding.step2.title}</h1>{localTrip && !nearby && <label className="mt-4 block text-sm">{nearbyError || 'Finding nearby destinations…'}<input aria-label="Starting coordinates" placeholder="Latitude, longitude" onChange={event => { const point = coordinates(event.target.value); if (point) setNearby(point); }} className="mt-2 w-full rounded-lg border p-2" /></label>}<div className="relative mt-7"><input autoFocus value={locationQuery} onChange={event => { setLocationQuery(event.target.value); setDestinationOpen(true); }} placeholder={home.onboarding.step2.inputPlaceholder} className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" />{locationQuery && destinationOpen && <div className="absolute inset-x-0 top-[52px] z-10 rounded-xl border border-border bg-card p-1 shadow-lg">{livePlaces.loading && <p className="p-2 text-xs">Searching destinations…</p>}{livePlaces.error && <p className="p-2 text-xs">{livePlaces.error}</p>}{destinationResults.length ? destinationResults.map(place => <button key={place.name} onClick={() => {
+  return <section className="dot-canvas flex min-h-[calc(100vh-1px)] items-center justify-center px-5 py-10" onKeyDown={keyAdvance}><div className="w-full max-w-[560px] rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8"><div className="flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Step {step} of 2</p><div className="flex gap-1.5" aria-label={`Step ${step} of 2`}>{[1, 2].map(dot => <span key={dot} className={`h-2 w-2 rounded-full ${dot <= step ? 'bg-primary' : 'bg-border'}`} />)}</div></div>{step === 1 && <><h1 className="mt-7 text-[32px] font-semibold leading-10 tracking-[-0.03em]">{home.onboarding.step1.title}</h1><div className="relative mt-7"><input autoFocus value={locationQuery} onChange={event => { setLocationQuery(event.target.value); setDestinationOpen(true); }} placeholder={home.onboarding.step1.inputPlaceholder} className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" />{locationQuery && destinationOpen && <div className="absolute inset-x-0 top-[52px] z-10 rounded-xl border border-border bg-card p-1 shadow-lg">{livePlaces.loading && <p className="p-2 text-xs">Searching destinations…</p>}{livePlaces.error && <p className="p-2 text-xs">{livePlaces.error}</p>}{destinationResults.length ? destinationResults.map(place => <button key={place.name} onClick={() => {
               setTrip(current => ({
                 ...current,
                 destination: place.name
               }));
               setLocationQuery(place.name);
               setDestinationOpen(false);
-            }} className="w-full rounded-lg px-3 py-2.5 text-left hover:bg-muted"><span className="block text-sm font-medium">{place.name}</span><span className="block text-[13px] text-muted-foreground">{place.detail}</span></button>) : <p className="px-3 py-2.5 text-[13px] text-muted-foreground">No matching destination found. Try a city, region, or country.</p>}</div>}</div>{trip.destination && <div className="mt-4 flex items-center gap-2 rounded-lg border border-primary bg-[hsl(var(--green-50))] px-3 py-2 text-sm text-primary"><Check size={16} /><span>Destination selected: {trip.destination}</span></div>}<p className="mt-4 text-[13px] leading-[18px] text-muted-foreground">{localTrip ? 'Search within 400 miles of your starting location.' : 'Search a destination or enter latitude, longitude.'}</p></>}{step === 3 && <><h1 className="mt-7 text-[32px] font-semibold leading-10 tracking-[-0.03em]">{home.onboarding.step3.title}</h1><p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">Invite the people who will help shape the plan.</p><InviteEditor trip={trip} setTrip={setTrip} value={inviteInput} setValue={setInviteInput} error={inviteError} setError={setInviteError} onAdd={addInvite} /><button disabled={trip.id === 'new-trip'} title="Create the trip first to get a shareable link" onClick={copyInvite} className={`disabled:opacity-50 mt-4 inline-flex items-center gap-2 text-sm font-semibold ${copied ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? 'Link copied ✓' : 'Copy invite link'}</button></>}<div className="mt-8 flex items-center justify-between border-t border-border pt-5"><button onClick={() => step === 1 ? onBackToProfile() : setStep(step - 1)} className="h-10 rounded-lg px-2 text-sm font-semibold text-muted-foreground hover:text-foreground">Back</button><div className="flex items-center gap-4">{step > 1 && <button onClick={() => step === 2 ? setStep(3) : onCreate()} className="text-sm font-semibold text-muted-foreground hover:text-foreground">Skip for now</button>}<PrimaryButton disabled={step === 1 && (!trip.name.trim() || !trip.type)} onClick={next}>{step === 3 ? 'Create trip' : 'Next'}<ChevronRight size={17} /></PrimaryButton></div></div></div></section>;
+            }} className="w-full rounded-lg px-3 py-2.5 text-left hover:bg-muted"><span className="block text-sm font-medium">{place.name}</span><span className="block text-[13px] text-muted-foreground">{place.detail}</span></button>) : <p className="px-3 py-2.5 text-[13px] text-muted-foreground">No matching destination found. Try a city, region, or country.</p>}</div>}</div>{trip.destination && <div className="mt-4 flex items-center gap-2 rounded-lg border border-primary bg-[hsl(var(--green-50))] px-3 py-2 text-sm text-primary"><Check size={16} /><span>Destination selected: {trip.destination}</span></div>}<p className="mt-4 text-[13px] leading-[18px] text-muted-foreground">Search a destination or enter latitude, longitude.</p></>}{step === 2 && <><h1 className="mt-7 text-[32px] font-semibold leading-10 tracking-[-0.03em]">{home.onboarding.step2.title}</h1><p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">Invite the people who will help shape the plan.</p><InviteEditor trip={trip} setTrip={setTrip} value={inviteInput} setValue={setInviteInput} error={inviteError} setError={setInviteError} onAdd={addInvite} /><button disabled={trip.id === 'new-trip'} title="Create the trip first to get a shareable link" onClick={copyInvite} className={`disabled:opacity-50 mt-4 inline-flex items-center gap-2 text-sm font-semibold ${copied ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? 'Link copied ✓' : 'Copy invite link'}</button></>}<div className="mt-8 flex items-center justify-between border-t border-border pt-5"><button onClick={() => step === 1 ? onBackToProfile() : setStep(step - 1)} className="h-10 rounded-lg px-2 text-sm font-semibold text-muted-foreground hover:text-foreground">Back</button><div className="flex items-center gap-4"><button onClick={() => step === 1 ? setStep(2) : onCreate()} className="text-sm font-semibold text-muted-foreground hover:text-foreground">Skip for now</button><PrimaryButton onClick={next}>{step === 2 ? 'Create trip' : 'Next'}<ChevronRight size={17} /></PrimaryButton></div></div></div></section>;
 }
 function InviteEditor({
   trip,
@@ -769,7 +768,7 @@ function InviteEditor({
         }))} aria-label={`Remove ${member.email}`}><X size={13} /></button></span>)}<input value={value} onChange={event => {
         setValue(event.target.value);
         setError('');
-      }} onKeyDown={onKeyDown} placeholder={home.onboarding.step3.inputPlaceholder} className="min-w-[160px] flex-1 bg-transparent px-1 py-1 text-sm outline-none" /><button onClick={onAdd} className="rounded-md px-2 py-1 text-sm font-semibold text-primary hover:bg-[hsl(var(--green-50))]">Add</button></div>{error && <p className="mt-2 text-[13px] text-destructive">{error}</p>}</div>;
+      }} onKeyDown={onKeyDown} placeholder={home.onboarding.step2.inputPlaceholder} className="min-w-[160px] flex-1 bg-transparent px-1 py-1 text-sm outline-none" /><button onClick={onAdd} className="rounded-md px-2 py-1 text-sm font-semibold text-primary hover:bg-[hsl(var(--green-50))]">Add</button></div>{error && <p className="mt-2 text-[13px] text-destructive">{error}</p>}</div>;
 }
 function Whiteboard({
   trip,
@@ -857,7 +856,6 @@ function Whiteboard({
   const confirmDatesInWidget = (widgetId: string) => {
     const stored = trip.availability;
     const draft = dateDrafts[widgetId] || { start: stored.start || '', end: stored.end || '' };
-    if (trip.type === 'day') draft.end = draft.start;
     if (!draft?.start || !draft.end || draft.end < draft.start) return;
     setTrip(current => ({
       ...current,
@@ -1132,7 +1130,7 @@ function Whiteboard({
                   selectedVotes: []
                 }]
               }));
-            }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted"><Vote size={16} className="text-primary" />Vote</button></motion.div>}</AnimatePresence><button className="whiteboard-fab" aria-label="Add to whiteboard" title="Add to whiteboard"><Plus size={20} /></button></div><p className="whiteboard-hint"><GripVertical size={15} />Drag widgets between grid cells · nothing here is a required step</p></div><AnimatePresence>{notificationsOpen && <NotificationsDrawer trip={trip} onClose={() => setNotificationsOpen(false)} />}{explorerOpen && <ExplorerModal trip={trip} setTrip={setTrip} onShowActivities={addActivitiesWidget} onClose={() => setExplorerOpen(false)} />}</AnimatePresence><AnimatePresence>{destinationSearchOpen && <DestinationSearchModal tripType={trip.type} query={destinationQuery} setQuery={setDestinationQuery} onClose={() => setDestinationSearchOpen(false)} onSelect={destination => {
+            }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted"><Vote size={16} className="text-primary" />Vote</button></motion.div>}</AnimatePresence><button className="whiteboard-fab" aria-label="Add to whiteboard" title="Add to whiteboard"><Plus size={20} /></button></div><p className="whiteboard-hint"><GripVertical size={15} />Drag widgets between grid cells · nothing here is a required step</p></div><AnimatePresence>{notificationsOpen && <NotificationsDrawer trip={trip} onClose={() => setNotificationsOpen(false)} />}{explorerOpen && <ExplorerModal trip={trip} setTrip={setTrip} onShowActivities={addActivitiesWidget} onClose={() => setExplorerOpen(false)} />}</AnimatePresence><AnimatePresence>{destinationSearchOpen && <DestinationSearchModal query={destinationQuery} setQuery={setDestinationQuery} onClose={() => setDestinationSearchOpen(false)} onSelect={destination => {
         setTrip(current => ({
           ...current,
           destination
@@ -1142,24 +1140,20 @@ function Whiteboard({
       }} />}</AnimatePresence></section>;
 }
 function DestinationSearchModal({
-  tripType,
   query,
   setQuery,
   onClose,
   onSelect
 }: {
-  tripType: TripType | null;
   query: string;
   setQuery: (value: string) => void;
   onClose: () => void;
   onSelect: (destination: string) => void;
 }) {
-  const localTrip = tripType === 'day' || tripType === 'road';
-  const { nearby, setNearby, error } = useNearbyOrigin(localTrip);
-  const live = usePlaces(localTrip && !nearby ? '' : query, '', localTrip ? nearby : null);
+  const live = usePlaces(query);
   const normalized = query.trim().toLowerCase();
-  const results = localTrip && !nearby ? [] : live.results.length ? live.results : localTrip ? [] : coordinates(query) ? [{ name: query, detail: 'Coordinates' }] : destinationCatalog.filter(place => !normalized || place.name.toLowerCase().split(/[ ,]+/).some(word => word.startsWith(normalized))).slice(0, 8);
-  return <ModalShell onClose={onClose}><h2 className="text-2xl font-semibold">Choose a destination</h2><p className="mt-1 text-sm text-muted-foreground">Search for a city, region, country, or park.</p><p className="mt-2 text-xs text-muted-foreground">{localTrip ? 'Destinations within 400 miles of your starting location.' : 'You can also enter latitude, longitude.'}</p>{localTrip && !nearby && <label className="mt-3 block text-sm">{error || 'Finding your location…'}<input aria-label="Starting coordinates" placeholder="Latitude, longitude" onChange={event => { const point = coordinates(event.target.value); if (point) setNearby(point); }} className="mt-2 w-full rounded-lg border p-2" /></label>}<div className="relative mt-5"><Search size={17} className="pointer-events-none absolute left-3 top-3 text-muted-foreground" /><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search destinations" className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/20" /></div><div className="mt-3 max-h-[360px] overflow-y-auto rounded-xl border border-border p-1">{live.loading && <p className="p-2 text-sm">Searching…</p>}{live.error && <p className="p-2 text-sm">{live.error}</p>}{results.length ? results.map(place => <button key={place.name} onClick={() => onSelect(place.name)} className="w-full rounded-lg px-3 py-3 text-left transition hover:bg-muted"><span className="block text-sm font-semibold">{place.name}</span><span className="mt-0.5 block text-[13px] text-muted-foreground">{place.detail}</span></button>) : <p className="px-3 py-5 text-sm text-muted-foreground">No matching destination found. Try a city, region, or country.</p>}</div></ModalShell>;
+  const results = live.results.length ? live.results : coordinates(query) ? [{ name: query, detail: 'Coordinates' }] : destinationCatalog.filter(place => !normalized || place.name.toLowerCase().split(/[ ,]+/).some(word => word.startsWith(normalized))).slice(0, 8);
+  return <ModalShell onClose={onClose}><h2 className="text-2xl font-semibold">Choose a destination</h2><p className="mt-1 text-sm text-muted-foreground">Search for a city, region, country, or park.</p><p className="mt-2 text-xs text-muted-foreground">You can also enter latitude, longitude.</p><div className="relative mt-5"><Search size={17} className="pointer-events-none absolute left-3 top-3 text-muted-foreground" /><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search destinations" className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/20" /></div><div className="mt-3 max-h-[360px] overflow-y-auto rounded-xl border border-border p-1">{live.loading && <p className="p-2 text-sm">Searching…</p>}{live.error && <p className="p-2 text-sm">{live.error}</p>}{results.length ? results.map(place => <button key={place.name} onClick={() => onSelect(place.name)} className="w-full rounded-lg px-3 py-3 text-left transition hover:bg-muted"><span className="block text-sm font-semibold">{place.name}</span><span className="mt-0.5 block text-[13px] text-muted-foreground">{place.detail}</span></button>) : <p className="px-3 py-5 text-sm text-muted-foreground">No matching destination found. Try a city, region, or country.</p>}</div></ModalShell>;
 }
 function WidgetCard({
   widget,
@@ -1252,7 +1246,7 @@ function WidgetCard({
   return <article data-widget-id={widget.id} draggable={false} data-resizing={resizing} onClick={() => linkSourceId && linkSourceId !== widget.id && onCompleteLink(widget.id)} style={gridStyle} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className={`widget-card ${highlightAvailability ? 'ring-4 ring-primary ring-offset-4 animate-pulse' : ''}`}><header className="widget-header"><button type="button" className="widget-drag-handle touch-none" onPointerDown={event => onPointerDragStart(event, widget.id)} aria-label={`Drag ${title} widget`} title="Drag to move"><GripVertical size={15} /></button><span className="flex min-w-0 items-center gap-2">{widget.type === 'availability' ? <CalendarDays size={15} className="text-primary" /> : widget.type === 'note' ? <MessageSquareText size={15} className="text-primary" /> : widget.type === 'vote' ? <Vote size={15} className="text-primary" /> : widget.type === 'activities' ? <Route size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}<span className="truncate font-semibold">{title}</span>{widget.createdBy && <span className="truncate text-[11px] font-normal text-muted-foreground">by {widget.createdBy}</span>}</span>{hovered && <span className="flex items-center gap-1"><button onClick={event => {
           event.stopPropagation();
           onStartLink(widget.id);
-        }} className={`widget-action ${linkSourceId === widget.id ? 'widget-link-active' : ''}`} aria-label="Link this widget" title="Link this widget"><Route size={14} /></button><button onClick={() => onMove(widget.id, 'left')} className="widget-action" aria-label="Move left">←</button><button onClick={() => onMove(widget.id, 'right')} className="widget-action" aria-label="Move right">→</button>{widget.type !== 'availability' && <button onClick={() => onDelete(widget.id)} className="widget-action" aria-label="Delete widget"><Trash2 size={14} /></button>}</span>}</header>{widget.type === 'availability' && <div className="availability-widget-body p-4"><AvailabilityCalendar month={month} setMonth={setMonth} selectedDays={selectedDays} availabilityByDay={availabilityByDay} mode="group" totalPeople={totalPeople} /><div className="mt-4 border-t border-border pt-3"><p className="text-sm font-semibold">Confirm trip dates</p><p className="mt-1 text-[13px] text-muted-foreground">{trip.availability.status === 'confirmed' ? 'Change your trip dates below.' : 'Enter the dates your group plans to travel.'}</p><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-xs">{trip.type === 'day' ? 'Date' : 'Start'}<input aria-label="Trip start date" type="date" value={dateDraft.start} onChange={event => setDateDraft({ start: event.target.value, end: trip.type === 'day' ? event.target.value : dateDraft.end })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label>{trip.type !== 'day' && <label className="text-xs">End<input aria-label="Trip end date" type="date" min={dateDraft.start || undefined} value={dateDraft.end} onChange={event => setDateDraft({ ...dateDraft, end: event.target.value })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label>}</div><button disabled={!dateDraft.start || (trip.type !== 'day' && (!dateDraft.end || dateDraft.end < dateDraft.start))} onClick={onConfirmDates} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-45"><Check size={15} />{trip.availability.status === 'confirmed' ? 'Update dates' : 'Confirm dates'}</button><button onClick={onAvailability} className="mt-3 block text-[12px] font-semibold text-primary">{trip.availability.status === 'confirmed' ? 'Update availability' : 'Add availability'}</button></div></div>}{widget.type === 'note' && <StickyNote widget={widget} setTrip={setTrip} />}<button onPointerDown={resizeWidget} className="widget-resize-handle" aria-label={`Resize ${title} widget`} title="Drag to resize">↘</button>{widget.type === 'vote' && <VoteWidget widget={widget} setTrip={setTrip} />}{widget.type === 'map' && <ExplorerWidget trip={trip} setTrip={setTrip} onExpand={onExpandExplorer} onShowActivities={onShowActivities} />}{widget.type === 'activities' && <SavedActivitiesWidget locations={trip.locations} onDelete={id => setTrip(current => ({
+        }} className={`widget-action ${linkSourceId === widget.id ? 'widget-link-active' : ''}`} aria-label="Link this widget" title="Link this widget"><Route size={14} /></button><button onClick={() => onMove(widget.id, 'left')} className="widget-action" aria-label="Move left">←</button><button onClick={() => onMove(widget.id, 'right')} className="widget-action" aria-label="Move right">→</button>{widget.type !== 'availability' && <button onClick={() => onDelete(widget.id)} className="widget-action" aria-label="Delete widget"><Trash2 size={14} /></button>}</span>}</header>{widget.type === 'availability' && <div className="availability-widget-body p-4"><AvailabilityCalendar month={month} setMonth={setMonth} selectedDays={selectedDays} availabilityByDay={availabilityByDay} mode="group" totalPeople={totalPeople} /><div className="mt-4 border-t border-border pt-3"><p className="text-sm font-semibold">Confirm trip dates</p><p className="mt-1 text-[13px] text-muted-foreground">{trip.availability.status === 'confirmed' ? 'Change your trip dates below.' : 'Enter the dates your group plans to travel.'}</p><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-xs">Start<input aria-label="Trip start date" type="date" value={dateDraft.start} onChange={event => setDateDraft({ start: event.target.value, end: dateDraft.end })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-xs">End<input aria-label="Trip end date" type="date" min={dateDraft.start || undefined} value={dateDraft.end} onChange={event => setDateDraft({ ...dateDraft, end: event.target.value })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label></div><button disabled={!dateDraft.start || !dateDraft.end || dateDraft.end < dateDraft.start} onClick={onConfirmDates} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-45"><Check size={15} />{trip.availability.status === 'confirmed' ? 'Update dates' : 'Confirm dates'}</button><button onClick={onAvailability} className="mt-3 block text-[12px] font-semibold text-primary">{trip.availability.status === 'confirmed' ? 'Update availability' : 'Add availability'}</button></div></div>}{widget.type === 'note' && <StickyNote widget={widget} setTrip={setTrip} />}<button onPointerDown={resizeWidget} className="widget-resize-handle" aria-label={`Resize ${title} widget`} title="Drag to resize">↘</button>{widget.type === 'vote' && <VoteWidget widget={widget} setTrip={setTrip} />}{widget.type === 'map' && <ExplorerWidget trip={trip} setTrip={setTrip} onExpand={onExpandExplorer} onShowActivities={onShowActivities} />}{widget.type === 'activities' && <SavedActivitiesWidget locations={trip.locations} onDelete={id => setTrip(current => ({
       ...current,
       locations: current.locations.filter(place => place.id !== id)
     }))} />}</article>;

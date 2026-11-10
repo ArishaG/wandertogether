@@ -10,9 +10,8 @@ async function request(query: Record<string, string>) {
   await handler({ query } as unknown as Request, res as Response);
   return { status, payload };
 }
-it('supports coordinates without a key and respects local limits', async () => {
+it('supports coordinates without a key', async () => {
   expect((await request({ q: '47.6,-122.3' })).payload.results[0]).toMatchObject({ latitude: 47.6, longitude: -122.3 });
-  expect((await request({ q: '51.5,-0.1', lat: '47.6', lng: '-122.3' })).payload.results).toEqual([]);
 });
 it('reports missing configuration instead of inventing places', async () => {
   vi.stubEnv('GOOGLE_MAPS_API_KEY', ''); vi.stubEnv('GOOGLE_PLACES_API_KEY', '');
@@ -20,11 +19,11 @@ it('reports missing configuration instead of inventing places', async () => {
   expect(result.status).toBe(503);
   expect(result.payload.error).toContain('not configured');
 });
-it('uses the requested destination and filters distant results', async () => {
+it('uses the requested destination', async () => {
   vi.stubEnv('GOOGLE_PLACES_API_KEY', 'test-key');
   const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ places: [{ displayName: { text: 'Nearby park' }, location: { latitude: 47.7, longitude: -122.2 } }, { displayName: { text: 'London park' }, location: { latitude: 51.5, longitude: -0.1 } }] }) });
   vi.stubGlobal('fetch', fetchMock);
-  const result = await request({ q: 'Parks', destination: 'Seattle', lat: '47.6', lng: '-122.3' });
+  const result = await request({ q: 'Parks', destination: 'Seattle' });
   expect(JSON.parse(fetchMock.mock.calls[0][1].body).textQuery).toBe('Parks in Seattle');
-  expect(result.payload.results.map((place: any) => place.name)).toEqual(['Nearby park']);
+  expect(result.payload.results.map((place: any) => place.name)).toEqual(['Nearby park', 'London park']);
 });

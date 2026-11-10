@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { avatarStyle, coordinates, distanceMiles, relativeTime } from './planning';
+import { avatarStyle, coordinates, relativeTime } from './planning';
 import { connectionRoute } from './connection-route';
 
 describe('planning report regressions', () => {
@@ -8,12 +8,9 @@ describe('planning report regressions', () => {
     expect(relativeTime('2026-10-01T12:00:00Z', Date.parse('2026-10-01T14:00:00Z'))).toBe('2h ago');
     expect(relativeTime('Just now')).toBe('Time unavailable');
   });
-  it('validates coordinates and the 400 mile nearby boundary', () => {
+  it('validates coordinates', () => {
     expect(coordinates('47.6062, -122.3321')).toEqual({ latitude: 47.6062, longitude: -122.3321 });
     expect(coordinates('91, 180')).toBeNull();
-    const seattle = coordinates('47.6062,-122.3321')!;
-    expect(distanceMiles(seattle, coordinates('45.5152,-122.6784')!)).toBeLessThan(400);
-    expect(distanceMiles(seattle, coordinates('51.5074,-0.1278')!)).toBeGreaterThan(400);
   });
   it('assigns repeatable colors by identity rather than shared initials', () => {
     expect(avatarStyle('alice')).toEqual(avatarStyle('alice'));
