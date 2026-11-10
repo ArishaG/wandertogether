@@ -72,6 +72,13 @@ export const {
   signOut
 } = _authClient;
 
+const LOGOUT_EVENT = 'wander:logout';
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', event => {
+    if (event.key === LOGOUT_EVENT && event.newValue) window.location.assign('/');
+  });
+}
+
 /**
  * useSession — null-safe session hook.
  *
@@ -182,7 +189,8 @@ export function LogoutButton({
     setIsLoading(true);
     try {
       await signOut();
-      window.location.href = '/login';
+      try { localStorage.setItem(LOGOUT_EVENT, String(Date.now())); } catch { /* Storage may be disabled; still leave the signed-out page. */ }
+      window.location.href = '/';
     } catch (error) {
       console.error('Logout failed:', error);
       setIsLoading(false);

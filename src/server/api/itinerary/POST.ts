@@ -4,7 +4,9 @@ type Activity = { id?: string; name: string; category?: string; detail?: string 
 type ItineraryDay = { dayIndex: number; date: string; entries: { id: string; time: string; title: string; cost: string | null; status: string }[] };
 
 function isDate(value: unknown): value is string {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T12:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 function preferredTime(activity: Activity, position: number): string {
@@ -16,14 +18,14 @@ function preferredTime(activity: Activity, position: number): string {
 }
 
 function buildItinerary(start: string, end: string, activities: Activity[]): ItineraryDay[] {
-  const startDate = new Date(`${start}T12:00:00`);
-  const endDate = new Date(`${end}T12:00:00`);
+  const startDate = new Date(`${start}T12:00:00Z`);
+  const endDate = new Date(`${end}T12:00:00Z`);
   const days: ItineraryDay[] = [];
   const cursor = new Date(startDate);
 
   while (cursor <= endDate) {
     days.push({ dayIndex: days.length, date: cursor.toISOString().slice(0, 10), entries: [] });
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   activities.forEach((activity, index) => {
@@ -44,7 +46,12 @@ export default async function handler(req: Request, res: Response) {
   const safeActivities: Activity[] = activities
     .filter((activity: unknown): activity is Activity => Boolean(activity) && typeof (activity as Activity).name === 'string')
     .slice(0, 40)
-    .map((activity) => ({ name: activity.name.slice(0, 160), category: activity.category?.slice(0, 80), detail: activity.detail?.slice(0, 240) }));
+    .map((activity) => ({ name: activity.name.slice(0, 160), category: typeof activity.category === 'string' ? activity.category.slice(0, 80) : '', detail: typeof activity.detail === 'string' ? activity.detail.slice(0, 240) : '' }));
+
+  if (end < start || (Date.parse(end) - Date.parse(start)) / 86400000 > 365) {
+    res.status(400).json({ error: 'Choose an end date on or after the start date, within one year.' });
+    return;
+  }
 
   if (!safeActivities.length) {
     res.status(400).json({ error: 'At least one valid activity is required.' });

@@ -18,7 +18,7 @@ export default async function handler(req: Request, res: Response) {
     const id = randomUUID();
     const initialState = state as { members?: unknown[] };
     const owner = { id: session.user.id, name: session.user.name || session.user.email, email: session.user.email, role: 'owner', availability: [], hasSubmittedAvailability: false };
-    await db.insert(trips).values({ id, ownerId: session.user.id, name: name.trim(), destination: destination || null, joinCode, state: { ...initialState, members: [owner] } });
+    await db.insert(trips).values({ id, ownerId: session.user.id, name: name.trim(), destination: destination || null, joinCode, state: { ...initialState, members: [owner], notifications: [{ actor: session.user.name || session.user.email, action: 'created', target: 'the trip', timestamp: new Date().toISOString() }] } });
     await db.insert(tripMembers).values({ id: randomUUID(), tripId: id, userId: session.user.id, role: 'owner' });
     res.status(201).json({ id, joinCode });
   } catch (error) { res.status(500).json({ error: error instanceof Error ? error.message : 'Unable to create trip.' }); }

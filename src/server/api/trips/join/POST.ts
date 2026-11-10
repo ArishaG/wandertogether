@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { getAuth } from '../../../../lib/auth/auth.js';
 import { db } from '../../../db/client.js';
 import { tripMembers, trips, user } from '../../../db/schema.js';
+import { isBlockedBetween } from '../../../blocked-accounts';
 
 export default async function handler(req: Request, res: Response) {
   try {
@@ -17,18 +18,22 @@ export default async function handler(req: Request, res: Response) {
     if (!trip) return res.status(404).json({ error: 'That board key was not found.' });
 
     const existing = await db.select({ id: tripMembers.id }).from(tripMembers).where(and(eq(tripMembers.tripId, trip.id), eq(tripMembers.userId, session.user.id))).limit(1);
+    if (!existing.length) {
+      const people = await db.select({ id: user.id, email: user.email }).from(tripMembers).innerJoin(user, eq(tripMembers.userId, user.id)).where(eq(tripMembers.tripId, trip.id));
+      if (await isBlockedBetween(people, session.user)) return res.status(403).json({ error: 'Joining this board is not allowed by account privacy settings.' });
+    }
     const state = trip.state as { notifications?: { actor: string; action: string; target: string; timestamp: string }[]; members?: { id?: string; name?: string; email?: string; availability?: string[] }[] };
-    const notifications = existing.length ? (state.notifications ?? []) : [...(state.notifications ?? []), { actor: session.user.name || session.user.email, action: 'joined', target: 'the board', timestamp: 'Just now' }];
+    const notifications = existing.length ? (state.notifications ?? []) : [...(state.notifications ?? []), { actor: session.user.name || session.user.email, action: 'joined', target: 'the board', timestamp: new Date().toISOString() }];
 
     if (!existing.length) await db.insert(tripMembers).values({ id: randomUUID(), tripId: trip.id, userId: session.user.id, role: 'member' });
 
-    const memberRows = await db.select({ userId: tripMembers.userId, role: tripMembers.role, accountName: user.name, email: user.email }).from(tripMembers).leftJoin(user, eq(tripMembers.userId, user.id)).where(eq(tripMembers.tripId, trip.id));
+    const memberRows = await db.select({ userId: tripMembers.userId, role: tripMembers.role, accountName: user.name, email: user.email, image: user.image }).from(tripMembers).leftJoin(user, eq(tripMembers.userId, user.id)).where(eq(tripMembers.tripId, trip.id));
     const savedMembers = state.members ?? [];
     const members = memberRows.map((member) => {
       const id = member.userId ?? 'member';
       const saved = savedMembers.find((item) => item.id === id);
       const availability = saved?.availability ?? [];
-      return { id, name: member.accountName ?? member.email ?? 'Member', email: member.email ?? '', role: member.role, availability, hasSubmittedAvailability: Boolean(availability.length) };
+      return { id, name: member.accountName ?? member.email ?? 'Member', email: member.email ?? '', image: member.image, role: member.role, availability, hasSubmittedAvailability: Boolean(availability.length) };
     });
 
     await db.update(trips).set({ state: { ...state, notifications, members } }).where(eq(trips.id, trip.id));

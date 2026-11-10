@@ -56,6 +56,9 @@ pids
 *.seed
 *.pid.lock
 
+# Local QA scripts, PDF renders, and browser screenshots
+/tmp/
+
 # TypeScript cache
 *.tsbuildinfo
 

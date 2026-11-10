@@ -2,6 +2,7 @@ import { RouteObject } from "react-router";
 
 import HomePage from './pages/index';
 import ProfilePage from './pages/ProfilePage';
+import PublicProfilePage from './pages/PublicProfilePage';
 import AuthPage from './pages/auth/AuthPage';
 // Eager import so renderToString doesn't hit a Suspense boundary on 404 routes
 // and abort to client rendering. The prod 404 page is tiny; the dev-tools
@@ -10,6 +11,9 @@ import AuthPage from './pages/auth/AuthPage';
 import ProdNotFoundPage from './pages/_404';
 const NotFoundPage = ProdNotFoundPage;
 export const routes: RouteObject[] = [{
+  path: '/people/:id',
+  element: <PublicProfilePage />
+}, {
   path: '/',
   element: <HomePage />
 }, {

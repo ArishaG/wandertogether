@@ -3,11 +3,14 @@ import { Link, useNavigate } from "react-router";
 import { Plus, Route, Trash2, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { LogoutButton, useSession } from '@/lib/auth/auth-client';
+import AccountSettings from '@/components/AccountSettings';
+import { avatarStyle } from '@/lib/planning';
 import { profile } from 'virtual:content';
 type TripMember = {
   id?: string;
   name?: string;
   email?: string;
+  image?: string | null;
 };
 type SavedTrip = {
   id: string;
@@ -27,7 +30,7 @@ function MemberAvatars({
 }) {
   const visible = members.slice(0, 3);
   const extra = members.length - visible.length;
-  return <div className="flex items-center" aria-label={`${members.length} collaborator${members.length === 1 ? '' : 's'}`}>{visible.map((member, index) => <span key={member.id || member.email || index} title={member.name || member.email || 'Collaborator'} className={`grid h-8 w-8 place-items-center rounded-full border-2 border-card bg-primary text-xs font-semibold text-primary-foreground ${index ? '-ml-2' : ''}`}>{initial(member.name, member.email)}</span>)}{extra > 0 && <span className="-ml-2 grid h-8 min-w-8 place-items-center rounded-full border-2 border-card bg-muted px-1 text-xs font-semibold text-muted-foreground">+{extra}</span>}</div>;
+  return <div className="flex items-center" aria-label={`${members.length} collaborator${members.length === 1 ? '' : 's'}`}>{visible.map((member, index) => <span style={avatarStyle(member.id || member.email || String(index))} key={member.id || member.email || index} title={member.name || member.email || 'Collaborator'} className={`grid h-8 w-8 place-items-center rounded-full border-2 border-card bg-primary text-xs font-semibold text-primary-foreground ${index ? '-ml-2' : ''}`}>{member.image ? <img src={member.image} alt="" className="h-full w-full rounded-full object-cover" /> : initial(member.name, member.email)}</span>)}{extra > 0 && <span className="-ml-2 grid h-8 min-w-8 place-items-center rounded-full border-2 border-card bg-muted px-1 text-xs font-semibold text-muted-foreground">+{extra}</span>}</div>;
 }
 export default function ProfilePage() {
   const {
@@ -78,10 +81,10 @@ export default function ProfilePage() {
     }
   };
   if (!isPending && !isAuthenticated) {
-    navigate('/login');
+    navigate('/');
     return null;
   }
-  return <><Helmet><title>{profile.title} — Wander</title><meta name="description" content={profile.description} /><link rel="canonical" href="https://wander.example/profile" /></Helmet><main className="dot-canvas min-h-[calc(100vh-1px)]"><header className="flex h-16 items-center justify-between border-b border-border bg-card px-5"><Link to="/" className="flex items-center gap-2.5 text-foreground" aria-label="Wander home"><span className="grid h-8 w-8 place-items-center rounded-xl bg-primary text-primary-foreground"><Route size={17} /></span><span className="text-lg font-semibold tracking-tight">Wander</span></Link><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground" title={user?.name || user?.email}>{initial(user?.name, user?.email)}</span><LogoutButton className="text-sm font-semibold text-muted-foreground hover:text-foreground" /></div></header><section className="mx-auto max-w-[1100px] px-5 py-12"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-3xl font-semibold tracking-tight">{profile.title}</h1><p className="mt-2 text-muted-foreground">{profile.description}</p></div><button onClick={() => navigate('/new-trip')} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"><Plus size={17} />{profile.newTrip}</button></div>{deleteError && <p role="alert" className="mt-5 rounded-lg border border-destructive bg-card px-4 py-3 text-sm text-destructive">{deleteError}</p>}{trips.length ? <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">{trips.map(trip => <article key={trip.id} className="group rounded-2xl border border-border bg-card p-5 transition hover:border-primary"><button onClick={() => navigate(`/trip/${trip.id}`, {
+  return <><Helmet><title>{profile.title} — Wander</title><meta name="description" content={profile.description} /><link rel="canonical" href="https://wander.example/profile" /></Helmet><main className="dot-canvas min-h-[calc(100vh-1px)]"><header className="flex h-16 items-center justify-between border-b border-border bg-card px-5"><Link to="/" className="flex items-center gap-2.5 text-foreground" aria-label="Wander home"><span className="grid h-8 w-8 place-items-center rounded-xl bg-primary text-primary-foreground"><Route size={17} /></span><span className="text-lg font-semibold tracking-tight">Wander</span></Link><div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground" title={user?.name || user?.email}>{user?.image ? <img src={user.image} alt="" className="h-full w-full rounded-full object-cover" /> : initial(user?.name, user?.email)}</span><LogoutButton className="text-sm font-semibold text-muted-foreground hover:text-foreground" /></div></header><section className="mx-auto max-w-[1100px] px-5 py-12"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h1 className="text-3xl font-semibold tracking-tight">{profile.title}</h1><p className="mt-2 text-muted-foreground">{profile.description}</p></div><button onClick={() => navigate('/new-trip')} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"><Plus size={17} />{profile.newTrip}</button></div><AccountSettings key={user?.id} />{deleteError && <p role="alert" className="mt-5 rounded-lg border border-destructive bg-card px-4 py-3 text-sm text-destructive">{deleteError}</p>}{trips.length ? <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">{trips.map(trip => <article key={trip.id} className="group rounded-2xl border border-border bg-card p-5 transition hover:border-primary"><button onClick={() => navigate(`/trip/${trip.id}`, {
               state: {
                 trip: trip.state
               }

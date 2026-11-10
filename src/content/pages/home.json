@@ -15,7 +15,7 @@
     "checklist": [
       { "id": "vAIZW-EvI-OUyGZq5eBxn", "label": "Choose a destination", "hint": "Pick a place to start exploring." },
       { "id": "XJKeN-oDFGQEm_CQay3mw", "label": "Confirm dates", "hint": "Find days that work for everyone." },
-      { "id": "YhfRKQPM2zvMcO38DploM", "label": "Save activities", "hint": "Collect enough ideas for each day." }
+      { "id": "YhfRKQPM2zvMcO38DploM", "label": "Save activities", "hint": "Save at least one activity. Free days are welcome." }
     ],
     "checklistTitle": "Build your trip",
     "createItinerary": "Create itinerary"

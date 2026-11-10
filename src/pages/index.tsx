@@ -1,12 +1,16 @@
 import { Helmet } from '@dr.pogodin/react-helmet';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowDown, ArrowUp, Bell, CalendarDays, Check, ChevronRight, Compass, Copy, Expand, GripVertical, MapPin, MapPinPlus, MessageSquareText, Minus, Pencil, Plus, Route, Search, Send, Sparkles, Trash2, Users, Vote, X } from 'lucide-react';
-import { DragEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, Bell, CalendarDays, Check, ChevronRight, Compass, Copy, Expand, GripVertical, MapPin, MessageSquareText, Minus, Pencil, Plus, Route, Search, Send, Sparkles, Trash2, Users, Vote, X } from 'lucide-react';
+import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from "react-router";
 import { useSession } from '@/lib/auth/auth-client';
 import { addMonths, eachDayOfInterval, endOfMonth, format, getDay, startOfMonth, subMonths } from 'date-fns';
 import { home } from 'virtual:content';
 import StaticMap from '@/components/StaticMap';
+import { connectionRoute, type BoardRect } from '@/lib/connection-route';
+import { avatarStyle, coordinates, relativeTime } from '@/lib/planning';
+import { usePlaces } from '@/lib/use-places';
+import { useNearbyOrigin } from '@/lib/use-nearby-origin';
 type Screen = 'landing' | 'profile' | 'onboarding' | 'whiteboard' | 'itinerary';
 type TripType = 'day' | 'road' | 'flight';
 type Modal = 'signup' | 'join' | 'availability' | 'activity' | 'invite' | 'widget' | null;
@@ -57,6 +61,7 @@ type TripMember = {
   id?: string;
   name?: string;
   email: string;
+  image?: string | null;
   role?: string;
   hasSubmittedAvailability?: boolean;
   availability?: string[];
@@ -196,15 +201,23 @@ export default function HomePage() {
   const location = useLocation();
   const {
     isAuthenticated,
-    user
+    user, isPending
   } = useSession();
+  useEffect(() => {
+    if (!isPending && !isAuthenticated && location.pathname.startsWith('/trip/')) navigate('/', { replace: true });
+  }, [isPending, isAuthenticated, location.pathname, navigate]);
+  useEffect(() => {
+    if (new URLSearchParams(location.search).has('join')) setModal('join');
+  }, [location.search]);
   const [screen, setScreen] = useState<Screen>(location.pathname === '/new-trip' ? 'onboarding' : location.pathname.startsWith('/trip/') ? 'whiteboard' : 'landing');
   const [modal, setModal] = useState<Modal>(null);
   const [userEmail, setUserEmail] = useState('');
   const [signupTouched, setSignupTouched] = useState(false);
   const [trip, setTrip] = useState<Trip>((location.state as {
     trip?: Trip;
-  } | null)?.trip || blankTrip);
+  } | null)?.trip || { ...blankTrip, id: location.pathname.startsWith('/trip/') ? location.pathname.split('/').pop()! : 'new-trip' });
+  const [boardError, setBoardError] = useState('');
+  const [boardLoaded, setBoardLoaded] = useState(!location.pathname.startsWith('/trip/'));
   const [, setTripId] = useState<string | null>(location.pathname.startsWith('/trip/') ? location.pathname.split('/').pop() || null : null);
   const [step, setStep] = useState(1);
   const [locationQuery, setLocationQuery] = useState('');
@@ -242,7 +255,7 @@ export default function HomePage() {
       start: new Date(`${availability.start}T12:00:00`),
       end: new Date(`${availability.end}T12:00:00`)
     }).length : 0;
-    const activities = dates && confirmedDays > 0 && locations.length >= confirmedDays;
+    const activities = locations.length > 0;
     return {
       location,
       dates,
@@ -254,14 +267,14 @@ export default function HomePage() {
   }, [trip]);
   const hasSubmittedAvailability = Boolean(user?.id && trip.members.some(member => member.id === user.id && member.hasSubmittedAvailability));
   useEffect(() => {
-    if (screen === 'whiteboard' && !availabilityOpened && !hasSubmittedAvailability) {
+    if (boardLoaded && screen === 'whiteboard' && !availabilityOpened && !hasSubmittedAvailability) {
       const timer = window.setTimeout(() => {
         setModal('availability');
         setAvailabilityOpened(true);
       }, 450);
       return () => window.clearTimeout(timer);
     }
-  }, [screen, availabilityOpened, hasSubmittedAvailability]);
+  }, [screen, availabilityOpened, hasSubmittedAvailability, boardLoaded]);
   const tripRef = useRef(trip);
   const editingRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
@@ -276,22 +289,26 @@ export default function HomePage() {
     widgets: value.widgets,
     locations: value.locations,
     notifications: value.notifications,
+    links: value.links,
     itinerary: value.itinerary
   });
   useEffect(() => {
     tripRef.current = trip;
   }, [trip]);
   useEffect(() => {
-    if (screen !== 'whiteboard' || trip.id === 'new-trip') return;
+    if (!['whiteboard', 'itinerary'].includes(screen) || trip.id === 'new-trip' || !isAuthenticated) return;
     const refresh = async () => {
       if (editingRef.current || saveRequestRef.current) return;
-      const response = await fetch(`/api/trips/${trip.id}`);
-      if (!response.ok) return;
+      const response = await fetch(`/api/trips/${trip.id}`).catch(() => null);
+      if (!response?.ok) { setBoardError('Unable to load this board. Check your connection and access, then try again.'); return; }
+      setBoardError('');
       const payload = (await response.json()) as {
         trip: Trip;
       };
       const incomingSignature = boardSignature(payload.trip);
+      setBoardLoaded(true);
       if (incomingSignature === lastSavedSignatureRef.current) return;
+      lastSavedSignatureRef.current = incomingSignature;
       setTrip(current => ({
         ...current,
         ...payload.trip
@@ -300,9 +317,9 @@ export default function HomePage() {
     void refresh();
     const timer = window.setInterval(() => void refresh(), 5000);
     return () => window.clearInterval(timer);
-  }, [screen, trip.id]);
+  }, [screen, trip.id, isAuthenticated]);
   useEffect(() => {
-    if (screen !== 'whiteboard' || trip.id === 'new-trip' || !isAuthenticated) return;
+    if (!boardLoaded || !['whiteboard', 'itinerary'].includes(screen) || trip.id === 'new-trip' || !isAuthenticated) return;
     const signature = boardSignature(trip);
     if (signature === lastSavedSignatureRef.current) return;
     editingRef.current = true;
@@ -332,13 +349,14 @@ export default function HomePage() {
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [trip, screen, isAuthenticated]);
+  }, [trip, screen, isAuthenticated, boardLoaded]);
   const openOnboarding = () => {
     if (!isAuthenticated) {
       navigate('/signup');
       return;
     }
-    setTrip(blankTrip);
+    setBoardLoaded(true);
+    setTrip({ ...blankTrip, joinCode: makeBoardKey() });
     setStep(1);
     setScreen('onboarding');
   };
@@ -350,10 +368,10 @@ export default function HomePage() {
     const nextTrip = {
       ...trip,
       notifications: [{
-        actor: 'You',
+        actor: user?.name || user?.email || 'A collaborator',
         action: 'created',
         target: 'the trip',
-        timestamp: 'Just now'
+        timestamp: new Date().toISOString()
       }]
     };
     const response = await fetch('/api/trips', {
@@ -375,11 +393,22 @@ export default function HomePage() {
       id: string;
       joinCode: string;
     };
+    const invitations = trip.members.filter(member => member.role === 'invited');
+    const invitationResults = await Promise.allSettled(invitations.map(async member => {
+      const response = await fetch(`/api/trips/${saved.id}/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: member.email }) });
+      if (!response.ok) throw new Error('Invitation not sent');
+    }));
+    if (invitationResults.some(result => result.status === 'rejected')) {
+      setInviteError('Some invitations could not be emailed. Open Board key to retry or share the invite link.');
+      setModal('invite');
+    }
     const savedTrip = {
       ...nextTrip,
+      members: [{ id: user?.id, name: user?.name || user?.email, email: user?.email || '', role: 'owner', availability: [] }],
       id: saved.id,
       joinCode: saved.joinCode
     };
+    setBoardLoaded(true);
     setTrip(savedTrip);
     setTripId(saved.id);
     setScreen('whiteboard');
@@ -395,10 +424,6 @@ export default function HomePage() {
     if (isFirstItinerary) setScreen('itinerary');
     setItineraryStatus('generating');
     setItineraryError('');
-    setTrip(current => ({
-      ...current,
-      itinerary: []
-    }));
     try {
       const response = await fetch('/api/itinerary', {
         method: 'POST',
@@ -424,7 +449,7 @@ export default function HomePage() {
           actor: 'Wander',
           action: current.itinerary.length ? 'synced' : 'created',
           target: 'your itinerary',
-          timestamp: 'Just now'
+          timestamp: new Date().toISOString()
         }]
       }));
       setItineraryBaseline(itinerarySignature);
@@ -438,7 +463,7 @@ export default function HomePage() {
           actor: 'Wander',
           action: 'could not create',
           target: 'your itinerary',
-          timestamp: 'Just now'
+          timestamp: new Date().toISOString()
         }]
       }));
     }
@@ -469,7 +494,8 @@ export default function HomePage() {
     setInviteError('');
   };
   const copyInvite = () => {
-    setCopied(true);
+    if (trip.id === 'new-trip') { setInviteError('Create the trip first, then copy its invite link from Board key.'); return; }
+    void navigator.clipboard.writeText(`${window.location.origin}/?join=${trip.joinCode}`).then(() => setCopied(true)).catch(() => setInviteError('Copy failed. Please copy the board key.'));
     window.setTimeout(() => setCopied(false), 2000);
   };
   const saveAvailability = (days: string[]) => {
@@ -530,7 +556,7 @@ export default function HomePage() {
       dateModified: '2026-08-12'
     }]
   };
-  return <><Helmet><title>Wander — Collaborative trip planning</title><meta name="description" content="A calm shared space for planning trips together." /><link rel="canonical" href={`${site}/`} /><meta property="og:title" content="Wander — Collaborative trip planning" /><meta property="og:description" content="A calm shared space for planning trips together." /><meta property="og:type" content="website" /><meta property="og:url" content={`${site}/`} /><meta property="og:image" content={`${site}/og-image.png`} /><meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="Wander — Collaborative trip planning" /><meta name="twitter:description" content="A calm shared space for planning trips together." /><meta name="twitter:image" content={`${site}/og-image.png`} /><script type="application/ld+json">{JSON.stringify(jsonLd)}</script></Helmet><main className="wander-app">{screen === 'landing' && <Landing onStart={openOnboarding} onJoin={() => setModal('join')} />}{screen === 'profile' && <Profile onNewTrip={openOnboarding} />}{screen === 'onboarding' && <Onboarding step={step} setStep={setStep} trip={trip} setTrip={setTrip} locationQuery={locationQuery} setLocationQuery={setLocationQuery} inviteInput={inviteInput} setInviteInput={setInviteInput} inviteError={inviteError} setInviteError={setInviteError} addInvite={addInvite} copied={copied} copyInvite={copyInvite} onCreate={createTrip} onBackToProfile={() => setScreen('profile')} />}{screen === 'whiteboard' && <Whiteboard trip={trip} setTrip={setTrip} checklist={checklist} hasItinerary={hasItinerary} itineraryNeedsSync={itineraryNeedsSync} onModal={setModal} onItinerary={createItinerary} onOpenItinerary={() => setScreen('itinerary')} notificationsOpen={notificationsOpen} setNotificationsOpen={setNotificationsOpen} />}{screen === 'itinerary' && <Itinerary trip={trip} setTrip={setTrip} checklist={checklist} status={itineraryStatus} error={itineraryError} onBack={() => setScreen('whiteboard')} onRetry={createItinerary} />}</main><AnimatePresence>{modal === 'signup' && <SignupModal email={userEmail} setEmail={setUserEmail} touched={signupTouched} setTouched={setSignupTouched} onClose={() => setModal(null)} onContinue={() => {
+  return <><Helmet><title>Wander — Collaborative trip planning</title><meta name="description" content="A calm shared space for planning trips together." /><link rel="canonical" href={`${site}/`} /><meta property="og:title" content="Wander — Collaborative trip planning" /><meta property="og:description" content="A calm shared space for planning trips together." /><meta property="og:type" content="website" /><meta property="og:url" content={`${site}/`} /><meta property="og:image" content={`${site}/og-image.png`} /><meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="Wander — Collaborative trip planning" /><meta name="twitter:description" content="A calm shared space for planning trips together." /><meta name="twitter:image" content={`${site}/og-image.png`} /><script type="application/ld+json">{JSON.stringify(jsonLd)}</script></Helmet><main className="wander-app">{screen === 'landing' && <Landing onStart={openOnboarding} onJoin={() => setModal('join')} />}{screen === 'profile' && <Profile onNewTrip={openOnboarding} />}{screen === 'onboarding' && <Onboarding step={step} setStep={setStep} trip={trip} setTrip={setTrip} locationQuery={locationQuery} setLocationQuery={setLocationQuery} inviteInput={inviteInput} setInviteInput={setInviteInput} inviteError={inviteError} setInviteError={setInviteError} addInvite={addInvite} copied={copied} copyInvite={copyInvite} onCreate={createTrip} onBackToProfile={() => setScreen('profile')} />}{screen === 'whiteboard' && (!boardLoaded ? <section className="min-h-screen grid place-items-center p-6"><p role="status">{boardError || 'Loading your board…'}</p></section> : <Whiteboard trip={trip} setTrip={setTrip} checklist={checklist} hasItinerary={hasItinerary} itineraryNeedsSync={itineraryNeedsSync} onModal={value => { if (value === 'availability') { const days = trip.members.find(member => member.id === user?.id)?.availability || []; setAvailabilityStart(days[0] || ''); setAvailabilityEnd(days.at(-1) || ''); } setModal(value); }} onItinerary={createItinerary} onOpenItinerary={() => setScreen('itinerary')} notificationsOpen={notificationsOpen} setNotificationsOpen={setNotificationsOpen} />)}{screen === 'itinerary' && <Itinerary trip={trip} setTrip={setTrip} checklist={checklist} status={itineraryStatus} error={itineraryError} onBack={() => setScreen('whiteboard')} onRetry={createItinerary} />}</main><AnimatePresence>{modal === 'signup' && <SignupModal email={userEmail} setEmail={setUserEmail} touched={signupTouched} setTouched={setSignupTouched} onClose={() => setModal(null)} onContinue={() => {
         setModal(null);
         navigate('/signup');
       }} />}{modal === 'join' && <JoinTripModal isAuthenticated={isAuthenticated} onClose={() => setModal(null)} onJoined={joinedTrip => {
@@ -543,7 +569,7 @@ export default function HomePage() {
             trip: joinedTrip
           }
         });
-      }} />}{modal === 'availability' && <AvailabilityModal start={availabilityStart} end={availabilityEnd} setStart={setAvailabilityStart} setEnd={setAvailabilityEnd} onClose={() => setModal(null)} onSave={saveAvailability} />}{modal === 'activity' && <ActivityModal trip={trip} setTrip={setTrip} onClose={() => setModal(null)} />}{modal === 'invite' && <InviteModal trip={trip} copied={copied} copyInvite={copyInvite} onClose={() => setModal(null)} />}{modal === 'widget' && <WidgetModal trip={trip} setTrip={setTrip} onClose={() => setModal(null)} />}</AnimatePresence></>;
+      }} />}{modal === 'availability' && <AvailabilityModal initialDays={trip.members.find(member => member.id === user?.id)?.availability || []} start={availabilityStart} end={availabilityEnd} setStart={setAvailabilityStart} setEnd={setAvailabilityEnd} onClose={() => setModal(null)} onSave={saveAvailability} />}{modal === 'activity' && <ActivityModal trip={trip} setTrip={setTrip} onClose={() => setModal(null)} />}{modal === 'invite' && <InviteModal notice={inviteError} trip={trip} copied={copied} copyInvite={copyInvite} onClose={() => setModal(null)} />}{modal === 'widget' && <WidgetModal trip={trip} setTrip={setTrip} onClose={() => setModal(null)} />}</AnimatePresence></>;
 }
 function PlanningMotionGraphic() {
   const prompts = [{
@@ -674,8 +700,12 @@ function Onboarding({
   onCreate: () => void;
   onBackToProfile: () => void;
 }) {
+  const [destinationOpen, setDestinationOpen] = useState(true);
+  const localTrip = trip.type === 'day' || trip.type === 'road';
+  const { nearby, setNearby, error: nearbyError } = useNearbyOrigin(localTrip);
+  const livePlaces = usePlaces(localTrip && !nearby ? '' : locationQuery, '', localTrip ? nearby : null);
   const normalizedLocationQuery = locationQuery.trim().toLowerCase();
-  const destinationResults = normalizedLocationQuery ? destinationCatalog.filter(place => place.name.toLowerCase().includes(normalizedLocationQuery) || place.detail.toLowerCase().includes(normalizedLocationQuery)).slice(0, 8) : destinationCatalog.slice(0, 8);
+  const destinationResults = localTrip && !nearby ? [] : livePlaces.results.length ? livePlaces.results : localTrip ? [] : coordinates(locationQuery) ? [{ name: locationQuery, detail: 'Coordinates' }] : destinationCatalog.filter(place => place.name.toLowerCase().split(/[ ,]+/).some(word => word.startsWith(normalizedLocationQuery))).slice(0, 8);
   const next = () => {
     if (step === 1 && trip.name.trim() && trip.type) setStep(2);else if (step === 2) setStep(3);else if (step === 3) onCreate();
   };
@@ -698,15 +728,17 @@ function Onboarding({
             const selected = trip.type === type;
             return <button key={item.label} onClick={() => setTrip(current => ({
               ...current,
-              type
+              type,
+              destination: current.type === type ? current.destination : null
             }))} className={`flex items-center gap-4 rounded-xl border-2 p-4 text-left transition ${selected ? 'border-primary bg-[hsl(var(--green-50))]' : 'border-border bg-background hover:border-primary/40'}`}><IconTile>{typeData[type]}</IconTile><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{item.label}</span><span className="mt-1 block text-[13px] leading-[18px] text-muted-foreground">{item.description}</span></span>{selected && <Check size={18} className="text-primary" />}</button>;
-          })}</div><p className="mt-4 text-[13px] leading-[18px] text-muted-foreground">{home.onboarding.step1.caption}</p></>}{step === 2 && <><h1 className="mt-7 text-[32px] font-semibold leading-10 tracking-[-0.03em]">{home.onboarding.step2.title}</h1><div className="relative mt-7"><input autoFocus value={locationQuery} onChange={event => setLocationQuery(event.target.value)} placeholder={home.onboarding.step2.inputPlaceholder} className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" />{locationQuery && <div className="absolute inset-x-0 top-[52px] z-10 rounded-xl border border-border bg-card p-1 shadow-lg">{destinationResults.length ? destinationResults.map(place => <button key={place.name} onClick={() => {
+          })}</div><p className="mt-4 text-[13px] leading-[18px] text-muted-foreground">{home.onboarding.step1.caption}</p></>}{step === 2 && <><h1 className="mt-7 text-[32px] font-semibold leading-10 tracking-[-0.03em]">{home.onboarding.step2.title}</h1>{localTrip && !nearby && <label className="mt-4 block text-sm">{nearbyError || 'Finding nearby destinations…'}<input aria-label="Starting coordinates" placeholder="Latitude, longitude" onChange={event => { const point = coordinates(event.target.value); if (point) setNearby(point); }} className="mt-2 w-full rounded-lg border p-2" /></label>}<div className="relative mt-7"><input autoFocus value={locationQuery} onChange={event => { setLocationQuery(event.target.value); setDestinationOpen(true); }} placeholder={home.onboarding.step2.inputPlaceholder} className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" />{locationQuery && destinationOpen && <div className="absolute inset-x-0 top-[52px] z-10 rounded-xl border border-border bg-card p-1 shadow-lg">{livePlaces.loading && <p className="p-2 text-xs">Searching destinations…</p>}{livePlaces.error && <p className="p-2 text-xs">{livePlaces.error}</p>}{destinationResults.length ? destinationResults.map(place => <button key={place.name} onClick={() => {
               setTrip(current => ({
                 ...current,
                 destination: place.name
               }));
               setLocationQuery(place.name);
-            }} className="w-full rounded-lg px-3 py-2.5 text-left hover:bg-muted"><span className="block text-sm font-medium">{place.name}</span><span className="block text-[13px] text-muted-foreground">{place.detail}</span></button>) : <p className="px-3 py-2.5 text-[13px] text-muted-foreground">No matching destination found. Try a city, region, or country.</p>}</div>}</div>{trip.destination && <div className="mt-4 flex items-center gap-2 rounded-lg border border-primary bg-[hsl(var(--green-50))] px-3 py-2 text-sm text-primary"><Check size={16} /><span>Destination selected: {trip.destination}</span></div>}<p className="mt-4 text-[13px] leading-[18px] text-muted-foreground">Start typing to choose a real destination from the search results.</p></>}{step === 3 && <><h1 className="mt-7 text-[32px] font-semibold leading-10 tracking-[-0.03em]">{home.onboarding.step3.title}</h1><p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">Invite the people who will help shape the plan.</p><InviteEditor trip={trip} setTrip={setTrip} value={inviteInput} setValue={setInviteInput} error={inviteError} setError={setInviteError} onAdd={addInvite} /><button onClick={copyInvite} className={`mt-4 inline-flex items-center gap-2 text-sm font-semibold ${copied ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? 'Link copied ✓' : 'Copy invite link'}</button></>}<div className="mt-8 flex items-center justify-between border-t border-border pt-5"><button onClick={() => step === 1 ? onBackToProfile() : setStep(step - 1)} className="h-10 rounded-lg px-2 text-sm font-semibold text-muted-foreground hover:text-foreground">Back</button><div className="flex items-center gap-4">{step > 1 && <button onClick={() => step === 2 ? setStep(3) : onCreate()} className="text-sm font-semibold text-muted-foreground hover:text-foreground">Skip for now</button>}<PrimaryButton disabled={step === 1 && (!trip.name.trim() || !trip.type)} onClick={next}>{step === 3 ? 'Create trip' : 'Next'}<ChevronRight size={17} /></PrimaryButton></div></div></div></section>;
+              setDestinationOpen(false);
+            }} className="w-full rounded-lg px-3 py-2.5 text-left hover:bg-muted"><span className="block text-sm font-medium">{place.name}</span><span className="block text-[13px] text-muted-foreground">{place.detail}</span></button>) : <p className="px-3 py-2.5 text-[13px] text-muted-foreground">No matching destination found. Try a city, region, or country.</p>}</div>}</div>{trip.destination && <div className="mt-4 flex items-center gap-2 rounded-lg border border-primary bg-[hsl(var(--green-50))] px-3 py-2 text-sm text-primary"><Check size={16} /><span>Destination selected: {trip.destination}</span></div>}<p className="mt-4 text-[13px] leading-[18px] text-muted-foreground">{localTrip ? 'Search within 400 miles of your starting location.' : 'Search a destination or enter latitude, longitude.'}</p></>}{step === 3 && <><h1 className="mt-7 text-[32px] font-semibold leading-10 tracking-[-0.03em]">{home.onboarding.step3.title}</h1><p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">Invite the people who will help shape the plan.</p><InviteEditor trip={trip} setTrip={setTrip} value={inviteInput} setValue={setInviteInput} error={inviteError} setError={setInviteError} onAdd={addInvite} /><button disabled={trip.id === 'new-trip'} title="Create the trip first to get a shareable link" onClick={copyInvite} className={`disabled:opacity-50 mt-4 inline-flex items-center gap-2 text-sm font-semibold ${copied ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? 'Link copied ✓' : 'Copy invite link'}</button></>}<div className="mt-8 flex items-center justify-between border-t border-border pt-5"><button onClick={() => step === 1 ? onBackToProfile() : setStep(step - 1)} className="h-10 rounded-lg px-2 text-sm font-semibold text-muted-foreground hover:text-foreground">Back</button><div className="flex items-center gap-4">{step > 1 && <button onClick={() => step === 2 ? setStep(3) : onCreate()} className="text-sm font-semibold text-muted-foreground hover:text-foreground">Skip for now</button>}<PrimaryButton disabled={step === 1 && (!trip.name.trim() || !trip.type)} onClick={next}>{step === 3 ? 'Create trip' : 'Next'}<ChevronRight size={17} /></PrimaryButton></div></div></div></section>;
 }
 function InviteEditor({
   trip,
@@ -789,9 +821,11 @@ function Whiteboard({
     }
   };
   const items = [checklist.location, checklist.dates, checklist.activities];
-  const unread = safeTrip.notifications.length;
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const dragImageRef = useRef<HTMLDivElement | null>(null);
+  const [alertsEnabled, setAlertsEnabled] = useState(true);
+  useEffect(() => {
+    void fetch('/api/preferences').then(response => response.ok ? response.json() : null).then(data => { if (data?.preferences) setAlertsEnabled(data.preferences.notifications); }).catch(() => undefined);
+  }, [user?.id, notificationsOpen]);
+  const unread = alertsEnabled ? safeTrip.notifications.length : 0;
   const pointerDragRef = useRef<{
     id: string;
     pointerId: number;
@@ -821,12 +855,14 @@ function Whiteboard({
     originY: number;
   } | null>(null);
   const confirmDatesInWidget = (widgetId: string) => {
-    const draft = dateDrafts[widgetId];
+    const stored = trip.availability;
+    const draft = dateDrafts[widgetId] || { start: stored.start || '', end: stored.end || '' };
+    if (trip.type === 'day') draft.end = draft.start;
     if (!draft?.start || !draft.end || draft.end < draft.start) return;
     setTrip(current => ({
       ...current,
       availability: {
-        proposedDays: [draft.start, draft.end],
+        ...current.availability,
         start: draft.start,
         end: draft.end,
         status: 'confirmed'
@@ -876,28 +912,21 @@ function Whiteboard({
   const placeWidgetAtPoint = (id: string, clientX: number, clientY: number, viewportElement: HTMLDivElement) => {
     const viewportRect = viewportElement.getBoundingClientRect();
     const gridWidth = Math.max(1180, viewportRect.width);
-    const gridX = (clientX - viewportRect.left - boardOffset.x) / boardScale;
-    const gridY = (clientY - viewportRect.top - boardOffset.y) / boardScale;
-    const cellWidth = gridWidth / 6;
+    const cellWidth = (gridWidth + 10) / 6;
     const rowHeight = 88;
+    const deltaX = (clientX - (pointerDragRef.current?.startX ?? clientX)) / boardScale;
+    const deltaY = (clientY - (pointerDragRef.current?.startY ?? clientY)) / boardScale;
     setTrip(current => {
       const moving = current.widgets.find(widget => widget.id === id);
       if (!moving) return current;
-      const preferredX = Math.max(0, Math.min(6 - moving.w, Math.floor((gridX - moving.w * cellWidth / 2) / cellWidth)));
-      const preferredY = Math.max(0, Math.floor((gridY - rowHeight / 2) / rowHeight));
+      const preferredX = Math.max(0, Math.min(6 - moving.w, Math.round((moving.gridX * cellWidth + deltaX) / cellWidth)));
+      const preferredY = Math.max(0, Math.round((moving.gridY * rowHeight + deltaY) / rowHeight));
       const placed = findOpenPosition(current.widgets, moving, preferredX, preferredY);
       return {
         ...current,
         widgets: current.widgets.map(widget => widget.id === id ? placed : widget)
       };
     });
-  };
-  const dropWidget = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const id = event.dataTransfer.getData('text/plain') || draggedId;
-    if (!id) return;
-    placeWidgetAtPoint(id, event.clientX, event.clientY, event.currentTarget);
-    setDraggedId(null);
   };
   const startPointerDrag = (event: React.PointerEvent<HTMLButtonElement>, id: string) => {
     if (event.button !== 0) return;
@@ -911,27 +940,30 @@ function Whiteboard({
       startY: event.clientY,
       moved: false
     };
-    setDraggedId(id);
   };
   const movePointerDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     const active = pointerDragRef.current;
     if (!active || active.pointerId !== event.pointerId) return;
+    const card = document.querySelector<HTMLElement>(`[data-widget-id="${active.id}"]`);
+    if (card) { card.style.transform = `translate(${(event.clientX - active.startX) / boardScale}px, ${(event.clientY - active.startY) / boardScale}px)`; card.style.zIndex = '20'; card.style.transition = 'none'; }
     if (Math.abs(event.clientX - active.startX) + Math.abs(event.clientY - active.startY) > 4) active.moved = true;
   };
   const endPointerDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     const active = pointerDragRef.current;
     if (!active || active.pointerId !== event.pointerId) return;
     if (active.moved) placeWidgetAtPoint(active.id, event.clientX, event.clientY, event.currentTarget);
+    const card = document.querySelector<HTMLElement>(`[data-widget-id="${active.id}"]`);
+    if (card) { card.style.transform = ''; card.style.zIndex = ''; card.style.transition = ''; }
     pointerDragRef.current = null;
-    setDraggedId(null);
   };
   const endPointerDragFromWindow = (event: PointerEvent) => {
     const active = pointerDragRef.current;
     if (!active || active.pointerId !== event.pointerId) return;
     const viewport = document.querySelector<HTMLDivElement>('.whiteboard-viewport');
     if (active.moved && viewport) placeWidgetAtPoint(active.id, event.clientX, event.clientY, viewport);
+    const card = document.querySelector<HTMLElement>(`[data-widget-id="${active.id}"]`);
+    if (card) { card.style.transform = ''; card.style.zIndex = ''; card.style.transition = ''; }
     pointerDragRef.current = null;
-    setDraggedId(null);
   };
   useEffect(() => {
     window.addEventListener('pointerup', endPointerDragFromWindow);
@@ -962,8 +994,19 @@ function Whiteboard({
     setLinkSourceId(null);
   };
   const widgetCreator = user?.name || user?.email || 'You';
+  const focusWidget = (widget: Widget, attempts = 3) => requestAnimationFrame(() => {
+    const element = document.querySelector<HTMLElement>(`[data-widget-id="${widget.id}"]`);
+    const rect = element?.getBoundingClientRect();
+    if (!rect) { if (attempts > 0) window.setTimeout(() => focusWidget(widget, attempts - 1), 0); return; }
+    if (rect.top >= 80 && rect.bottom <= window.innerHeight - 80 && rect.left >= 0 && rect.right <= window.innerWidth) return;
+    setBoardOffset({ x: -widget.gridX * (1180 / 6) * boardScale, y: -widget.gridY * 88 * boardScale });
+  });
   const addActivitiesWidget = () => setTrip(current => {
-    if (current.widgets.some(widget => widget.type === 'activities')) return current;
+    const existing = current.widgets.find(widget => widget.type === 'activities');
+    if (existing) {
+      focusWidget(existing);
+      return current;
+    }
     const explorer = current.widgets.find(widget => widget.type === 'map');
     const widget = {
       id: crypto.randomUUID(),
@@ -976,6 +1019,7 @@ function Whiteboard({
       createdBy: widgetCreator
     };
     const placed = findOpenPosition(current.widgets, widget, widget.gridX, widget.gridY);
+    focusWidget(placed);
     return {
       ...current,
       widgets: [...current.widgets, placed],
@@ -990,10 +1034,10 @@ function Whiteboard({
   return <section className="whiteboard-shell"><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 sm:px-5"><div className="flex min-w-0 items-center gap-3"><Brand homeLink /><span className="hidden h-6 w-px bg-border sm:block" /><div className="hidden items-center gap-2 text-xs text-muted-foreground lg:flex">{trip.destination ? <><MapPin size={14} className="text-primary" /><span>{trip.destination}</span></> : <><span className="text-amber-600">⚠</span><span>Location needed</span></>}{trip.availability.status === 'confirmed' ? <><span className="h-3 w-px bg-border" /><CalendarDays size={14} className="text-primary" /><span>{trip.availability.start} – {trip.availability.end}</span></> : <><span className="h-3 w-px bg-border" /><span className="text-amber-600">⚠</span><span>Dates needed</span></>}</div><input aria-label="Trip name" value={trip.name} onChange={event => setTrip(current => ({
           ...current,
           name: event.target.value
-        }))} placeholder="Untitled trip" className="min-w-0 max-w-[220px] bg-transparent text-sm font-semibold outline-none placeholder:text-muted-foreground" /><nav aria-label="Trip workspace" className="ml-2 hidden items-center gap-1 text-sm md:flex"><span className="rounded-lg bg-muted px-3 py-2 font-semibold">Whiteboard</span><button onClick={hasItinerary ? onOpenItinerary : onItinerary} className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground">Itinerary</button></nav></div><div className="flex items-center gap-2"><div className="relative group"><button className="flex h-10 items-center rounded-full border border-border bg-card pl-1.5 pr-2 text-primary transition hover:bg-[hsl(var(--green-50))]" title="Board members" aria-label={`${trip.members.length} board collaborators`}><span className="flex items-center">{trip.members.slice(0, 3).map((member, index) => <span key={member.id || member.email || index} className={`grid h-7 w-7 place-items-center rounded-full border-2 border-card bg-primary text-xs font-semibold text-primary-foreground ${index ? '-ml-2' : ''}`}>{memberInitial(member)}</span>)}{trip.members.length > 3 && <span className="-ml-2 grid h-7 min-w-7 place-items-center rounded-full border-2 border-card bg-muted px-1 text-[11px] font-semibold text-muted-foreground">+{trip.members.length - 3}</span>}</span><span className="ml-1.5 text-xs font-semibold text-foreground">{trip.members.length}</span></button><div className="pointer-events-none absolute right-0 top-full z-40 mt-2 hidden w-64 rounded-xl border border-border bg-card p-2 shadow-lg group-hover:block group-focus-within:block"><p className="px-2 py-1 text-xs font-semibold text-muted-foreground">Board members</p>{trip.members.length ? trip.members.map((member, index) => {
+        }))} placeholder="Untitled trip" className="min-w-0 max-w-[220px] bg-transparent text-sm font-semibold outline-none placeholder:text-muted-foreground" /><nav aria-label="Trip workspace" className="ml-2 hidden items-center gap-1 text-sm md:flex"><span className="rounded-lg bg-muted px-3 py-2 font-semibold">Whiteboard</span><button onClick={hasItinerary ? onOpenItinerary : onItinerary} className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground">Itinerary</button></nav></div><div className="flex items-center gap-2"><div className="relative group"><button className="flex h-10 items-center rounded-full border border-border bg-card pl-1.5 pr-2 text-primary transition hover:bg-[hsl(var(--green-50))]" title="Board members" aria-label={`${trip.members.length} board collaborators`}><span className="flex items-center">{trip.members.slice(0, 3).map((member, index) => <span style={avatarStyle(member.id || member.email)} key={member.id || member.email || index} className={`grid h-7 w-7 place-items-center rounded-full border-2 border-card bg-primary text-xs font-semibold text-primary-foreground ${index ? '-ml-2' : ''}`}>{member.image ? <img src={member.image} alt="" className="h-full w-full rounded-full object-cover" /> : memberInitial(member)}</span>)}{trip.members.length > 3 && <span className="-ml-2 grid h-7 min-w-7 place-items-center rounded-full border-2 border-card bg-muted px-1 text-[11px] font-semibold text-muted-foreground">+{trip.members.length - 3}</span>}</span><span className="ml-1.5 text-xs font-semibold text-foreground">{trip.members.length}</span></button><div className="pointer-events-none absolute right-0 top-full z-40 mt-2 hidden w-64 rounded-xl border border-border bg-card p-2 shadow-lg group-hover:block group-focus-within:block"><p className="px-2 py-1 text-xs font-semibold text-muted-foreground">Board members</p>{trip.members.length ? trip.members.map((member, index) => {
               const name = member.name || member.email || 'Guest';
-              return <div key={member.id || member.email || index} className="flex items-center gap-2 rounded-lg px-2 py-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{memberInitial(member)}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold">{name}</span><span className="block truncate text-xs text-muted-foreground">{member.role === 'owner' ? 'Board owner' : 'Joined the board'}</span></span></div>;
-            }) : <p className="px-2 py-2 text-sm text-muted-foreground">No members yet.</p>}</div></div><button onClick={() => setNotificationsOpen(!notificationsOpen)} className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground transition hover:bg-muted" aria-label="Notifications"><Bell size={18} />{unread > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />}</button><PrimaryButton onClick={() => onModal('invite')} className="h-10 rounded-full px-3 sm:px-4"><Users size={16} /><span className="hidden sm:inline">Board key</span><span className="sm:hidden">Key</span></PrimaryButton><button onClick={() => navigate('/profile')} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-[hsl(var(--green-900))]" aria-label="View your trips" title={user?.name || user?.email || 'Your trips'}>{(user?.name || user?.email || '?').trim().charAt(0).toUpperCase()}</button></div></header><div className="whiteboard-canvas"><div className="whiteboard-viewport" onWheel={event => {
+              return <div key={member.id || member.email || index} className="flex items-center gap-2 rounded-lg px-2 py-2"><span style={avatarStyle(member.id || member.email)} className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{member.image ? <img src={member.image} alt="" className="h-full w-full rounded-full object-cover" /> : memberInitial(member)}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold">{name}</span><span className="block truncate text-xs text-muted-foreground">{member.role === 'owner' ? 'Board owner' : 'Joined the board'}</span></span></div>;
+            }) : <p className="px-2 py-2 text-sm text-muted-foreground">No members yet.</p>}</div></div><button onClick={() => setNotificationsOpen(!notificationsOpen)} className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground transition hover:bg-muted" aria-label="Notifications"><Bell size={18} />{unread > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />}</button><PrimaryButton onClick={() => onModal('invite')} className="h-10 rounded-full px-3 sm:px-4"><Users size={16} /><span className="hidden sm:inline">Board key</span><span className="sm:hidden">Key</span></PrimaryButton><button onClick={() => navigate('/profile')} className="grid h-10 w-10 place-items-center rounded-full border border-border bg-primary text-sm font-semibold text-primary-foreground transition hover:bg-[hsl(var(--green-900))]" aria-label="View your trips" title={user?.name || user?.email || 'Your trips'}>{user?.image ? <img src={user.image} alt="" className="h-full w-full rounded-full object-cover" /> : (user?.name || user?.email || '?').trim().charAt(0).toUpperCase()}</button></div></header><div className="whiteboard-canvas"><div className="whiteboard-viewport" onWheel={event => {
         if (!event.ctrlKey && !event.metaKey) return;
         event.preventDefault();
         setBoardScale(scale => Math.max(0.6, Math.min(1.6, scale - event.deltaY * 0.001)));
@@ -1016,7 +1060,7 @@ function Whiteboard({
       }} onPointerUp={event => {
         setPanning(null);
         endPointerDrag(event);
-      }} onPointerCancel={endPointerDrag} onDragOver={event => event.preventDefault()} onDrop={dropWidget}><div className="whiteboard-grid" style={{
+      }} onPointerCancel={endPointerDrag}><div className="whiteboard-grid" style={{
           transform: `translate(${boardOffset.x}px, ${boardOffset.y}px) scale(${boardScale})`,
           transformOrigin: 'top left'
         }}><WidgetLinks widgets={trip.widgets} links={trip.links ?? []} onDelete={id => setTrip(current => ({
@@ -1028,34 +1072,12 @@ function Whiteboard({
           }} setDateDraft={draft => setDateDrafts(current => ({
             ...current,
             [widget.id]: draft
-          }))} onConfirmDates={() => confirmDatesInWidget(widget.id)} onExpandExplorer={() => setExplorerOpen(true)} onShowActivities={addActivitiesWidget} linkSourceId={linkSourceId} onStartLink={startLink} onCompleteLink={completeLink} onPointerDragStart={startPointerDrag} onDragStart={event => {
-            setDraggedId(widget.id);
-            event.dataTransfer.setData('text/plain', widget.id);
-            event.dataTransfer.effectAllowed = 'move';
-            const source = event.currentTarget as HTMLElement;
-            const rect = source.getBoundingClientRect();
-            const preview = source.cloneNode(true) as HTMLDivElement;
-            preview.style.width = `${rect.width}px`;
-            preview.style.height = `${rect.height}px`;
-            preview.style.position = 'fixed';
-            preview.style.top = '-10000px';
-            preview.style.left = '-10000px';
-            preview.style.transform = 'none';
-            preview.style.opacity = '1';
-            preview.style.pointerEvents = 'none';
-            document.body.appendChild(preview);
-            dragImageRef.current = preview;
-            event.dataTransfer.setDragImage(preview, event.clientX - rect.left, event.clientY - rect.top);
-          }} onDragEnd={() => {
-            dragImageRef.current?.remove();
-            dragImageRef.current = null;
-            setDraggedId(null);
-          }} />)}</div></div><div className="whiteboard-zoom-controls" role="group" aria-label="Whiteboard zoom"><button onClick={() => setBoardScale(scale => Math.min(1.6, scale + 0.1))} aria-label="Zoom in"><Plus size={16} /></button><span>{Math.round(boardScale * 100)}%</span><button onClick={() => setBoardScale(scale => Math.max(0.6, scale - 0.1))} aria-label="Zoom out"><Minus size={16} /></button></div>{hasItinerary ? <aside className="itinerary-sync-control"><button onClick={onOpenItinerary} className="flex min-w-0 items-center gap-2 text-left"><CalendarDays size={16} className="shrink-0 text-primary" /><span className="min-w-0"><span className="block text-sm font-semibold">Itinerary</span><span className="block truncate text-xs text-muted-foreground">Open your plan</span></span></button><button disabled={!itineraryNeedsSync} onClick={onItinerary} className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-card">Sync</button></aside> : <aside className="checklist-sidebar"><div className="flex items-center justify-between"><h2 className="text-xl font-semibold">{home.whiteboard.checklistTitle}</h2><span className="rounded-full bg-muted px-2.5 py-1 text-[13px] font-medium text-muted-foreground">{items.filter(Boolean).length}/3</span></div><div className="mt-4 grid gap-2">{home.whiteboard.checklist.map((item, index) => <button key={item.label} onClick={() => {
+          }))} onConfirmDates={() => confirmDatesInWidget(widget.id)} onExpandExplorer={() => setExplorerOpen(true)} onShowActivities={addActivitiesWidget} linkSourceId={linkSourceId} onStartLink={startLink} onCompleteLink={completeLink} onPointerDragStart={startPointerDrag} />)}</div></div><div className="whiteboard-zoom-controls" role="group" aria-label="Whiteboard zoom"><button onClick={() => setBoardScale(scale => Math.min(1.6, scale + 0.1))} aria-label="Zoom in"><Plus size={16} /></button><span>{Math.round(boardScale * 100)}%</span><button onClick={() => setBoardScale(scale => Math.max(0.6, scale - 0.1))} aria-label="Zoom out"><Minus size={16} /></button></div>{hasItinerary ? <aside className="itinerary-sync-control"><button onClick={onOpenItinerary} className="flex min-w-0 items-center gap-2 text-left"><CalendarDays size={16} className="shrink-0 text-primary" /><span className="min-w-0"><span className="block text-sm font-semibold">Itinerary</span><span className="block truncate text-xs text-muted-foreground">Open your plan</span></span></button><button disabled={!itineraryNeedsSync} onClick={onItinerary} className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-card">Sync</button></aside> : <aside className="checklist-sidebar"><div className="flex items-center justify-between"><h2 className="text-xl font-semibold">{home.whiteboard.checklistTitle}</h2><span className="rounded-full bg-muted px-2.5 py-1 text-[13px] font-medium text-muted-foreground">{items.filter(Boolean).length}/3</span></div><div className="mt-4 grid gap-2">{home.whiteboard.checklist.map((item, index) => <button key={item.label} onClick={() => {
             if (index === 0) setDestinationSearchOpen(true);else if (index === 1) {
               setAvailabilityFocus(true);
               window.setTimeout(() => setAvailabilityFocus(false), 2200);
             } else setExplorerOpen(true);
-          }} className="flex items-start gap-3 rounded-xl border border-border p-3 text-left transition hover:bg-muted"><span className={`mt-0.5 grid h-5 w-5 place-items-center rounded-full border ${items[index] ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-transparent'}`}><Check size={13} /></span><span><span className="block text-sm font-semibold">{item.label}</span><span className="mt-0.5 block text-[13px] leading-[18px] text-muted-foreground">{index === 0 && checklist.location ? trip.destination : index === 1 && checklist.dates ? `${trip.availability.start} – ${trip.availability.end}` : index === 2 && checklist.dates ? checklist.activities ? 'Complete' : `${checklist.activityCount} of ${checklist.confirmedDays} activities added` : items[index] ? 'Complete' : item.hint}</span></span></button>)}</div><PrimaryButton disabled={!checklist.canCreateItinerary} onClick={onItinerary} className="mt-5 w-full">{home.whiteboard.createItinerary}<ChevronRight size={17} /></PrimaryButton></aside>}<div className="whiteboard-add-control" onMouseEnter={() => setAddMenuOpen(true)} onMouseLeave={() => setAddMenuOpen(false)}><AnimatePresence>{addMenuOpen && <motion.div initial={{
+          }} className="flex items-start gap-3 rounded-xl border border-border p-3 text-left transition hover:bg-muted"><span className={`mt-0.5 grid h-5 w-5 place-items-center rounded-full border ${items[index] ? 'border-primary bg-primary text-primary-foreground' : 'border-border text-transparent'}`}><Check size={13} /></span><span><span className="block text-sm font-semibold">{item.label}</span><span className="mt-0.5 block text-[13px] leading-[18px] text-muted-foreground">{index === 0 && checklist.location ? trip.destination : index === 1 && checklist.dates ? `${trip.availability.start} – ${trip.availability.end}` : index === 2 && checklist.dates ? checklist.activities ? 'Complete' : 'Save at least one activity; free days are welcome.' : items[index] ? 'Complete' : item.hint}</span></span></button>)}</div><PrimaryButton disabled={!checklist.canCreateItinerary} onClick={onItinerary} className="mt-5 w-full">{home.whiteboard.createItinerary}<ChevronRight size={17} /></PrimaryButton></aside>}<div className="whiteboard-add-control" onMouseEnter={() => setAddMenuOpen(true)} onMouseLeave={() => setAddMenuOpen(false)}><AnimatePresence>{addMenuOpen && <motion.div initial={{
             opacity: 0,
             y: 8
           }} animate={{
@@ -1081,7 +1103,7 @@ function Whiteboard({
                   body: '',
                   author: user?.name || user?.email || 'You',
                   createdBy: user?.name || user?.email || 'You',
-                  createdAt: 'Just now',
+                  createdAt: new Date().toISOString(),
                   noteColor: 'mint'
                 }]
               }));
@@ -1110,7 +1132,7 @@ function Whiteboard({
                   selectedVotes: []
                 }]
               }));
-            }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted"><Vote size={16} className="text-primary" />Vote</button></motion.div>}</AnimatePresence><button className="whiteboard-fab" aria-label="Add to whiteboard" title="Add to whiteboard"><Plus size={20} /></button></div><p className="whiteboard-hint"><GripVertical size={15} />Drag widgets between grid cells · nothing here is a required step</p></div><AnimatePresence>{notificationsOpen && <NotificationsDrawer trip={trip} onClose={() => setNotificationsOpen(false)} />}{explorerOpen && <ExplorerModal trip={trip} setTrip={setTrip} onClose={() => setExplorerOpen(false)} />}</AnimatePresence><AnimatePresence>{destinationSearchOpen && <DestinationSearchModal query={destinationQuery} setQuery={setDestinationQuery} onClose={() => setDestinationSearchOpen(false)} onSelect={destination => {
+            }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted"><Vote size={16} className="text-primary" />Vote</button></motion.div>}</AnimatePresence><button className="whiteboard-fab" aria-label="Add to whiteboard" title="Add to whiteboard"><Plus size={20} /></button></div><p className="whiteboard-hint"><GripVertical size={15} />Drag widgets between grid cells · nothing here is a required step</p></div><AnimatePresence>{notificationsOpen && <NotificationsDrawer trip={trip} onClose={() => setNotificationsOpen(false)} />}{explorerOpen && <ExplorerModal trip={trip} setTrip={setTrip} onShowActivities={addActivitiesWidget} onClose={() => setExplorerOpen(false)} />}</AnimatePresence><AnimatePresence>{destinationSearchOpen && <DestinationSearchModal tripType={trip.type} query={destinationQuery} setQuery={setDestinationQuery} onClose={() => setDestinationSearchOpen(false)} onSelect={destination => {
         setTrip(current => ({
           ...current,
           destination
@@ -1120,19 +1142,24 @@ function Whiteboard({
       }} />}</AnimatePresence></section>;
 }
 function DestinationSearchModal({
+  tripType,
   query,
   setQuery,
   onClose,
   onSelect
 }: {
+  tripType: TripType | null;
   query: string;
   setQuery: (value: string) => void;
   onClose: () => void;
   onSelect: (destination: string) => void;
 }) {
+  const localTrip = tripType === 'day' || tripType === 'road';
+  const { nearby, setNearby, error } = useNearbyOrigin(localTrip);
+  const live = usePlaces(localTrip && !nearby ? '' : query, '', localTrip ? nearby : null);
   const normalized = query.trim().toLowerCase();
-  const results = (normalized ? destinationCatalog.filter(place => place.name.toLowerCase().includes(normalized) || place.detail.toLowerCase().includes(normalized)) : destinationCatalog).slice(0, 8);
-  return <ModalShell onClose={onClose}><h2 className="text-2xl font-semibold">Choose a destination</h2><p className="mt-1 text-sm text-muted-foreground">Search for a city, region, country, or park.</p><div className="relative mt-5"><Search size={17} className="pointer-events-none absolute left-3 top-3 text-muted-foreground" /><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search destinations" className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/20" /></div><div className="mt-3 max-h-[360px] overflow-y-auto rounded-xl border border-border p-1">{results.length ? results.map(place => <button key={place.name} onClick={() => onSelect(place.name)} className="w-full rounded-lg px-3 py-3 text-left transition hover:bg-muted"><span className="block text-sm font-semibold">{place.name}</span><span className="mt-0.5 block text-[13px] text-muted-foreground">{place.detail}</span></button>) : <p className="px-3 py-5 text-sm text-muted-foreground">No matching destination found. Try a city, region, or country.</p>}</div></ModalShell>;
+  const results = localTrip && !nearby ? [] : live.results.length ? live.results : localTrip ? [] : coordinates(query) ? [{ name: query, detail: 'Coordinates' }] : destinationCatalog.filter(place => !normalized || place.name.toLowerCase().split(/[ ,]+/).some(word => word.startsWith(normalized))).slice(0, 8);
+  return <ModalShell onClose={onClose}><h2 className="text-2xl font-semibold">Choose a destination</h2><p className="mt-1 text-sm text-muted-foreground">Search for a city, region, country, or park.</p><p className="mt-2 text-xs text-muted-foreground">{localTrip ? 'Destinations within 400 miles of your starting location.' : 'You can also enter latitude, longitude.'}</p>{localTrip && !nearby && <label className="mt-3 block text-sm">{error || 'Finding your location…'}<input aria-label="Starting coordinates" placeholder="Latitude, longitude" onChange={event => { const point = coordinates(event.target.value); if (point) setNearby(point); }} className="mt-2 w-full rounded-lg border p-2" /></label>}<div className="relative mt-5"><Search size={17} className="pointer-events-none absolute left-3 top-3 text-muted-foreground" /><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search destinations" className="h-11 w-full rounded-lg border border-border bg-background pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/20" /></div><div className="mt-3 max-h-[360px] overflow-y-auto rounded-xl border border-border p-1">{live.loading && <p className="p-2 text-sm">Searching…</p>}{live.error && <p className="p-2 text-sm">{live.error}</p>}{results.length ? results.map(place => <button key={place.name} onClick={() => onSelect(place.name)} className="w-full rounded-lg px-3 py-3 text-left transition hover:bg-muted"><span className="block text-sm font-semibold">{place.name}</span><span className="mt-0.5 block text-[13px] text-muted-foreground">{place.detail}</span></button>) : <p className="px-3 py-5 text-sm text-muted-foreground">No matching destination found. Try a city, region, or country.</p>}</div></ModalShell>;
 }
 function WidgetCard({
   widget,
@@ -1150,9 +1177,7 @@ function WidgetCard({
   linkSourceId,
   onStartLink,
   onCompleteLink,
-  onPointerDragStart,
-  onDragStart,
-  onDragEnd
+  onPointerDragStart
 }: {
   widget: Widget;
   highlightAvailability?: boolean;
@@ -1176,8 +1201,6 @@ function WidgetCard({
   onStartLink: (id: string) => void;
   onCompleteLink: (id: string) => void;
   onPointerDragStart: (event: React.PointerEvent<HTMLButtonElement>, id: string) => void;
-  onDragStart: (event: DragEvent<HTMLElement>) => void;
-  onDragEnd: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const [resizing, setResizing] = useState(false);
@@ -1226,16 +1249,10 @@ function WidgetCard({
     window.addEventListener('pointermove', onMovePointer);
     window.addEventListener('pointerup', onUp);
   };
-  return <article data-widget-id={widget.id} draggable={!resizing} onClick={() => linkSourceId && linkSourceId !== widget.id && onCompleteLink(widget.id)} onDragStart={onDragStart} onDragEnd={onDragEnd} style={gridStyle} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className={`widget-card ${highlightAvailability ? 'ring-4 ring-primary ring-offset-4 animate-pulse' : ''}`}><header className="widget-header"><button type="button" className="widget-drag-handle touch-none" onPointerDown={event => onPointerDragStart(event, widget.id)} aria-label={`Drag ${title} widget`} title="Drag to move"><GripVertical size={15} /></button><span className="flex min-w-0 items-center gap-2">{widget.type === 'availability' ? <CalendarDays size={15} className="text-primary" /> : widget.type === 'note' ? <MessageSquareText size={15} className="text-primary" /> : widget.type === 'vote' ? <Vote size={15} className="text-primary" /> : widget.type === 'activities' ? <Route size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}<span className="truncate font-semibold">{title}</span>{widget.createdBy && <span className="truncate text-[11px] font-normal text-muted-foreground">by {widget.createdBy}</span>}</span>{hovered && <span className="flex items-center gap-1"><button onClick={event => {
+  return <article data-widget-id={widget.id} draggable={false} data-resizing={resizing} onClick={() => linkSourceId && linkSourceId !== widget.id && onCompleteLink(widget.id)} style={gridStyle} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className={`widget-card ${highlightAvailability ? 'ring-4 ring-primary ring-offset-4 animate-pulse' : ''}`}><header className="widget-header"><button type="button" className="widget-drag-handle touch-none" onPointerDown={event => onPointerDragStart(event, widget.id)} aria-label={`Drag ${title} widget`} title="Drag to move"><GripVertical size={15} /></button><span className="flex min-w-0 items-center gap-2">{widget.type === 'availability' ? <CalendarDays size={15} className="text-primary" /> : widget.type === 'note' ? <MessageSquareText size={15} className="text-primary" /> : widget.type === 'vote' ? <Vote size={15} className="text-primary" /> : widget.type === 'activities' ? <Route size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}<span className="truncate font-semibold">{title}</span>{widget.createdBy && <span className="truncate text-[11px] font-normal text-muted-foreground">by {widget.createdBy}</span>}</span>{hovered && <span className="flex items-center gap-1"><button onClick={event => {
           event.stopPropagation();
           onStartLink(widget.id);
-        }} className={`widget-action ${linkSourceId === widget.id ? 'widget-link-active' : ''}`} aria-label="Link this widget" title="Link this widget"><Route size={14} /></button><button onClick={() => onMove(widget.id, 'left')} className="widget-action" aria-label="Move left">←</button><button onClick={() => onMove(widget.id, 'right')} className="widget-action" aria-label="Move right">→</button>{widget.type !== 'availability' && <button onClick={() => onDelete(widget.id)} className="widget-action" aria-label="Delete widget"><Trash2 size={14} /></button>}</span>}</header>{widget.type === 'availability' && <div className="p-4"><AvailabilityCalendar month={month} setMonth={setMonth} selectedDays={selectedDays} availabilityByDay={availabilityByDay} mode="group" totalPeople={totalPeople} /><div className="mt-4 border-t border-border pt-3"><p className="text-sm font-semibold">Confirm trip dates</p>{trip.availability.status === 'confirmed' ? <p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">Confirmed: {trip.availability.start} to {trip.availability.end}</p> : <><p className="mt-1 text-[13px] leading-[18px] text-muted-foreground">Enter the dates your group plans to travel.</p><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-[12px] font-medium text-muted-foreground">Start<input type="date" value={dateDraft.start} onChange={event => setDateDraft({
-                ...dateDraft,
-                start: event.target.value
-              })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary" /></label><label className="text-[12px] font-medium text-muted-foreground">End<input type="date" min={dateDraft.start || undefined} value={dateDraft.end} onChange={event => setDateDraft({
-                ...dateDraft,
-                end: event.target.value
-              })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs text-foreground outline-none focus:border-primary" /></label></div><button disabled={!dateDraft.start || !dateDraft.end || dateDraft.end < dateDraft.start} onClick={onConfirmDates} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"><Check size={15} />Confirm dates</button></>}<button onClick={onAvailability} className="mt-3 block text-[12px] font-semibold text-primary">{trip.availability.status === 'confirmed' ? 'Update availability' : 'Add availability'}</button></div></div>}{widget.type === 'note' && <StickyNote widget={widget} setTrip={setTrip} />}<button onPointerDown={resizeWidget} className="widget-resize-handle" aria-label={`Resize ${title} widget`} title="Drag to resize">↘</button>{widget.type === 'vote' && <VoteWidget widget={widget} setTrip={setTrip} />}{widget.type === 'map' && <ExplorerWidget trip={trip} setTrip={setTrip} onExpand={onExpandExplorer} onShowActivities={onShowActivities} />}{widget.type === 'activities' && <SavedActivitiesWidget locations={trip.locations} onDelete={id => setTrip(current => ({
+        }} className={`widget-action ${linkSourceId === widget.id ? 'widget-link-active' : ''}`} aria-label="Link this widget" title="Link this widget"><Route size={14} /></button><button onClick={() => onMove(widget.id, 'left')} className="widget-action" aria-label="Move left">←</button><button onClick={() => onMove(widget.id, 'right')} className="widget-action" aria-label="Move right">→</button>{widget.type !== 'availability' && <button onClick={() => onDelete(widget.id)} className="widget-action" aria-label="Delete widget"><Trash2 size={14} /></button>}</span>}</header>{widget.type === 'availability' && <div className="availability-widget-body p-4"><AvailabilityCalendar month={month} setMonth={setMonth} selectedDays={selectedDays} availabilityByDay={availabilityByDay} mode="group" totalPeople={totalPeople} /><div className="mt-4 border-t border-border pt-3"><p className="text-sm font-semibold">Confirm trip dates</p><p className="mt-1 text-[13px] text-muted-foreground">{trip.availability.status === 'confirmed' ? 'Change your trip dates below.' : 'Enter the dates your group plans to travel.'}</p><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-xs">{trip.type === 'day' ? 'Date' : 'Start'}<input aria-label="Trip start date" type="date" value={dateDraft.start} onChange={event => setDateDraft({ start: event.target.value, end: trip.type === 'day' ? event.target.value : dateDraft.end })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label>{trip.type !== 'day' && <label className="text-xs">End<input aria-label="Trip end date" type="date" min={dateDraft.start || undefined} value={dateDraft.end} onChange={event => setDateDraft({ ...dateDraft, end: event.target.value })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label>}</div><button disabled={!dateDraft.start || (trip.type !== 'day' && (!dateDraft.end || dateDraft.end < dateDraft.start))} onClick={onConfirmDates} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-45"><Check size={15} />{trip.availability.status === 'confirmed' ? 'Update dates' : 'Confirm dates'}</button><button onClick={onAvailability} className="mt-3 block text-[12px] font-semibold text-primary">{trip.availability.status === 'confirmed' ? 'Update availability' : 'Add availability'}</button></div></div>}{widget.type === 'note' && <StickyNote widget={widget} setTrip={setTrip} />}<button onPointerDown={resizeWidget} className="widget-resize-handle" aria-label={`Resize ${title} widget`} title="Drag to resize">↘</button>{widget.type === 'vote' && <VoteWidget widget={widget} setTrip={setTrip} />}{widget.type === 'map' && <ExplorerWidget trip={trip} setTrip={setTrip} onExpand={onExpandExplorer} onShowActivities={onShowActivities} />}{widget.type === 'activities' && <SavedActivitiesWidget locations={trip.locations} onDelete={id => setTrip(current => ({
       ...current,
       locations: current.locations.filter(place => place.id !== id)
     }))} />}</article>;
@@ -1250,70 +1267,35 @@ function WidgetLinks({
   onDelete: (id: string) => void;
 }) {
   const [hoveredLink, setHoveredLink] = useState<string | null>(null);
-  const cellWidth = 1180 / 6;
-  const rowHeight = 88;
-  const gap = 10;
-  const clearance = 22;
-  const laneGap = 12;
-  const widgetRect = (widget: Widget) => ({
-    left: widget.gridX * (cellWidth + gap),
-    top: widget.gridY * (rowHeight + gap),
-    right: widget.gridX * (cellWidth + gap) + widget.w * cellWidth + (widget.w - 1) * gap,
-    bottom: widget.gridY * (rowHeight + gap) + widget.h * rowHeight + (widget.h - 1) * gap
-  });
-  const routeFor = (link: WidgetLink, index: number) => {
-    const from = widgets.find(widget => widget.id === link.fromId);
-    const to = widgets.find(widget => widget.id === link.toId);
-    if (!from || !to) return null;
-    const a = widgetRect(from);
-    const b = widgetRect(to);
-    const explorerToActivities = from.type === 'map' && to.type === 'activities' || from.type === 'activities' && to.type === 'map';
-    if (explorerToActivities) {
-      const explorer = from.type === 'map' ? a : b;
-      const activities = from.type === 'activities' ? a : b;
-      return {
-        startX: (explorer.left + explorer.right) / 2,
-        startY: explorer.bottom,
-        endX: (activities.left + activities.right) / 2,
-        endY: activities.top,
-        routeY: Math.max(explorer.bottom, activities.top) + clearance + index * laneGap,
-        explorerToActivities: true
-      };
-    }
-    const startX = (a.left + a.right) / 2;
-    const startY = a.top;
-    const endX = (b.left + b.right) / 2;
-    const endY = b.top;
-    const routeY = Math.min(a.top, b.top) - clearance - index * laneGap;
-    return {
-      startX,
-      startY,
-      endX,
-      endY,
-      routeY,
-      explorerToActivities: false
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [rects, setRects] = useState<Record<string, BoardRect>>({});
+  useEffect(() => {
+    const grid = svgRef.current?.parentElement;
+    if (!grid) return;
+    const measure = () => {
+      const next: Record<string, BoardRect> = {};
+      grid.querySelectorAll<HTMLElement>('[data-widget-id]').forEach(element => {
+        next[element.dataset.widgetId!] = { left: element.offsetLeft, top: element.offsetTop, right: element.offsetLeft + element.offsetWidth, bottom: element.offsetTop + element.offsetHeight };
+      });
+      setRects(next);
     };
-  };
-  return <svg className="widget-links" aria-label="Widget connections">{links.map((link, index) => {
-      const route = routeFor(link, index);
-      if (!route) return null;
-      const {
-        startX,
-        startY,
-        endX,
-        endY,
-        routeY,
-        explorerToActivities
-      } = route;
-      const corner = 14;
-      const horizontalDirection = endX >= startX ? 1 : -1;
-      const verticalCorner = explorerToActivities ? routeY - corner : routeY + corner;
-      const d = `M ${startX} ${startY} V ${verticalCorner} Q ${startX} ${routeY} ${startX + horizontalDirection * corner} ${routeY} H ${endX - horizontalDirection * corner} Q ${endX} ${routeY} ${endX} ${verticalCorner} V ${endY}`;
-      const deleteX = (startX + endX) / 2;
-      const deleteY = routeY;
-      return <g key={link.id} className="widget-link-group" onMouseEnter={() => setHoveredLink(link.id)} onMouseLeave={() => setHoveredLink(null)}><path d={d} className="widget-link-hit-area" /><path d={d} className="widget-link-line" />{hoveredLink === link.id && <g className="widget-link-delete" onClick={() => onDelete(link.id)} role="button" aria-label="Delete widget connection"><circle cx={deleteX} cy={deleteY} r="11" /><path d={`M ${deleteX - 4} ${deleteY - 4} L ${deleteX + 4} ${deleteY + 4} M ${deleteX + 4} ${deleteY - 4} L ${deleteX - 4} ${deleteY + 4}`} /></g>}</g>;
-    })}</svg>;
+    const observer = new ResizeObserver(measure);
+    observer.observe(grid);
+    grid.querySelectorAll('[data-widget-id]').forEach(element => observer.observe(element));
+    measure();
+    return () => observer.disconnect();
+  }, [widgets]);
+  return <svg ref={svgRef} className="widget-links" aria-label="Widget connections">{links.map(link => {
+    const from = rects[link.fromId], to = rects[link.toId];
+    if (!from || !to) return null;
+    const points = connectionRoute(from, to, Object.values(rects));
+    if (!points.length) return null;
+    const d = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
+    const midpoint = points[Math.floor(points.length / 2)];
+    return <g key={link.id} className="widget-link-group" onMouseEnter={() => setHoveredLink(link.id)} onMouseLeave={() => setHoveredLink(null)}><path d={d} className="widget-link-hit-area" /><path d={d} className="widget-link-line" />{hoveredLink === link.id && <g className="widget-link-delete" onClick={() => onDelete(link.id)} role="button" aria-label="Delete widget connection"><circle cx={midpoint.x} cy={midpoint.y} r="11" /><text x={midpoint.x} y={midpoint.y + 4} textAnchor="middle">×</text></g>}</g>;
+  })}</svg>;
 }
+
 function SavedActivitiesWidget({
   locations,
   onDelete
@@ -1343,14 +1325,15 @@ function VoteWidget({
     ...current,
     widgets: current.widgets.map(item => item.id === widget.id ? {
       ...item,
-      h: patch.options ? Math.max(2, Math.ceil((patch.options.length + 3) / 2)) : item.h,
+      h: patch.options ? Math.max(item.h, Math.ceil((patch.options.length + (editing ? 10 : 3)) / 2)) : item.h,
       ...patch
     } : item)
   }));
   const openEditor = () => {
     setEditing(true);
+    requestAnimationFrame(() => document.querySelector(`[data-widget-id="${widget.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
     update({
-      h: Math.max(widget.h, Math.ceil(((widget.options?.length || 2) + 7) / 2))
+      h: Math.max(widget.h, Math.ceil(((widget.options?.length || 2) + 10) / 2))
     });
   };
   const closeEditor = () => {
@@ -1400,7 +1383,7 @@ function VoteWidget({
       votes: 0
     }))
   });
-  return <div className="p-4" draggable={false} onDragStart={event => event.preventDefault()}><div className="flex items-start justify-between gap-3"><p className={`text-sm font-semibold ${widget.body ? 'text-foreground' : 'text-muted-foreground'}`}>{widget.body || 'Add your question'}</p><button type="button" draggable={false} onDragStart={event => event.preventDefault()} onClick={() => editing ? closeEditor() : openEditor()} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Edit vote" title="Edit vote"><Pencil size={14} /></button></div>{editing && <div className="mt-3 grid gap-3 rounded-lg bg-muted p-3"><input value={widget.body || ''} onChange={event => update({
+  return <div className="vote-widget p-4" draggable={false} onDragStart={event => event.preventDefault()}><div className="flex items-start justify-between gap-3"><p className={`text-sm font-semibold ${widget.body ? 'text-foreground' : 'text-muted-foreground'}`}>{widget.body || 'Add your question'}</p><button type="button" draggable={false} onDragStart={event => event.preventDefault()} onClick={() => editing ? closeEditor() : openEditor()} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Edit vote" title="Edit vote"><Pencil size={14} /></button></div>{editing && <div className="mt-3 grid gap-3 rounded-lg bg-muted p-3"><input value={widget.body || ''} onChange={event => update({
         body: event.target.value
       })} aria-label="Vote question" placeholder="Add your question" className="w-full border-b border-border bg-transparent pb-2 text-sm font-semibold outline-none placeholder:text-muted-foreground focus:border-primary" /><button type="button" onClick={toggleMulti} className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground" aria-pressed={Boolean(widget.multiSelect)}><span className={`grid h-4 w-4 place-items-center border ${widget.multiSelect ? 'rounded-sm border-primary bg-primary text-primary-foreground' : 'rounded-full border-border'}`}>{widget.multiSelect && <Check size={12} />}</span>Allow multiple choices</button>{widget.options?.map((option, index) => <div key={`${widget.id}-edit-${index}`} className="flex gap-2"><input value={option.label} onChange={event => updateOption(index, event.target.value)} aria-label={`Option ${index + 1}`} placeholder={`Option ${index + 1}`} className="min-w-0 flex-1 border-b border-border bg-transparent py-1 text-sm outline-none focus:border-primary" />{(widget.options?.length || 0) > 2 && <button type="button" onClick={() => update({
           options: widget.options?.filter((_, optionIndex) => optionIndex !== index)
@@ -1409,18 +1392,20 @@ function VoteWidget({
           label: `Option ${(widget.options?.length || 0) + 1}`,
           votes: 0
         }]
-      })} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary"><Plus size={15} />Add option</button></div>}<div className="mt-4 grid gap-2">{widget.options?.map((option, index) => <button key={`${widget.id}-vote-${index}`} type="button" onClick={() => toggleVote(index)} className="flex items-center gap-2 text-left"><span className={`grid h-5 w-5 shrink-0 place-items-center border ${widget.multiSelect ? 'rounded-sm' : 'rounded-full'} ${selected.includes(index) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background'}`}>{selected.includes(index) && <Check size={13} />}</span><span className="min-w-0 flex-1 text-sm text-muted-foreground">{option.label || `Option ${index + 1}`}</span><span className="flex shrink-0 items-center gap-1.5"><span className="flex -space-x-1" aria-label={option.votes ? `Voted by ${option.votes} people` : 'No votes yet'}>{(option.voters || []).slice(0, 3).map(voter => <span key={voter.id} className="grid h-5 w-5 place-items-center rounded-full border border-background bg-primary text-[10px] font-semibold text-primary-foreground" title={voter.name}>{voter.name.trim().charAt(0).toUpperCase()}</span>)}</span><span className="text-xs text-muted-foreground">{option.votes} vote{option.votes === 1 ? '' : 's'}</span></span></button>)}</div><p className="mt-3 text-xs text-muted-foreground">{selected.length ? 'Your vote is saved. Select another option to change it.' : 'Choose an option to cast your vote.'}</p></div>;
+      })} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary"><Plus size={15} />Add option</button></div>}<div className="mt-4 grid gap-2">{widget.options?.map((option, index) => <button key={`${widget.id}-vote-${index}`} type="button" onClick={() => toggleVote(index)} className="flex items-center gap-2 text-left"><span className={`grid h-5 w-5 shrink-0 place-items-center border ${widget.multiSelect ? 'rounded-sm' : 'rounded-full'} ${selected.includes(index) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background'}`}>{selected.includes(index) && <Check size={13} />}</span><span className="min-w-0 flex-1 text-sm text-muted-foreground">{option.label || `Option ${index + 1}`}</span><span className="flex shrink-0 items-center gap-1.5"><span className="flex -space-x-1" aria-label={option.votes ? `Voted by ${option.votes} people` : 'No votes yet'}>{(option.voters || []).slice(0, 3).map(voter => <span style={avatarStyle(voter.id)} key={voter.id} className="grid h-5 w-5 place-items-center rounded-full border border-background bg-primary text-[10px] font-semibold text-primary-foreground" title={voter.name}>{voter.name.trim().charAt(0).toUpperCase()}</span>)}</span><span className="text-xs text-muted-foreground">{option.votes} vote{option.votes === 1 ? '' : 's'}</span></span></button>)}</div><p className="mt-3 text-xs text-muted-foreground">{selected.length ? 'Your vote is saved. Select another option to change it.' : 'Choose an option to cast your vote.'}</p></div>;
 }
 function ExplorerModal({
   trip,
   setTrip,
-  onClose
+  onClose,
+  onShowActivities
 }: {
   trip: Trip;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   onClose: () => void;
+  onShowActivities: () => void;
 }) {
-  return <ModalShell wide onClose={onClose}><div className="explorer-modal-content"><h2 className="shrink-0 text-2xl font-semibold">Explore {trip.destination || 'your destination'}</h2><p className="mt-1 shrink-0 text-sm text-muted-foreground">Search for places and add them to your shared map.</p><div className="explorer-modal-panel"><ExplorerWidget trip={trip} setTrip={setTrip} onExpand={() => undefined} onShowActivities={() => undefined} /></div></div></ModalShell>;
+  return <ModalShell wide onClose={onClose}><div className="explorer-modal-content"><h2 className="shrink-0 text-2xl font-semibold">Explore {trip.destination || 'your destination'}</h2><p className="mt-1 shrink-0 text-sm text-muted-foreground">Search for places and add them to your shared map.</p><div className="explorer-modal-panel"><ExplorerWidget trip={trip} setTrip={setTrip} onExpand={() => undefined} onShowActivities={() => { onShowActivities(); onClose(); }} /></div></div></ModalShell>;
 }
 type ExplorerIdea = {
   name: string;
@@ -1681,34 +1666,17 @@ function ExplorerWidget({
   onShowActivities: () => void;
 }) {
   const [query, setQuery] = useState('');
-  const destination = trip.destination || 'New York, United States';
+  const { user } = useSession();
+  const destination = trip.destination || '';
+  const [preview, setPreview] = useState<string | null>(null);
+  useEffect(() => { setPreview(null); setQuery(''); }, [destination]);
+  const live = usePlaces(query || (destination ? 'tourist attractions' : ''), destination);
   const destinationKey = Object.keys(destinationIdeas).find(key => destination.toLowerCase().includes(key));
-  const ideas = destinationKey ? destinationIdeas[destinationKey] : [{
-    name: 'Historic center walk',
-    category: 'Activity',
-    detail: `${destination} · Sightseeing`
-  }, {
-    name: 'Local food market',
-    category: 'Market',
-    detail: `${destination} · Food & drink`
-  }, {
-    name: 'Museum visit',
-    category: 'Museum',
-    detail: `${destination} · Culture`
-  }, {
-    name: 'Sunset viewpoint',
-    category: 'Activity',
-    detail: `${destination} · Scenic`
-  }, {
-    name: 'Coffee and neighborhood walk',
-    category: 'Activity',
-    detail: `${destination} · Easygoing`
-  }];
+  const fallback = destinationKey ? destinationIdeas[destinationKey] : [];
   const normalizedQuery = query.trim().toLowerCase();
-  const matchingIdeas = ideas.filter(item => `${item.name} ${item.category} ${item.detail}`.toLowerCase().includes(normalizedQuery));
   const savedNames = new Set(trip.locations.map(place => place.name));
   const hasSavedActivitiesWidget = trip.widgets.some(widget => widget.type === 'activities');
-  const suggestions = normalizedQuery ? matchingIdeas : ideas.filter(idea => !savedNames.has(idea.name)).slice(0, 6);
+  const suggestions = (live.results.length ? live.results : fallback.filter(idea => `${idea.name} ${idea.category}`.toLowerCase().includes(normalizedQuery))).filter(idea => !savedNames.has(idea.name));
   const addPlace = (idea: ExplorerIdea) => {
     if (trip.locations.some(place => place.name === idea.name)) return;
     const savedPlace = {
@@ -1722,38 +1690,16 @@ function ExplorerWidget({
       ...trip,
       locations: [...trip.locations, savedPlace],
       notifications: [...trip.notifications, {
-        actor: 'You',
+        actor: user?.name || user?.email || 'A collaborator',
         action: 'saved',
         target: idea.name,
-        timestamp: 'Just now'
+        timestamp: new Date().toISOString()
       }]
     };
     setTrip(nextTrip);
-    if (trip.id !== 'new-trip') {
-      void fetch(`/api/trips/${trip.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: nextTrip.name,
-          destination: nextTrip.destination,
-          state: nextTrip
-        })
-      }).then(async response => {
-        if (!response.ok) return;
-        const payload = (await response.json()) as {
-          trip?: Trip;
-        };
-        if (payload.trip) setTrip(current => ({
-          ...current,
-          ...payload.trip
-        }));
-      });
-    }
     setQuery('');
   };
-  return <div className="explorer-widget"><div className="explorer-search"><Search size={15} className="text-muted-foreground" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search places or activities in ${destination}`} aria-label="Search places or activities" /><div className="explorer-results">{suggestions.length ? suggestions.slice(0, normalizedQuery ? 10 : 2).map(idea => <button key={idea.name} onClick={() => addPlace(idea)}><MapPin size={14} /><span className="min-w-0 flex-1"><span className="block truncate">{idea.name}</span><span className="block truncate text-xs text-muted-foreground">{idea.category} · {idea.detail}</span></span><Plus size={14} /></button>) : <p className="px-3 py-3 text-sm text-muted-foreground">{normalizedQuery ? 'No matching ideas. Try a landmark, food, museum, park, or activity.' : 'Your recommended stops are saved. Search for another place to keep exploring.'}</p>}</div></div><div className="explorer-map"><button onClick={onExpand} className="explorer-expand" aria-label="Expand Explorer"><Expand size={15} /></button><StaticMap location={trip.locations.length ? trip.locations[trip.locations.length - 1].name : destination} markers={trip.locations.map(place => `${place.name}, ${destination}`)} height="100%" zoom={12} className="h-full w-full border-0 rounded-none" />{trip.locations.length > 0 && <div className="explorer-map-label"><button onClick={onShowActivities} className="flex min-w-0 flex-1 items-center gap-1.5 text-left" aria-label={hasSavedActivitiesWidget ? 'View saved activities' : 'Add saved activities widget'}><MapPin size={15} /><span className="truncate">{hasSavedActivitiesWidget ? `${trip.locations.length} activit${trip.locations.length === 1 ? 'y' : 'ies'} saved` : 'View saved activities'}</span></button></div>}</div></div>;
+  return <div className="explorer-widget"><div className="explorer-search"><Search size={15} className="text-muted-foreground" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search places or activities in ${destination}`} aria-label="Search places or activities" /><div className="explorer-results">{live.loading && <p className="p-2 text-xs">Searching places…</p>}{live.error && <p className="p-2 text-xs text-muted-foreground">{live.error}</p>}{live.results.length > 0 && <p className="p-2 text-xs text-muted-foreground">Google Maps</p>}{suggestions.length ? suggestions.slice(0, 20).map(idea => <div key={`${idea.name}-${idea.detail}`} className="flex items-center"><button className="min-w-0 flex-1" onClick={() => setPreview(coordinates(idea.name) ? idea.name : `${idea.name}, ${idea.detail || destination}`)}><MapPin size={14} /><span className="min-w-0 flex-1"><span className="block truncate">{idea.name}</span><span className="block truncate text-xs text-muted-foreground">{idea.category} · {idea.detail}</span></span></button><button aria-label={`Save ${idea.name}`} title={`Save ${idea.name}`} onClick={() => addPlace(idea)}><Plus size={14} /></button></div>) : <p className="px-3 py-3 text-sm text-muted-foreground">{normalizedQuery ? 'No matching ideas. Try a landmark, food, museum, park, or activity.' : 'Your recommended stops are saved. Search for another place to keep exploring.'}</p>}</div></div><div className="explorer-map"><button onClick={onExpand} className="explorer-expand" aria-label="Expand Explorer"><Expand size={15} /></button><StaticMap location={preview || destination || 'World'} markers={trip.locations.map(place => `${place.name}, ${destination}`)} height="100%" zoom={12} className="h-full w-full border-0 rounded-none" />{trip.locations.length > 0 && <div className="explorer-map-label"><button onClick={onShowActivities} className="flex min-w-0 flex-1 items-center gap-1.5 text-left" aria-label={hasSavedActivitiesWidget ? 'View saved activities' : 'Add saved activities widget'}><MapPin size={15} /><span className="truncate">{hasSavedActivitiesWidget ? `${trip.locations.length} activit${trip.locations.length === 1 ? 'y' : 'ies'} saved` : 'View saved activities'}</span></button></div>}</div></div>;
 }
 function StickyNote({
   widget,
@@ -1772,8 +1718,8 @@ function StickyNote({
   return <div className="sticky-note sticky-mint"><textarea autoFocus={!widget.body} value={widget.body || ''} onDragStart={event => event.stopPropagation()} onChange={event => update({
       body: event.target.value
     })} onBlur={() => update({
-      createdAt: widget.createdAt || 'Just now'
-    })} placeholder="Write a note…" aria-label="Note text" className="sticky-note-editor" /><footer className="sticky-note-footer"><span>From {widget.author || 'Unknown account'}</span><span>·</span><span>{widget.createdAt || 'Just now'}</span></footer></div>;
+      createdAt: widget.createdAt || new Date().toISOString()
+    })} placeholder="Write a note…" aria-label="Note text" className="sticky-note-editor" /><footer className="sticky-note-footer"><span>From {widget.author || 'Unknown account'}</span><span>·</span><span>{relativeTime(widget.createdAt || '')}</span></footer></div>;
 }
 function NotificationsDrawer({
   trip,
@@ -1782,6 +1728,8 @@ function NotificationsDrawer({
   trip: Trip;
   onClose: () => void;
 }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(timer); }, []);
   return <motion.aside className="notification-drawer" initial={{
     x: 360
   }} animate={{
@@ -1790,7 +1738,7 @@ function NotificationsDrawer({
     x: 360
   }} transition={{
     duration: 0.2
-  }}><div className="flex items-center justify-between border-b border-border p-5"><h2 className="text-xl font-semibold">Notifications</h2><button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-muted" aria-label="Close notifications"><X size={18} /></button></div><div className="p-5">{trip.notifications.length ? <div className="grid gap-3">{trip.notifications.map((notification, index) => <div key={index} className="rounded-xl border border-border bg-background p-3 text-sm"><span className="font-semibold">{notification.actor}</span> {notification.action} {notification.target}<span className="mt-1 block text-[13px] text-muted-foreground">{notification.timestamp}</span></div>)}</div> : <p className="text-[15px] leading-[22px] text-muted-foreground">Nothing new yet. Invite your group to start the conversation.</p>}</div></motion.aside>;
+  }}><div className="flex items-center justify-between border-b border-border p-5"><h2 className="text-xl font-semibold">Notifications</h2><button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-muted" aria-label="Close notifications"><X size={18} /></button></div><div className="p-5">{trip.notifications.length ? <div className="grid gap-3">{[...trip.notifications].reverse().sort((a, b) => (Date.parse(b.timestamp) || 0) - (Date.parse(a.timestamp) || 0)).map((notification, index) => <div key={index} className="rounded-xl border border-border bg-background p-3 text-sm"><span className="font-semibold">{notification.actor}</span> {notification.action} {notification.target}<span className="mt-1 block text-[13px] text-muted-foreground">{relativeTime(notification.timestamp, now)}</span></div>)}</div> : <p className="text-[15px] leading-[22px] text-muted-foreground">Nothing new yet. Invite your group to start the conversation.</p>}</div></motion.aside>;
 }
 function Itinerary({
   trip,
@@ -1962,14 +1910,14 @@ function JoinTripModal({
   onJoined: (trip: Trip) => void;
 }) {
   const navigate = useNavigate();
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => new URLSearchParams(window.location.search).get('join') || '');
   const [error, setError] = useState('');
   const join = async () => {
     if (!isAuthenticated) {
       navigate('/signup', {
         state: {
           from: {
-            pathname: '/'
+            pathname: `/?join=${encodeURIComponent(code)}`
           }
         }
       });
@@ -2000,6 +1948,7 @@ function JoinTripModal({
       }} placeholder="ABC123" className="mt-2 h-11 w-full rounded-lg border border-border bg-background px-3 text-sm uppercase outline-none focus:border-primary" /></label>{error && <p className="mt-3 text-sm text-destructive">{error}</p>}<PrimaryButton disabled={!code.trim()} onClick={join} className="mt-6 w-full">{isAuthenticated ? 'Join trip' : 'Sign in to join'}</PrimaryButton></ModalShell>;
 }
 function AvailabilityModal({
+  initialDays,
   start,
   end,
   setStart,
@@ -2007,6 +1956,7 @@ function AvailabilityModal({
   onClose,
   onSave
 }: {
+  initialDays: string[];
   start: string;
   end: string;
   setStart: (value: string) => void;
@@ -2015,10 +1965,7 @@ function AvailabilityModal({
   onSave: (days: string[]) => void;
 }) {
   const [month, setMonth] = useState(start ? new Date(`${start}T12:00:00`) : new Date());
-  const [selectedDays, setSelectedDays] = useState<string[]>(start && end ? eachDayOfInterval({
-    start: new Date(`${start}T12:00:00`),
-    end: new Date(`${end}T12:00:00`)
-  }).map(day => format(day, 'yyyy-MM-dd')) : []);
+  const [selectedDays, setSelectedDays] = useState<string[]>(initialDays);
   const toggleDay = (day: Date) => {
     const value = format(day, 'yyyy-MM-dd');
     setSelectedDays(current => current.includes(value) ? current.filter(item => item !== value) : [...current, value]);
@@ -2089,45 +2036,9 @@ function ActivityModal({
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   onClose: () => void;
 }) {
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<string | null>(null);
-  const add = () => {
-    if (!selected) return;
-    setTrip(current => ({
-      ...current,
-      destination: current.destination || selected,
-      locations: [...current.locations, {
-        id: crypto.randomUUID(),
-        name: selected,
-        category: 'Place',
-        detail: 'Added from search',
-        dayIndex: 0
-      }],
-      itinerary: current.availability.start ? [{
-        dayIndex: 0,
-        date: current.availability.start,
-        entries: [{
-          id: crypto.randomUUID(),
-          time: '',
-          title: selected,
-          cost: null,
-          status: 'planned'
-        }]
-      }] : current.itinerary,
-      notifications: [...current.notifications, {
-        actor: 'You',
-        action: 'added',
-        target: selected,
-        timestamp: 'Just now'
-      }]
-    }));
-    onClose();
-  };
-  return <ModalShell onClose={onClose} wide><div className="grid gap-6 md:grid-cols-[1fr_1fr]"><div><IconTile solid><MapPinPlus size={19} /></IconTile><h2 className="mt-5 text-xl font-semibold">Add activity or destination</h2><p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">Search for a place, then add it to the plan.</p><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="Search a city, place, or activity" className="mt-6 h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary" />{query ? <div className="mt-3 grid gap-2">{[`${query}`, `${query} nearby`, `${query} idea`].map(result => <button key={result} onClick={() => setSelected(result)} className={`rounded-xl border p-3 text-left ${selected === result ? 'border-primary bg-[hsl(var(--green-50))]' : 'border-border hover:bg-muted'}`}><span className="block text-sm font-semibold">{result}</span><span className="mt-1 block text-[13px] text-muted-foreground">Place · Add it to your trip map</span></button>)}</div> : <p className="mt-5 text-[13px] leading-[18px] text-muted-foreground">Search to see place results and pins.</p>}<PrimaryButton disabled={!selected} onClick={add} className="mt-5 w-full">Add to itinerary</PrimaryButton></div><div className="relative min-h-[320px] overflow-hidden rounded-xl bg-[hsl(var(--green-50))] p-5"><span className="absolute inset-0 opacity-50" style={{
-          backgroundImage: 'linear-gradient(45deg, transparent 48%, hsl(var(--green-200)) 49%, hsl(var(--green-200)) 51%, transparent 52%)',
-          backgroundSize: '42px 42px'
-        }} />{query ? <div className="relative grid h-full place-items-center text-center"><MapPin size={28} className="text-primary" /><p className="mt-2 text-sm font-semibold">Select a result to preview it</p></div> : <div className="relative grid h-full place-items-center text-center"><MapPin size={28} className="text-primary" /><p className="mt-2 text-sm font-semibold">Your search map will appear here</p></div>}</div></div></ModalShell>;
+  return <ModalShell onClose={onClose} wide><h2 className="text-xl font-semibold">Add an activity</h2><p className="mt-2 text-sm text-muted-foreground">Preview a place on the map, then use + to save it.</p><div className="mt-5 h-[480px]"><ExplorerWidget trip={trip} setTrip={setTrip} onExpand={() => undefined} onShowActivities={onClose} /></div><PrimaryButton onClick={onClose} className="mt-4">Done</PrimaryButton></ModalShell>;
 }
+
 function WidgetModal({
   trip,
   setTrip,
@@ -2154,7 +2065,7 @@ function WidgetModal({
       title,
       body,
       author: 'You',
-      createdAt: 'Just now',
+      createdAt: new Date().toISOString(),
       noteColor: 'mint'
     } : type === 'vote' ? {
       id,
@@ -2186,11 +2097,13 @@ function WidgetModal({
   return <ModalShell onClose={onClose}><IconTile solid>{type === 'note' ? <MessageSquareText size={19} /> : type === 'vote' ? <Vote size={19} /> : <MapPin size={19} />}</IconTile><h2 className="mt-5 text-xl font-semibold">Add a widget</h2><div className="mt-5 grid grid-cols-3 gap-2">{(['note', 'vote', 'map'] as const).map(item => <button key={item} onClick={() => setType(item)} className={`rounded-lg border px-3 py-2 text-sm font-semibold capitalize ${type === item ? 'border-primary bg-[hsl(var(--green-50))] text-primary' : 'border-border text-muted-foreground'}`}>{item}</button>)}</div>{type !== 'map' && <><label className="mt-5 block text-sm font-medium">{type === 'vote' ? 'Question' : 'Title (optional)'}<input value={title} onChange={event => setTitle(event.target.value)} placeholder={type === 'vote' ? 'Ask your group a question' : 'Give this note a title'} className="mt-2 h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary" /></label><label className="mt-4 block text-sm font-medium">{type === 'vote' ? 'Prompt' : 'Note'}<textarea value={body} onChange={event => setBody(event.target.value)} placeholder={type === 'vote' ? 'What should everyone decide?' : 'Write a thought for the group'} className="mt-2 min-h-24 w-full rounded-lg border border-border bg-background p-3 text-sm outline-none focus:border-primary" /></label>{type === 'vote' && <label className="mt-4 block text-sm font-medium">Options<input value={options} onChange={event => setOptions(event.target.value)} placeholder="Option one, option two" className="mt-2 h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary" /></label>}</>}<PrimaryButton disabled={type !== 'map' && (!body.trim() || type === 'vote' && !options.trim())} onClick={add} className="mt-6 w-full">Add widget</PrimaryButton></ModalShell>;
 }
 function InviteModal({
+  notice,
   trip,
   copied,
   copyInvite,
   onClose
 }: {
+  notice: string;
   trip: Trip;
   copied: boolean;
   copyInvite: () => void;
@@ -2198,15 +2111,29 @@ function InviteModal({
 }) {
   const boardKey = trip.joinCode || '------';
   const [copyError, setCopyError] = useState(false);
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [email, setEmail] = useState('');
+  const [inviteStatus, setInviteStatus] = useState('');
+  const [sending, setSending] = useState(false);
+  const send = async () => {
+    setSending(true); setInviteStatus('');
+    try {
+      const response = await fetch(`/api/trips/${trip.id}/invite`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to send invitation.');
+      setInviteStatus('Invitation sent. They can sign in or create an account to join.'); setEmail('');
+    } catch (error) { setInviteStatus(error instanceof Error ? error.message : 'Unable to send invitation.'); }
+    finally { setSending(false); }
+  };
   const copyBoardKey = async () => {
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
       await navigator.clipboard.writeText(boardKey);
       setCopyError(false);
-      copyInvite();
+      setKeyCopied(true);
     } catch {
       setCopyError(true);
     }
   };
-  return <ModalShell onClose={onClose}><IconTile solid><Users size={19} /></IconTile><h2 className="mt-5 text-xl font-semibold">Board key</h2><p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">Share this six-character key. Anyone who enters it while signed in can join this board with their account.</p><div className="mt-6 rounded-xl border border-border bg-muted px-4 py-5 text-center"><p className="text-xs font-semibold text-muted-foreground">Your board key</p><p className="mt-2 font-mono text-3xl font-bold tracking-[0.24em] text-foreground">{boardKey}</p></div><button disabled={!trip.joinCode} onClick={() => void copyBoardKey()} className={`mt-4 inline-flex items-center gap-2 text-sm font-semibold disabled:opacity-45 ${copied ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? 'Board key copied' : 'Copy board key'}</button>{copyError && <p className="mt-2 text-xs text-muted-foreground">Copying is unavailable here. Select the board key above to copy it.</p>}<PrimaryButton onClick={onClose} className="mt-6 w-full">Done</PrimaryButton></ModalShell>;
+  return <ModalShell onClose={onClose}><IconTile solid><Users size={19} /></IconTile><h2 className="mt-5 text-xl font-semibold">Board key</h2>{notice && <p role="status" className="mt-3 text-sm">{notice}</p>}<p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">Share this six-character key. Anyone who enters it while signed in can join this board with their account.</p><div className="mt-6 rounded-xl border border-border bg-muted px-4 py-5 text-center"><p className="text-xs font-semibold text-muted-foreground">Your board key</p><p className="mt-2 font-mono text-3xl font-bold tracking-[0.24em] text-foreground">{boardKey}</p></div><button disabled={!trip.joinCode} onClick={() => void copyBoardKey()} className={`mt-4 inline-flex items-center gap-2 text-sm font-semibold disabled:opacity-45 ${copied ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}>{copied ? <Check size={16} /> : <Copy size={16} />}{keyCopied ? 'Board key copied' : 'Copy board key'}</button>{copyError && <p className="mt-2 text-xs text-muted-foreground">Copying is unavailable here. Select the board key above to copy it.</p>}<button onClick={copyInvite} className="mt-4 ml-4 text-sm font-semibold text-primary">{copied ? 'Invite link copied' : 'Copy invite link'}</button><label className="mt-5 block text-sm">Invite by email<input type="email" value={email} onChange={event => setEmail(event.target.value)} className="mt-2 h-10 w-full rounded-lg border border-border bg-background px-3" /></label><PrimaryButton disabled={sending || !emailPattern.test(email)} onClick={() => void send()} className="mt-3 w-full">{sending ? 'Sending…' : 'Send invitation'}</PrimaryButton>{inviteStatus && <p role="status" className="mt-3 text-sm">{inviteStatus}</p>}<PrimaryButton onClick={onClose} className="mt-6 w-full">Done</PrimaryButton></ModalShell>;
 }

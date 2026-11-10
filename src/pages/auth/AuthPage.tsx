@@ -42,8 +42,8 @@ const PROVIDER_CONFIG: Record<string, {
 }> = {
   google: {
     name: 'Google',
-    bg: 'bg-white border border-gray-300 text-gray-700',
-    hover: 'hover:bg-gray-50',
+    bg: 'bg-white border border-border text-foreground',
+    hover: 'hover:dot-canvas bg-background',
     icon: <svg className="w-5 h-5" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -133,7 +133,7 @@ export default function AuthPage({
     return null;
   }
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={from} replace />;
   }
   async function handleEmailSubmit(e: FormEvent) {
     e.preventDefault();
@@ -212,16 +212,16 @@ export default function AuthPage({
     window.setTimeout(() => setSocialLoading(null), 4000);
   }
   if (isPending) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+    return <div className="min-h-screen flex items-center justify-center dot-canvas bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>;
   }
-  return <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-md">
+  return <div className="min-h-screen flex items-center justify-center dot-canvas bg-background py-12 px-4">
+      <div className="w-full max-w-md p-8 bg-card border border-border rounded-2xl shadow-sm">
         <h2 className="text-2xl font-bold text-center mb-2">
           {showEmail ? isLogin ? 'Sign In' : 'Create Account' : 'Welcome'}
         </h2>
-        {!showEmail && <p className="text-gray-600 text-center mb-6">Sign in to continue</p>}
+        {!showEmail && <p className="text-muted-foreground text-center mb-6">Sign in to continue</p>}
 
         {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
             {error}
@@ -248,10 +248,10 @@ export default function AuthPage({
         {/* Divider */}
         {showEmail && showOAuth && <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
+              <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white text-gray-500">or</span>
+              <span className="px-2 bg-white text-muted-foreground">or</span>
             </div>
           </div>}
 
@@ -259,32 +259,32 @@ export default function AuthPage({
         {showEmail && <>
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               {!isLogin && <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                  <input id="name" type="text" value={name} onChange={e => setName(e.target.value)} disabled={loading} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" placeholder="Your name" />
+                  <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1">Name</label>
+                  <input id="name" type="text" value={name} onChange={e => setName(e.target.value)} disabled={loading} className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100" placeholder="Your name" />
                 </div>}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required disabled={loading} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" placeholder="you@example.com" />
+                <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">Email</label>
+                <input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} required disabled={loading} className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100" placeholder="you@example.com" />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={isLogin ? undefined : 8} disabled={loading} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" placeholder={isLogin ? '••••••••' : 'Min 8 chars, A-Z, 0-9, special'} />
-                {!isLogin && <p className="mt-1 text-xs text-gray-500">Must include uppercase, number, and special character</p>}
+                <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1">Password</label>
+                <input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={isLogin ? undefined : 8} disabled={loading} className="w-full px-3 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-100" placeholder={isLogin ? '••••••••' : 'Min 8 chars, A-Z, 0-9, special'} />
+                {!isLogin && <p className="mt-1 text-xs text-muted-foreground">Must include uppercase, number, and special character</p>}
               </div>
-              <button type="submit" disabled={loading || socialLoading !== null} className="w-full py-2 px-4 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 disabled:opacity-50">
+              <button type="submit" disabled={loading || socialLoading !== null} className="w-full py-2 px-4 bg-primary text-white font-medium rounded-md hover:opacity-90 disabled:opacity-50">
                 {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Create Account'}
               </button>
             </form>
 
-            <p className="mt-4 text-center text-sm text-gray-600">
+            <p className="mt-4 text-center text-sm text-muted-foreground">
               {isLogin ? "Don't have an account? " : 'Already have an account? '}
-              <a href={isLogin ? '/signup' : '/login'} className="text-blue-600 hover:underline font-medium">
+              <a href={`${isLogin ? '/signup' : '/login'}?from=${encodeURIComponent(from)}`} className="text-primary hover:underline font-medium">
                 {isLogin ? 'Sign up' : 'Sign in'}
               </a>
             </p>
           </>}
 
-        {!showEmail && <p className="mt-6 text-center text-xs text-gray-500">
+        {!showEmail && <p className="mt-6 text-center text-xs text-muted-foreground">
             By continuing, you agree to our Terms of Service and Privacy Policy.
           </p>}
       </div>

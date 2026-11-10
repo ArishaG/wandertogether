@@ -3,6 +3,11 @@ import { fileURLToPath } from "node:url";
 import { dirname, extname, join } from "node:path";
 import { readFileSync } from "node:fs";
 
+import invite_post from "./api/trips/invite/POST";
+import preferences_get from "./api/preferences/GET";
+import preferences_put from "./api/preferences/PUT";
+import profile_get from "./api/profiles/GET";
+import places_get from "./api/places/GET";
 // <api-imports>
 import ai_provider_check_post_0 from "./api/ai-provider-check/POST";
 import auth_action_get_1 from "./api/auth/[action]/GET";
@@ -98,6 +103,11 @@ app.set("trust proxy", true);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get("/api/places", places_get);
+app.post("/api/trips/:id/invite", invite_post);
+app.get("/api/preferences", preferences_get);
+app.put("/api/preferences", preferences_put);
+app.get("/api/profiles/:id", profile_get);
 // <api-registrations>
 app.post("/api/ai-provider-check", ai_provider_check_post_0);
 app.get("/api/auth/:action", auth_action_get_1);

@@ -66,3 +66,8 @@ export const tripMembers = pgTable('trip_members', {
   role: varchar('role', { length: 32 }).notNull().default('guest'),
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+export const accountPreferences = pgTable('account_preferences', {
+  userId: varchar('user_id', { length: 36 }).primaryKey().references(() => user.id, { onDelete: 'cascade' }),
+  preferences: json('preferences').notNull(),
+});

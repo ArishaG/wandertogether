@@ -12,14 +12,15 @@ export default async function handler(req: Request, res: Response) {
     if (!trip) return res.status(404).json({ error: 'Trip not found.' });
 
     if (!session?.user) return res.status(401).json({ error: 'Sign in to access this board.' });
-    const memberRows = await db.select({ userId: tripMembers.userId, role: tripMembers.role, accountName: user.name, email: user.email }).from(tripMembers).leftJoin(user, eq(tripMembers.userId, user.id)).where(eq(tripMembers.tripId, tripId));
+    const memberRows = await db.select({ userId: tripMembers.userId, role: tripMembers.role, accountName: user.name, email: user.email, image: user.image }).from(tripMembers).leftJoin(user, eq(tripMembers.userId, user.id)).where(eq(tripMembers.tripId, tripId));
     const isMember = memberRows.some((member) => member.userId === session.user.id);
     if (!isMember) return res.status(403).json({ error: 'You do not have access to this trip.' });
 
-    const state = trip.state as { members?: { id?: string; name?: string; email?: string; availability?: string[]; hasSubmittedAvailability?: boolean }[] };
+    const state = trip.state as { notifications?: { actor: string; action: string; target: string; timestamp: string }[]; members?: { id?: string; name?: string; email?: string; availability?: string[]; hasSubmittedAvailability?: boolean }[] };
     res.json({
       trip: {
         ...(state as object),
+        notifications: (state.notifications || []).map(event => event.actor === 'You' && event.action === 'created' ? { ...event, actor: memberRows.find(member => member.role === 'owner')?.accountName || 'Trip owner' } : event),
         id: trip.id,
         name: trip.name,
         destination: trip.destination,
@@ -28,7 +29,7 @@ export default async function handler(req: Request, res: Response) {
           const id = member.userId ?? 'member';
           const saved = (state.members ?? []).find((item) => item.id === id);
           const availability = saved?.availability ?? [];
-          return { id, name: member.accountName ?? member.email ?? 'Member', email: member.email ?? '', role: member.role, availability, hasSubmittedAvailability: saved?.hasSubmittedAvailability === true || availability.length > 0 };
+          return { id, name: member.accountName ?? member.email ?? 'Member', email: member.email ?? '', image: member.image, role: member.role, availability, hasSubmittedAvailability: saved?.hasSubmittedAvailability === true || availability.length > 0 };
         }),
       },
     });
