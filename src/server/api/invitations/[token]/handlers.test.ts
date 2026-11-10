@@ -40,3 +40,11 @@ it('requires sign-in to accept, and refuses used or expired invitations', async 
   expect(expired.status).toBe(410);
   expect(expired.payload.status).toBe('expired');
 });
+
+it('only lets the invited email accept', async () => {
+  fixture.session = { user: { id: 'u3', email: 'intruder@example.com' } };
+  fixture.rows = [{ id: 'i1', tripId: 't1', email: 'b@example.com', status: 'pending', acceptedBy: null, expiresAt: new Date(Date.now() + 1e6) }];
+  const result = await call(acceptHandler, token);
+  expect(result.status).toBe(403);
+  expect(result.payload.code).toBe('email_mismatch');
+});

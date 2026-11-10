@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Helmet } from '@dr.pogodin/react-helmet';
 import { Link, useNavigate, useParams } from 'react-router';
 import { MapPin, Route, Users } from 'lucide-react';
-import { useSession } from '@/lib/auth/auth-client';
+import { signOut, useSession } from '@/lib/auth/auth-client';
 
 type InvitationPreview = {
   status: 'pending' | 'accepted' | 'revoked' | 'expired';
@@ -60,6 +60,10 @@ export default function InvitePage() {
     }
   };
 
+  const switchAccount = async () => {
+    try { await signOut(); } finally { navigate('/login', returnHere); }
+  };
+
   const signedInElsewhere = Boolean(invitation && user?.email && user.email.toLowerCase() !== invitation.email.toLowerCase());
   const open = invitation?.status === 'pending';
 
@@ -76,13 +80,15 @@ export default function InvitePage() {
         {invitation.destination && <p className="mt-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin size={15} />{invitation.destination}</p>}
         {!open && <p className="mt-6 rounded-lg bg-muted px-3 py-2.5 text-sm">{closedMessages[invitation.status]}</p>}
         {open && !isPending && !isAuthenticated && <>
-          <p className="mt-6 text-sm text-muted-foreground">Create a free account or sign in to accept. You'll come right back here.</p>
+          <p className="mt-6 text-sm text-muted-foreground">Sign in or create a free account with <strong className="font-semibold text-foreground">{invitation.email}</strong> to accept. You'll come right back here.</p>
           <button onClick={() => navigate('/signup', returnHere)} className={`${buttonClass} mt-4 bg-primary text-primary-foreground hover:bg-[hsl(var(--green-900))]`}>Create account to accept</button>
           <button onClick={() => navigate('/login', returnHere)} className={`${buttonClass} mt-2 border border-border hover:bg-muted`}>I already have an account</button>
         </>}
         {open && isAuthenticated && <>
-          {signedInElsewhere && <p className="mt-6 text-sm text-muted-foreground">This invitation was sent to {invitation.email}. You're signed in as {user?.email}, and you'll join with that account.</p>}
-          <button disabled={accepting} onClick={() => void accept()} className={`${buttonClass} mt-6 bg-primary text-primary-foreground hover:bg-[hsl(var(--green-900))]`}>{accepting ? 'Joining…' : 'Accept invitation'}</button>
+          {signedInElsewhere ? <>
+            <p className="mt-6 rounded-lg bg-muted px-3 py-2.5 text-sm">This invitation was sent to <strong className="font-semibold">{invitation.email}</strong>, but you're signed in as {user?.email}. Sign in with the invited email to accept it.</p>
+            <button onClick={() => void switchAccount()} className={`${buttonClass} mt-4 bg-primary text-primary-foreground hover:bg-[hsl(var(--green-900))]`}>Switch account</button>
+          </> : <button disabled={accepting} onClick={() => void accept()} className={`${buttonClass} mt-6 bg-primary text-primary-foreground hover:bg-[hsl(var(--green-900))]`}>{accepting ? 'Joining…' : 'Accept invitation'}</button>}
         </>}
         {acceptError && <p className="mt-3 text-sm text-destructive" role="alert">{acceptError}</p>}
         {invitation.status === 'accepted' && isAuthenticated && <button onClick={() => void accept()} className={`${buttonClass} mt-4 border border-border hover:bg-muted`}>Open the board</button>}

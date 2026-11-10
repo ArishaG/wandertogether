@@ -27,6 +27,10 @@ export default async function handler(req: Request, res: Response) {
       return res.json({ trip: await addMemberToTrip(trip, session.user) });
     }
     if (status !== 'pending') return res.status(410).json({ error: gone[status] ?? gone.revoked, status });
+    // Strict: only the account whose email received the invitation can accept it.
+    if ((session.user.email || '').trim().toLowerCase() !== invitation.email.toLowerCase()) {
+      return res.status(403).json({ error: `This invitation was sent to ${invitation.email}. Sign in with that email to accept it.`, code: 'email_mismatch' });
+    }
 
     const joined = await db.transaction(async tx => {
       // Claiming the row in the same transaction makes the link single-use.

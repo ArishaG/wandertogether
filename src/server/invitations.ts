@@ -41,13 +41,13 @@ function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 }
 
-export function buildInvitationEmail(input: { inviter: string; tripName: string; destination?: string | null; acceptUrl: string; expiresAt: Date }) {
+export function buildInvitationEmail(input: { to: string; inviter: string; tripName: string; destination?: string | null; acceptUrl: string; expiresAt: Date }) {
   const tripName = input.tripName.slice(0, 100);
   const inviter = input.inviter.slice(0, 100);
   const where = input.destination ? ` to ${input.destination.slice(0, 100)}` : '';
   const expires = input.expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   const subject = `${inviter} invited you to plan ${tripName} on Wander`;
-  const text = `${inviter} invited you to plan ${tripName}${where} together on Wander.\n\nAccept the invitation: ${input.acceptUrl}\n\nYou'll be asked to sign in or create a free account first. This invitation expires on ${expires}.\n\nIf you weren't expecting this, you can ignore this email.`;
+  const text = `${inviter} invited you to plan ${tripName}${where} together on Wander.\n\nAccept the invitation: ${input.acceptUrl}\n\nSign in or create a free account with this email address (${input.to}) to accept. This invitation expires on ${expires}.\n\nIf you weren't expecting this, you can ignore this email.`;
   const html = `<!doctype html><html><body style="margin:0;background:#f6f5f2;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1f2328">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;padding:32px">
@@ -56,7 +56,7 @@ export function buildInvitationEmail(input: { inviter: string; tripName: string;
 <h1 style="margin:0 0 12px;font-size:22px;line-height:28px">You're invited to plan ${escapeHtml(tripName)}</h1>
 <p style="margin:0 0 24px;font-size:15px;line-height:22px;color:#4b5563"><strong>${escapeHtml(inviter)}</strong> invited you to plan ${escapeHtml(tripName)}${escapeHtml(where)} together on Wander.</p>
 <a href="${escapeHtml(input.acceptUrl)}" style="display:inline-block;background:#1f2328;color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:12px 20px;border-radius:10px">Accept invitation</a>
-<p style="margin:24px 0 0;font-size:13px;line-height:20px;color:#6b7280">You'll be asked to sign in or create a free account first. This invitation expires on ${escapeHtml(expires)}.</p>
+<p style="margin:24px 0 0;font-size:13px;line-height:20px;color:#6b7280">Sign in or create a free account with this email address (${escapeHtml(input.to)}) to accept. This invitation expires on ${escapeHtml(expires)}.</p>
 <p style="margin:12px 0 0;font-size:12px;line-height:18px;color:#9ca3af">Button not working? Paste this link into your browser:<br><span style="word-break:break-all">${escapeHtml(input.acceptUrl)}</span></p>
 </td></tr></table>
 <p style="margin:16px 0 0;font-size:12px;color:#9ca3af">If you weren't expecting this, you can ignore this email.</p>

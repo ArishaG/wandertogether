@@ -42,7 +42,7 @@ export default async function handler(req: Request, res: Response) {
 
     const acceptUrl = `${getAppOrigin()}/invite/${token}`;
     try {
-      await sendEmail(email, buildInvitationEmail({ inviter: session.user.name || session.user.email, tripName: trip.name, destination: trip.destination, acceptUrl, expiresAt }));
+      await sendEmail(email, buildInvitationEmail({ to: email, inviter: session.user.name || session.user.email, tripName: trip.name, destination: trip.destination, acceptUrl, expiresAt }));
     } catch (error) {
       await db.update(tripInvitations).set({ status: 'revoked' }).where(eq(tripInvitations.id, id));
       return res.status(503).json({ error: error instanceof Error ? error.message : 'Unable to send invitation.' });

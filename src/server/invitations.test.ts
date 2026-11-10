@@ -21,7 +21,7 @@ it('reports pending invitations past expiry as expired', () => {
 });
 
 it('builds an email with an accept link and escapes user-controlled text', () => {
-  const email = buildInvitationEmail({ inviter: 'Ana <script>', tripName: 'Tokyo & "Kyoto"', destination: 'Japan', acceptUrl: 'https://wander.example/invite/abc', expiresAt: new Date('2026-11-24T00:00:00Z') });
+  const email = buildInvitationEmail({ to: 'b@example.com', inviter: 'Ana <script>', tripName: 'Tokyo & "Kyoto"', destination: 'Japan', acceptUrl: 'https://wander.example/invite/abc', expiresAt: new Date('2026-11-24T00:00:00Z') });
   expect(email.subject).toBe('Ana <script> invited you to plan Tokyo & "Kyoto" on Wander');
   expect(email.html).toContain('href="https://wander.example/invite/abc"');
   expect(email.html).toContain('Accept invitation');
@@ -30,4 +30,5 @@ it('builds an email with an accept link and escapes user-controlled text', () =>
   expect(email.html).not.toContain('<script>');
   expect(email.text).toContain('https://wander.example/invite/abc');
   expect(email.text).toContain('November 24, 2026');
+  expect(email.text).toContain('(b@example.com)');
 });
