@@ -1323,19 +1323,33 @@ function VoteWidget({
       ...patch
     } : item)
   }));
-  const openEditor = () => {
-    setEditing(true);
-    requestAnimationFrame(() => document.querySelector(`[data-widget-id="${widget.id}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
-    update({
-      h: Math.max(widget.h, Math.ceil(((widget.options?.length || 2) + 10) / 2))
-    });
-  };
-  const closeEditor = () => {
-    setEditing(false);
-    update({
-      h: Math.max(2, Math.ceil(((widget.options?.length || 2) + 3) / 2))
-    });
-  };
+  const contentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const content = contentRef.current;
+    const card = content?.closest<HTMLElement>('.widget-card');
+    const grid = card?.parentElement;
+    if (!content || !card || !grid) return;
+    const fitContent = () => {
+      const style = getComputedStyle(grid);
+      const row = parseFloat(style.gridAutoRows);
+      const gap = parseFloat(style.rowGap) || 0;
+      if (!row) return;
+      const header = card.querySelector<HTMLElement>('.widget-header')?.offsetHeight || 42;
+      const height = Math.max(2, Math.ceil((content.offsetHeight + header + 2 + gap) / (row + gap)));
+      setTrip(current => {
+        const saved = current.widgets.find(item => item.id === widget.id);
+        if (!saved || saved.h === height) return current;
+        return { ...current, widgets: current.widgets.map(item => item.id === widget.id ? { ...item, h: height } : item) };
+      });
+    };
+    const observer = new ResizeObserver(fitContent);
+    observer.observe(content);
+    observer.observe(grid);
+    fitContent();
+    return () => observer.disconnect();
+  }, [widget.id, setTrip]);
+  const openEditor = () => setEditing(true);
+  const closeEditor = () => setEditing(false);
   const updateOption = (index: number, label: string) => update({
     options: widget.options?.map((option, optionIndex) => optionIndex === index ? {
       ...option,
@@ -1377,7 +1391,7 @@ function VoteWidget({
       votes: 0
     }))
   });
-  return <div className="vote-widget p-4" draggable={false} onDragStart={event => event.preventDefault()}><div className="flex items-start justify-between gap-3"><p className={`text-sm font-semibold ${widget.body ? 'text-foreground' : 'text-muted-foreground'}`}>{widget.body || 'Add your question'}</p><button type="button" draggable={false} onDragStart={event => event.preventDefault()} onClick={() => editing ? closeEditor() : openEditor()} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Edit vote" title="Edit vote"><Pencil size={14} /></button></div>{editing && <div className="mt-3 grid gap-3 rounded-lg bg-muted p-3"><input value={widget.body || ''} onChange={event => update({
+  return <div ref={contentRef} className="vote-widget p-2" draggable={false} onDragStart={event => event.preventDefault()}><div className="flex items-start justify-between gap-3"><p className={`text-sm font-semibold ${widget.body ? 'text-foreground' : 'text-muted-foreground'}`}>{widget.body || 'Add your question'}</p><button type="button" draggable={false} onDragStart={event => event.preventDefault()} onClick={() => editing ? closeEditor() : openEditor()} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label={editing ? "Done editing vote" : "Edit vote"} title={editing ? "Done editing" : "Edit vote"}>{editing ? <Check size={14} /> : <Pencil size={14} />}</button></div>{editing && <div className="mt-2 grid gap-2 rounded-lg bg-muted p-2"><input value={widget.body || ''} onChange={event => update({
         body: event.target.value
       })} aria-label="Vote question" placeholder="Add your question" className="w-full border-b border-border bg-transparent pb-2 text-sm font-semibold outline-none placeholder:text-muted-foreground focus:border-primary" /><button type="button" onClick={toggleMulti} className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground" aria-pressed={Boolean(widget.multiSelect)}><span className={`grid h-4 w-4 place-items-center border ${widget.multiSelect ? 'rounded-sm border-primary bg-primary text-primary-foreground' : 'rounded-full border-border'}`}>{widget.multiSelect && <Check size={12} />}</span>Allow multiple choices</button>{widget.options?.map((option, index) => <div key={`${widget.id}-edit-${index}`} className="flex gap-2"><input value={option.label} onChange={event => updateOption(index, event.target.value)} aria-label={`Option ${index + 1}`} placeholder={`Option ${index + 1}`} className="min-w-0 flex-1 border-b border-border bg-transparent py-1 text-sm outline-none focus:border-primary" />{(widget.options?.length || 0) > 2 && <button type="button" onClick={() => update({
           options: widget.options?.filter((_, optionIndex) => optionIndex !== index)
@@ -1386,7 +1400,7 @@ function VoteWidget({
           label: `Option ${(widget.options?.length || 0) + 1}`,
           votes: 0
         }]
-      })} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary"><Plus size={15} />Add option</button></div>}<div className="mt-4 grid gap-2">{widget.options?.map((option, index) => <button key={`${widget.id}-vote-${index}`} type="button" onClick={() => toggleVote(index)} className="flex items-center gap-2 text-left"><span className={`grid h-5 w-5 shrink-0 place-items-center border ${widget.multiSelect ? 'rounded-sm' : 'rounded-full'} ${selected.includes(index) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background'}`}>{selected.includes(index) && <Check size={13} />}</span><span className="min-w-0 flex-1 text-sm text-muted-foreground">{option.label || `Option ${index + 1}`}</span><span className="flex shrink-0 items-center gap-1.5"><span className="flex -space-x-1" aria-label={option.votes ? `Voted by ${option.votes} people` : 'No votes yet'}>{(option.voters || []).slice(0, 3).map(voter => <span style={avatarStyle(voter.id)} key={voter.id} className="grid h-5 w-5 place-items-center rounded-full border border-background bg-primary text-[10px] font-semibold text-primary-foreground" title={voter.name}>{voter.name.trim().charAt(0).toUpperCase()}</span>)}</span><span className="text-xs text-muted-foreground">{option.votes} vote{option.votes === 1 ? '' : 's'}</span></span></button>)}</div><p className="mt-3 text-xs text-muted-foreground">{selected.length ? 'Your vote is saved. Select another option to change it.' : 'Choose an option to cast your vote.'}</p></div>;
+      })} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary"><Plus size={15} />Add option</button></div>}{!editing && <div className="mt-1 grid gap-1">{widget.options?.map((option, index) => <button key={`${widget.id}-vote-${index}`} type="button" onClick={() => toggleVote(index)} aria-pressed={selected.includes(index)} className="flex min-h-8 items-center gap-2 rounded-md px-1 text-left hover:bg-muted"><span className={`grid h-5 w-5 shrink-0 place-items-center border ${widget.multiSelect ? 'rounded-sm' : 'rounded-full'} ${selected.includes(index) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background'}`}>{selected.includes(index) && <Check size={13} />}</span><span className="min-w-0 flex-1 break-words text-sm text-muted-foreground">{option.label || `Option ${index + 1}`}</span><span className="flex shrink-0 items-center gap-1.5"><span className="flex -space-x-1" aria-label={option.votes ? `Voted by ${option.votes} people` : 'No votes yet'}>{(option.voters || []).slice(0, 3).map(voter => <span style={avatarStyle(voter.id)} key={voter.id} className="grid h-5 w-5 place-items-center rounded-full border border-background bg-primary text-[10px] font-semibold text-primary-foreground" title={voter.name}>{voter.name.trim().charAt(0).toUpperCase()}</span>)}</span><span className="text-xs text-muted-foreground">{option.votes} vote{option.votes === 1 ? '' : 's'}</span></span></button>)}</div>}{!editing && <p className="sr-only">{selected.length ? 'Vote saved · tap to change' : widget.multiSelect ? 'Choose one or more' : 'Choose one'}</p>}</div>;
 }
 function ExplorerModal({
   trip,

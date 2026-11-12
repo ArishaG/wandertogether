@@ -311,7 +311,7 @@
   .explorer-expand:hover { background: hsl(var(--muted)); }
   .widget-card:has(.widget-drag-handle:active) { box-shadow: var(--shadow-lg); }
   .availability-widget-body { height: calc(100% - 42px); overflow-y: auto; padding-bottom: 28px; }
-  .widget-card:has(.vote-widget) > .vote-widget { max-height: calc(100% - 42px); overflow-y: auto; }
+  .widget-card:has(.vote-widget) > .vote-widget { overflow: visible; }
   .explorer-results > div > button:last-child { width: 32px; flex: 0 0 32px; }
   .widget-drag-handle { display: grid; height: 26px; width: 22px; flex: 0 0 auto; place-items: center; cursor: grab; border-radius: 6px; color: hsl(var(--muted-foreground)); }
   .widget-drag-handle:active { cursor: grabbing; background: hsl(var(--muted)); }
