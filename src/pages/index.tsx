@@ -1087,7 +1087,7 @@ function Whiteboard({
                   type: 'vote',
                   gridX: 3,
                   gridY: Math.max(0, ...current.widgets.map(item => item.gridY + item.h)),
-                  w: 3,
+                  w: 2,
                   h: 2,
                   title: 'Vote',
                   body: '',
@@ -1192,7 +1192,8 @@ function WidgetCard({
   const [month, setMonth] = useState(trip.availability.start ? new Date(`${trip.availability.start}T12:00:00`) : new Date());
   const gridStyle = {
     gridColumn: `${widget.gridX + 1} / span ${widget.w}`,
-    gridRow: `${widget.gridY + 1} / span ${widget.h}`
+    gridRow: `${widget.gridY + 1} / span ${widget.h}`,
+    ...(widget.type === 'vote' ? { width: `${widget.w * 152}px`, maxWidth: '100%', height: 'fit-content', alignSelf: 'start' } : {})
   };
   const title = widget.type === 'availability' ? 'Availability' : widget.type === 'note' ? widget.title || 'Note' : widget.type === 'vote' ? widget.title || 'Vote' : widget.type === 'activities' ? 'Saved activities' : 'Explorer';
   const availabilityByDay = (trip.members ?? []).reduce<Record<string, number>>((counts, member) => {
@@ -1213,7 +1214,7 @@ function WidgetCard({
     const startH = widget.h;
     setResizing(true);
     const onMovePointer = (moveEvent: PointerEvent) => {
-      const minimumWidth = widget.type === 'note' || widget.type === 'vote' || widget.type === 'activities' ? 1 : 2;
+      const minimumWidth = widget.type === 'note' || widget.type === 'activities' ? 1 : 2;
       const minimumHeight = widget.type === 'note' ? 1 : 2;
       const nextW = Math.max(minimumWidth, Math.min(6 - widget.gridX, startW + Math.round((moveEvent.clientX - startX) / 120)));
       const nextH = Math.max(minimumHeight, startH + Math.round((moveEvent.clientY - startY) / 96));
@@ -1325,6 +1326,9 @@ function VoteWidget({
   }));
   const contentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    setTrip(current => ({ ...current, widgets: current.widgets.map(item => item.id === widget.id && item.w === 3 ? { ...item, w: 2 } : item) }));
+  }, [widget.id, setTrip]);
+  useEffect(() => {
     const content = contentRef.current;
     const card = content?.closest<HTMLElement>('.widget-card');
     const grid = card?.parentElement;
@@ -1391,7 +1395,7 @@ function VoteWidget({
       votes: 0
     }))
   });
-  return <div ref={contentRef} className="vote-widget p-2" draggable={false} onDragStart={event => event.preventDefault()}><div className="flex items-start justify-between gap-3"><p className={`text-sm font-semibold ${widget.body ? 'text-foreground' : 'text-muted-foreground'}`}>{widget.body || 'Add your question'}</p><button type="button" draggable={false} onDragStart={event => event.preventDefault()} onClick={() => editing ? closeEditor() : openEditor()} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label={editing ? "Done editing vote" : "Edit vote"} title={editing ? "Done editing" : "Edit vote"}>{editing ? <Check size={14} /> : <Pencil size={14} />}</button></div>{editing && <div className="mt-2 grid gap-2 rounded-lg bg-muted p-2"><input value={widget.body || ''} onChange={event => update({
+  return <div ref={contentRef} className="vote-widget p-3" draggable={false} onDragStart={event => event.preventDefault()}><div className="flex items-start justify-between gap-3"><p className={`text-sm font-semibold ${widget.body ? 'text-foreground' : 'text-muted-foreground'}`}>{widget.body || 'Add your question'}</p><button type="button" draggable={false} onDragStart={event => event.preventDefault()} onClick={() => editing ? closeEditor() : openEditor()} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label={editing ? "Done editing vote" : "Edit vote"} title={editing ? "Done editing" : "Edit vote"}>{editing ? <Check size={14} /> : <Pencil size={14} />}</button></div>{editing && <div className="mt-2 grid gap-2 rounded-lg bg-muted p-2"><input value={widget.body || ''} onChange={event => update({
         body: event.target.value
       })} aria-label="Vote question" placeholder="Add your question" className="w-full border-b border-border bg-transparent pb-2 text-sm font-semibold outline-none placeholder:text-muted-foreground focus:border-primary" /><button type="button" onClick={toggleMulti} className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground" aria-pressed={Boolean(widget.multiSelect)}><span className={`grid h-4 w-4 place-items-center border ${widget.multiSelect ? 'rounded-sm border-primary bg-primary text-primary-foreground' : 'rounded-full border-border'}`}>{widget.multiSelect && <Check size={12} />}</span>Allow multiple choices</button>{widget.options?.map((option, index) => <div key={`${widget.id}-edit-${index}`} className="flex gap-2"><input value={option.label} onChange={event => updateOption(index, event.target.value)} aria-label={`Option ${index + 1}`} placeholder={`Option ${index + 1}`} className="min-w-0 flex-1 border-b border-border bg-transparent py-1 text-sm outline-none focus:border-primary" />{(widget.options?.length || 0) > 2 && <button type="button" onClick={() => update({
           options: widget.options?.filter((_, optionIndex) => optionIndex !== index)
@@ -1400,7 +1404,7 @@ function VoteWidget({
           label: `Option ${(widget.options?.length || 0) + 1}`,
           votes: 0
         }]
-      })} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary"><Plus size={15} />Add option</button></div>}{!editing && <div className="mt-1 grid gap-1">{widget.options?.map((option, index) => <button key={`${widget.id}-vote-${index}`} type="button" onClick={() => toggleVote(index)} aria-pressed={selected.includes(index)} className="flex min-h-8 items-center gap-2 rounded-md px-1 text-left hover:bg-muted"><span className={`grid h-5 w-5 shrink-0 place-items-center border ${widget.multiSelect ? 'rounded-sm' : 'rounded-full'} ${selected.includes(index) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background'}`}>{selected.includes(index) && <Check size={13} />}</span><span className="min-w-0 flex-1 break-words text-sm text-muted-foreground">{option.label || `Option ${index + 1}`}</span><span className="flex shrink-0 items-center gap-1.5"><span className="flex -space-x-1" aria-label={option.votes ? `Voted by ${option.votes} people` : 'No votes yet'}>{(option.voters || []).slice(0, 3).map(voter => <span style={avatarStyle(voter.id)} key={voter.id} className="grid h-5 w-5 place-items-center rounded-full border border-background bg-primary text-[10px] font-semibold text-primary-foreground" title={voter.name}>{voter.name.trim().charAt(0).toUpperCase()}</span>)}</span><span className="text-xs text-muted-foreground">{option.votes} vote{option.votes === 1 ? '' : 's'}</span></span></button>)}</div>}{!editing && <p className="sr-only">{selected.length ? 'Vote saved · tap to change' : widget.multiSelect ? 'Choose one or more' : 'Choose one'}</p>}</div>;
+      })} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary"><Plus size={15} />Add option</button></div>}{!editing && <div className="mt-1 grid gap-1">{widget.options?.map((option, index) => <button key={`${widget.id}-vote-${index}`} type="button" onClick={() => toggleVote(index)} aria-pressed={selected.includes(index)} className="flex min-h-9 items-center gap-2 rounded-md px-1 text-left hover:bg-muted"><span className={`grid h-5 w-5 shrink-0 place-items-center border ${widget.multiSelect ? 'rounded-sm' : 'rounded-full'} ${selected.includes(index) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background'}`}>{selected.includes(index) && <Check size={13} />}</span><span className="min-w-0 flex-1 break-words text-sm text-muted-foreground">{option.label || `Option ${index + 1}`}</span><span className="flex shrink-0 items-center gap-1.5"><span className="flex -space-x-1" aria-label={option.votes ? `Voted by ${option.votes} people` : 'No votes yet'}>{(option.voters || []).slice(0, 3).map(voter => <span style={avatarStyle(voter.id)} key={voter.id} className="grid h-5 w-5 place-items-center rounded-full border border-background bg-primary text-[10px] font-semibold text-primary-foreground" title={voter.name}>{voter.name.trim().charAt(0).toUpperCase()}</span>)}</span><span className="text-xs text-muted-foreground">{option.votes} vote{option.votes === 1 ? '' : 's'}</span></span></button>)}</div>}{!editing && <p className="sr-only">{selected.length ? 'Vote saved · tap to change' : widget.multiSelect ? 'Choose one or more' : 'Choose one'}</p>}</div>;
 }
 function ExplorerModal({
   trip,
@@ -1915,7 +1919,7 @@ function WidgetModal({
       type,
       gridX: 3,
       gridY: nextY,
-      w: 3,
+      w: 2,
       h: 2,
       title,
       body,
