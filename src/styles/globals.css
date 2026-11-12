@@ -294,8 +294,7 @@
   .explorer-modal-panel { min-height: 0; flex: 1; margin-top: 20px; overflow: hidden; }
   .explorer-widget { display: grid; height: calc(100% - 42px); min-height: 0; overflow: hidden; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); }
   .explorer-search { position: relative; display: flex; min-height: 0; flex-direction: column; gap: 6px; overflow: hidden; border-right: 1px solid hsl(var(--border)); padding: 10px; }
-  .explorer-search > svg { position: absolute; top: 20px; left: 18px; }
-  .explorer-search input { min-width: 0; width: 100%; flex: 0 0 auto; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--background)); padding: 8px 8px 8px 28px; font-size: 12px; outline: none; }
+  .explorer-search input { min-width: 0; width: 100%; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--background)); padding: 8px; font-size: 12px; }
   .explorer-results { display: grid; min-height: 0; flex: 1; align-content: start; overflow-y: auto; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card)); }
   .explorer-results button { display: flex; width: 100%; align-items: center; gap: 6px; padding: 8px; font-size: 12px; text-align: left; }
   .explorer-results button span { flex: 1; }

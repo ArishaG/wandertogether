@@ -15,6 +15,7 @@ let board = { id: 'fixture', name: 'Sydney trip', destination: 'Sydney, Australi
 await context.route('https://www.google.com/maps**', route => route.fulfill({ contentType: 'text/html', body: '<html><body style="background:#e8f4ee">Map preview (test fixture)</body></html>' }));
 await context.route('**/api/**', async route => {
   const url = new URL(route.request().url());
+  if (url.pathname === '/api/places' && url.searchParams.get('q') === 'A place with no matches') return route.fulfill({ json: { results: [] } });
   if (url.pathname === '/api/auth/get-session') return route.fulfill({ json: { user, session: { id: 'session', token: 'fixture-token', userId: user.id, expiresAt: '2099-01-01T00:00:00Z' } } });
   if (url.pathname === '/api/places') return route.fulfill({ json: { results: !url.searchParams.get('destination') && url.searchParams.get('q') === 'L' ? [{ name: 'London', detail: 'United Kingdom', category: 'City' }, { name: 'Lisbon', detail: 'Portugal', category: 'City' }] : [{ name: 'Sydney Opera House', detail: 'Sydney, Australia', category: 'Landmark' }, { name: 'Royal Botanic Garden', detail: 'Sydney, Australia', category: 'Park' }] } });
   if (url.pathname === '/api/preferences') return route.fulfill({ json: { preferences: { phone: '', notifications: true, publicProfile: false, blockedEmails: [] } } });
@@ -31,11 +32,12 @@ try {
   await page.waitForFunction(() => document.querySelector('input[aria-label="Trip name"]')?.value === 'Sydney trip');
   assert(await page.getByRole('textbox', { name: 'Trip name' }).inputValue() === 'Sydney trip', 'direct board URL hydrates saved state');
   assert(await page.locator('.explorer-map iframe').getAttribute('src').then(src => src.includes('Sydney')), 'map initially shows the destination');
-  assert(await page.getByLabel('Trip end date').count() === 0, 'day trip hides end date');
+  assert(await page.getByLabel('Trip end date').count() === 1, 'trip dates include an editable end date');
   await page.getByLabel('Trip start date').fill('2026-11-05');
+  await page.getByLabel('Trip end date').fill('2026-11-05');
   await page.getByRole('button', { name: 'Update dates', exact: true }).click();
   await page.waitForTimeout(500);
-  assert(board.availability.start === '2026-11-05' && board.availability.end === '2026-11-05', 'confirmed day-trip date can be edited');
+  assert(board.availability.start === '2026-11-05' && board.availability.end === '2026-11-05', 'confirmed trip dates can be edited');
   await page.getByRole('button', { name: 'Sydney Opera House', exact: false }).first().click();
   assert(await page.locator('.explorer-map iframe').getAttribute('src').then(src => src.includes('Opera')), 'place click previews map');
   assert(await page.getByRole('button', { name: 'Save Sydney Opera House', exact: true }).count() === 1, 'preview does not save place');
@@ -43,6 +45,17 @@ try {
   await page.getByRole('button', { name: 'Add saved activities widget', exact: true }).click();
   await page.locator('.saved-activities-widget').waitFor();
   assert(await page.locator('.saved-activities-widget').innerText().then(text => text.includes('Opera')), 'saved activities button opens the list');
+  await page.getByRole('textbox', { name: 'Search places or activities' }).fill('A place with no matches');
+  await page.getByRole('button', { name: 'Search activities', exact: true }).click();
+  await page.getByText('No matching places found.').waitFor();
+  await page.getByRole('button', { name: 'Add activity manually', exact: true }).click();
+  await page.getByLabel('Activity name', { exact: true }).fill('Picnic with friends');
+  await page.getByLabel('Address', { exact: true }).fill('1 Mrs Macquaries Road, Sydney');
+  await page.getByRole('button', { name: 'Save activity', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('.saved-activities-widget')?.textContent.includes('Picnic with friends'));
+  assert(await page.locator('.explorer-map iframe').getAttribute('src').then(src => src.includes('Macquaries')), 'manually added activity previews its address');
+  await page.waitForTimeout(500);
+  assert(board.locations.some(place => place.name === 'Picnic with friends' && place.detail === '1 Mrs Macquaries Road, Sydney'), 'manual activity name and address persist');
   await page.getByRole('button', { name: /^Save activities/ }).click();
   await page.locator('.explorer-modal-content').getByRole('button', { name: 'View saved activities', exact: true }).click();
   await page.locator('.explorer-modal-content').waitFor({ state: 'hidden' });
@@ -70,9 +83,6 @@ try {
   await page.waitForURL('http://127.0.0.1:5173/');
   assert(new URL(page.url()).pathname === '/', 'logout in another tab redirects board to landing');
   await page.goto('http://127.0.0.1:5173/new-trip');
-  await page.locator('input').first().fill('Search test trip');
-  await page.getByRole('button', { name: /Getaway/ }).click();
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.locator('input').first().fill('L');
   await page.getByRole('button', { name: /London.*United Kingdom/ }).click();
   assert(await page.getByRole('button', { name: /London.*United Kingdom/ }).count() === 0, 'destination results close after selection');

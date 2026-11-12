@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { coordinates } from '../../../lib/planning';
 import { getAuth } from '../../../lib/auth/auth';
+import { searchActivities } from '../../activity-search';
 
 export default async function handler(req: Request, res: Response) {
   const query = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 160) : '';
@@ -8,6 +9,16 @@ export default async function handler(req: Request, res: Response) {
   const point = coordinates(query);
   if (/^-?[\d.]+\s*,\s*-?[\d.]+$/.test(query) && !point) return res.status(400).json({ error: 'Latitude must be between -90 and 90, and longitude between -180 and 180.' });
   if (point) return res.json({ results: [{ name: query, detail: 'Coordinates', category: 'Place', ...point }] });
+  if (req.query.mode === 'activities') {
+    const session = await getAuth().api.getSession({ headers: req.headers as unknown as Headers });
+    if (!session?.user) return res.status(401).json({ error: 'Sign in to search activities.' });
+    const destination = typeof req.query.destination === 'string' ? req.query.destination.trim().slice(0, 160) : '';
+    try {
+      return res.json({ results: await searchActivities(query, destination) });
+    } catch {
+      return res.status(502).json({ error: 'Activity search is temporarily unavailable.' });
+    }
+  }
   const key = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
   if (!key) return res.status(503).json({ error: 'Live place search is not configured. You can enter latitude, longitude instead.' });
   const session = await getAuth().api.getSession({ headers: req.headers as unknown as Headers });

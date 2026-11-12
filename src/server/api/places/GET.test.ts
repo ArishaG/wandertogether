@@ -27,3 +27,25 @@ it('uses the requested destination', async () => {
   expect(JSON.parse(fetchMock.mock.calls[0][1].body).textQuery).toBe('Parks in Seattle');
   expect(result.payload.results.map((place: any) => place.name)).toEqual(['Nearby park', 'London park']);
 });
+
+it('returns named activities and street addresses from Photon without a Google key', async () => {
+  vi.stubEnv('GOOGLE_MAPS_API_KEY', '');
+  vi.stubEnv('GOOGLE_PLACES_API_KEY', '');
+  const feature = (name: string, latitude: number) => ({
+    properties: { name, street: '1st Avenue', housenumber: '1300', city: 'Seattle', osm_value: 'museum' },
+    geometry: { coordinates: [-122.34, latitude] },
+  });
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ features: [feature('Seattle', 47.6)] }) })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ features: [feature('Seattle Art Museum', 47.61), feature('Distant museum', 48.5)] }) });
+  vi.stubGlobal('fetch', fetchMock);
+
+  const result = await request({ q: 'attractions', destination: 'Seattle, WA', mode: 'activities' });
+  expect(result.status).toBe(200);
+  expect(result.payload.results).toEqual([{
+    name: 'Seattle Art Museum', category: 'Museum', detail: '1300 1st Avenue, Seattle', latitude: 47.61, longitude: -122.34,
+  }]);
+  const searchUrl = new URL(fetchMock.mock.calls[1][0]);
+  expect(searchUrl.searchParams.getAll('include')).toEqual([expect.stringContaining('osm.tourism.attraction,osm.tourism.museum')]);
+  expect(searchUrl.searchParams.has('bbox')).toBe(true);
+});

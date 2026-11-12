@@ -9,7 +9,7 @@ import { home } from 'virtual:content';
 import StaticMap from '@/components/StaticMap';
 import { connectionRoute, type BoardRect } from '@/lib/connection-route';
 import { avatarStyle, coordinates, relativeTime } from '@/lib/planning';
-import { usePlaces } from '@/lib/use-places';
+import { usePlaces, type PlaceResult } from '@/lib/use-places';
 type Screen = 'landing' | 'profile' | 'onboarding' | 'whiteboard' | 'itinerary';
 type Modal = 'signup' | 'join' | 'availability' | 'activity' | 'invite' | 'widget' | null;
 type WidgetType = 'availability' | 'note' | 'vote' | 'map' | 'activities';
@@ -1402,258 +1402,11 @@ function ExplorerModal({
 }) {
   return <ModalShell wide onClose={onClose}><div className="explorer-modal-content"><h2 className="shrink-0 text-2xl font-semibold">Explore {trip.destination || 'your destination'}</h2><p className="mt-1 shrink-0 text-sm text-muted-foreground">Search for places and add them to your shared map.</p><div className="explorer-modal-panel"><ExplorerWidget trip={trip} setTrip={setTrip} onExpand={() => undefined} onShowActivities={() => { onShowActivities(); onClose(); }} /></div></div></ModalShell>;
 }
-type ExplorerIdea = {
-  name: string;
-  category: string;
-  detail: string;
-};
-const destinationIdeas: Record<string, ExplorerIdea[]> = {
-  'new york': [{
-    name: 'Statue of Liberty',
-    category: 'Landmark',
-    detail: 'Liberty Island · Sightseeing'
-  }, {
-    name: 'Times Square',
-    category: 'Landmark',
-    detail: 'Midtown Manhattan · Sightseeing'
-  }, {
-    name: 'Central Park',
-    category: 'Park',
-    detail: 'Manhattan · Outdoors'
-  }, {
-    name: 'Empire State Building',
-    category: 'Landmark',
-    detail: 'Midtown Manhattan · Observation deck'
-  }, {
-    name: 'The Metropolitan Museum of Art',
-    category: 'Museum',
-    detail: 'Upper East Side · Culture'
-  }, {
-    name: 'Museum of Modern Art',
-    category: 'Museum',
-    detail: 'Midtown Manhattan · Culture'
-  }, {
-    name: 'Brooklyn Bridge walk',
-    category: 'Activity',
-    detail: 'Manhattan to Brooklyn · Scenic walk'
-  }, {
-    name: 'High Line',
-    category: 'Park',
-    detail: 'Chelsea · Elevated park'
-  }, {
-    name: 'Chelsea Market food crawl',
-    category: 'Activity',
-    detail: 'Chelsea · Food & drink'
-  }, {
-    name: 'Broadway show',
-    category: 'Activity',
-    detail: 'Theater District · Evening'
-  }, {
-    name: 'Top of the Rock',
-    category: 'Landmark',
-    detail: 'Rockefeller Center · Observation deck'
-  }, {
-    name: 'Greenwich Village food tour',
-    category: 'Activity',
-    detail: 'Greenwich Village · Food & drink'
-  }],
-  seattle: [{
-    name: 'Space Needle',
-    category: 'Landmark',
-    detail: 'Seattle Center · Observation deck'
-  }, {
-    name: 'Pike Place Market',
-    category: 'Market',
-    detail: 'Downtown · Food & local makers'
-  }, {
-    name: 'Woodland Park Zoo',
-    category: 'Zoo',
-    detail: 'Phinney Ridge · Wildlife'
-  }, {
-    name: 'Chihuly Garden and Glass',
-    category: 'Museum',
-    detail: 'Seattle Center · Glass art'
-  }, {
-    name: 'Museum of Pop Culture',
-    category: 'Museum',
-    detail: 'Seattle Center · Music & culture'
-  }, {
-    name: 'Seattle Art Museum',
-    category: 'Museum',
-    detail: 'Downtown · Art collection'
-  }, {
-    name: 'Kerry Park',
-    category: 'Park',
-    detail: 'Queen Anne · Skyline viewpoint'
-  }, {
-    name: 'Ferry to Bainbridge Island',
-    category: 'Activity',
-    detail: 'Pier 52 · Scenic ferry ride'
-  }, {
-    name: 'Ballard Locks',
-    category: 'Landmark',
-    detail: 'Ballard · Boats & salmon ladder'
-  }, {
-    name: 'Discovery Park',
-    category: 'Park',
-    detail: 'Magnolia · Beach and trails'
-  }, {
-    name: 'Gas Works Park',
-    category: 'Park',
-    detail: 'Wallingford · Lake Union views'
-  }, {
-    name: 'Underground Tour',
-    category: 'Activity',
-    detail: 'Pioneer Square · Local history'
-  }],
-  'san francisco': [{
-    name: 'Golden Gate Bridge',
-    category: 'Landmark',
-    detail: 'Presidio · Scenic walk'
-  }, {
-    name: 'Alcatraz Island',
-    category: 'Landmark',
-    detail: 'San Francisco Bay · Historic site'
-  }, {
-    name: 'Ferry Building Marketplace',
-    category: 'Market',
-    detail: 'Embarcadero · Food & local makers'
-  }, {
-    name: 'Cable car ride',
-    category: 'Activity',
-    detail: 'Powell Street · Classic transit'
-  }, {
-    name: 'Golden Gate Park',
-    category: 'Park',
-    detail: 'West side · Gardens and museums'
-  }, {
-    name: 'Exploratorium',
-    category: 'Museum',
-    detail: 'Pier 15 · Science museum'
-  }],
-  chicago: [{
-    name: 'Millennium Park',
-    category: 'Park',
-    detail: 'Loop · Cloud Gate and gardens'
-  }, {
-    name: 'Art Institute of Chicago',
-    category: 'Museum',
-    detail: 'Grant Park · Art collection'
-  }, {
-    name: 'Architecture river cruise',
-    category: 'Activity',
-    detail: 'Chicago River · Guided sightseeing'
-  }, {
-    name: 'Navy Pier',
-    category: 'Landmark',
-    detail: 'Lakefront · Rides and views'
-  }, {
-    name: 'Museum of Science and Industry',
-    category: 'Museum',
-    detail: 'Hyde Park · Science exhibits'
-  }, {
-    name: 'Wrigley Field tour',
-    category: 'Activity',
-    detail: 'Wrigleyville · Ballpark history'
-  }],
-  london: [{
-    name: 'Tower of London',
-    category: 'Landmark',
-    detail: 'Tower Hill · Historic fortress'
-  }, {
-    name: 'British Museum',
-    category: 'Museum',
-    detail: 'Bloomsbury · World history'
-  }, {
-    name: 'Borough Market',
-    category: 'Market',
-    detail: 'Southwark · Food & drink'
-  }, {
-    name: 'Westminster Abbey',
-    category: 'Landmark',
-    detail: 'Westminster · Historic church'
-  }, {
-    name: 'Thames river cruise',
-    category: 'Activity',
-    detail: 'Central London · Scenic'
-  }, {
-    name: 'Tate Modern',
-    category: 'Museum',
-    detail: 'Bankside · Modern art'
-  }],
-  rome: [{
-    name: 'Colosseum',
-    category: 'Landmark',
-    detail: 'Centro Storico · Ancient Rome'
-  }, {
-    name: 'Vatican Museums',
-    category: 'Museum',
-    detail: 'Vatican City · Art & history'
-  }, {
-    name: 'Trevi Fountain',
-    category: 'Landmark',
-    detail: 'Trevi · Sightseeing'
-  }, {
-    name: 'Pantheon',
-    category: 'Landmark',
-    detail: 'Centro Storico · Ancient architecture'
-  }, {
-    name: 'Trastevere food walk',
-    category: 'Activity',
-    detail: 'Trastevere · Food & drink'
-  }, {
-    name: 'Villa Borghese',
-    category: 'Park',
-    detail: 'Pinciano · Gardens and gallery'
-  }],
-  paris: [{
-    name: 'Eiffel Tower',
-    category: 'Landmark',
-    detail: 'Champ de Mars · Sightseeing'
-  }, {
-    name: 'Louvre Museum',
-    category: 'Museum',
-    detail: '1st arrondissement · Culture'
-  }, {
-    name: 'Montmartre walk',
-    category: 'Activity',
-    detail: '18th arrondissement · Neighborhood walk'
-  }, {
-    name: 'Seine river cruise',
-    category: 'Activity',
-    detail: 'Central Paris · Scenic'
-  }, {
-    name: 'Le Marais food tour',
-    category: 'Activity',
-    detail: 'Le Marais · Food & drink'
-  }],
-  tokyo: [{
-    name: 'Senso-ji Temple',
-    category: 'Landmark',
-    detail: 'Asakusa · Culture'
-  }, {
-    name: 'Shibuya Crossing',
-    category: 'Landmark',
-    detail: 'Shibuya · Sightseeing'
-  }, {
-    name: 'Tsukiji Outer Market',
-    category: 'Market',
-    detail: 'Tsukiji · Food & drink'
-  }, {
-    name: 'Meiji Shrine',
-    category: 'Landmark',
-    detail: 'Harajuku · Culture'
-  }, {
-    name: 'Shinjuku night walk',
-    category: 'Activity',
-    detail: 'Shinjuku · Evening'
-  }]
-};
 function ExplorerWidget({
   trip,
   setTrip,
   onExpand,
-  onShowActivities
+  onShowActivities,
 }: {
   trip: Trip;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
@@ -1661,40 +1414,141 @@ function ExplorerWidget({
   onShowActivities: () => void;
 }) {
   const [query, setQuery] = useState('');
+  const [search, setSearch] = useState('');
+  const [preview, setPreview] = useState<string | null>(null);
+  const [manual, setManual] = useState(false);
+  const [name, setName] = useState('');
+  const [address, setAddress] = useState('');
+  const [duplicate, setDuplicate] = useState(false);
   const { user } = useSession();
   const destination = trip.destination || '';
-  const [preview, setPreview] = useState<string | null>(null);
-  useEffect(() => { setPreview(null); setQuery(''); }, [destination]);
-  const live = usePlaces(query || (destination ? 'tourist attractions' : ''), destination);
-  const destinationKey = Object.keys(destinationIdeas).find(key => destination.toLowerCase().includes(key));
-  const fallback = destinationKey ? destinationIdeas[destinationKey] : [];
-  const normalizedQuery = query.trim().toLowerCase();
-  const savedNames = new Set(trip.locations.map(place => place.name));
+  useEffect(() => {
+    setPreview(null);
+    setQuery('');
+    setSearch('');
+  }, [destination]);
+  const live = usePlaces(search || (destination ? 'attractions' : ''), destination, 'activities');
+  const placeKey = (place: Pick<PlaceResult, 'name' | 'detail'>) =>
+    [place.name, place.detail].map(value => value.trim().toLowerCase()).join('|');
+  const savedKeys = new Set(trip.locations.map(placeKey));
+  const suggestions = live.results.filter(idea => !savedKeys.has(placeKey(idea)));
   const hasSavedActivitiesWidget = trip.widgets.some(widget => widget.type === 'activities');
-  const suggestions = (live.results.length ? live.results : fallback.filter(idea => `${idea.name} ${idea.category}`.toLowerCase().includes(normalizedQuery))).filter(idea => !savedNames.has(idea.name));
-  const addPlace = (idea: ExplorerIdea) => {
-    if (trip.locations.some(place => place.name === idea.name)) return;
+
+  const previewPlace = (place: PlaceResult) => {
+    const location = place.latitude !== undefined && place.longitude !== undefined
+      ? `${place.latitude}, ${place.longitude}`
+      : [place.name, place.detail || destination].filter(Boolean).join(', ');
+    setPreview(location);
+  };
+
+  const addPlace = (idea: PlaceResult) => {
+    if (savedKeys.has(placeKey(idea))) return false;
     const savedPlace = {
       id: crypto.randomUUID(),
       name: idea.name,
       category: idea.category,
       detail: idea.detail,
-      dayIndex: null
+      dayIndex: null,
     };
-    const nextTrip = {
-      ...trip,
-      locations: [...trip.locations, savedPlace],
-      notifications: [...trip.notifications, {
-        actor: user?.name || user?.email || 'A collaborator',
-        action: 'saved',
-        target: idea.name,
-        timestamp: new Date().toISOString()
-      }]
-    };
-    setTrip(nextTrip);
-    setQuery('');
+    setTrip(current => {
+      if (current.locations.some(place => placeKey(place) === placeKey(savedPlace))) return current;
+      return {
+        ...current,
+        locations: [...current.locations, savedPlace],
+        notifications: [...current.notifications, {
+          actor: user?.name || user?.email || 'A collaborator',
+          action: 'saved',
+          target: idea.name,
+          timestamp: new Date().toISOString(),
+        }],
+      };
+    });
+    return true;
   };
-  return <div className="explorer-widget"><div className="explorer-search"><Search size={15} className="text-muted-foreground" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search places or activities in ${destination}`} aria-label="Search places or activities" /><div className="explorer-results">{live.loading && <p className="p-2 text-xs">Searching places…</p>}{live.error && <p className="p-2 text-xs text-muted-foreground">{live.error}</p>}{live.results.length > 0 && <p className="p-2 text-xs text-muted-foreground">Google Maps</p>}{suggestions.length ? suggestions.slice(0, 20).map(idea => <div key={`${idea.name}-${idea.detail}`} className="flex items-center"><button className="min-w-0 flex-1" onClick={() => setPreview(coordinates(idea.name) ? idea.name : `${idea.name}, ${idea.detail || destination}`)}><MapPin size={14} /><span className="min-w-0 flex-1"><span className="block truncate">{idea.name}</span><span className="block truncate text-xs text-muted-foreground">{idea.category} · {idea.detail}</span></span></button><button aria-label={`Save ${idea.name}`} title={`Save ${idea.name}`} onClick={() => addPlace(idea)}><Plus size={14} /></button></div>) : <p className="px-3 py-3 text-sm text-muted-foreground">{normalizedQuery ? 'No matching ideas. Try a landmark, food, museum, park, or activity.' : 'Your recommended stops are saved. Search for another place to keep exploring.'}</p>}</div></div><div className="explorer-map"><button onClick={onExpand} className="explorer-expand" aria-label="Expand Explorer"><Expand size={15} /></button><StaticMap location={preview || destination || 'World'} markers={trip.locations.map(place => `${place.name}, ${destination}`)} height="100%" zoom={12} className="h-full w-full border-0 rounded-none" />{trip.locations.length > 0 && <div className="explorer-map-label"><button onClick={onShowActivities} className="flex min-w-0 flex-1 items-center gap-1.5 text-left" aria-label={hasSavedActivitiesWidget ? 'View saved activities' : 'Add saved activities widget'}><MapPin size={15} /><span className="truncate">{hasSavedActivitiesWidget ? `${trip.locations.length} activit${trip.locations.length === 1 ? 'y' : 'ies'} saved` : 'View saved activities'}</span></button></div>}</div></div>;
+
+  return (
+    <div className="explorer-widget">
+      <div className="explorer-search">
+        <form className="flex shrink-0 gap-1" onSubmit={event => {
+          event.preventDefault();
+          setSearch(query.trim());
+          setManual(false);
+        }}>
+          <input value={query} maxLength={160} onChange={event => setQuery(event.target.value)}
+            placeholder="Try museums, parks, or a place name" aria-label="Search places or activities" />
+          <button type="submit" className="grid shrink-0 place-items-center rounded-lg bg-primary px-2.5 text-primary-foreground" aria-label="Search activities">
+            <Search size={15} />
+          </button>
+        </form>
+        <div className="explorer-results">
+          {manual ? (
+            <form className="grid gap-2 p-2.5 text-xs" onSubmit={event => {
+              event.preventDefault();
+              if (!name.trim() || !address.trim()) return;
+              const place = { name: name.trim(), detail: address.trim(), category: 'Activity' };
+              if (!addPlace(place)) { setDuplicate(true); return; }
+              setPreview(place.detail);
+              setManual(false);
+              setName('');
+              setAddress('');
+            }}>
+              <label className="grid gap-1">Activity name
+                <input autoFocus required maxLength={160} value={name} onChange={event => { setName(event.target.value); setDuplicate(false); }} />
+              </label>
+              <label className="grid gap-1">Address
+                <input required maxLength={240} value={address} onChange={event => { setAddress(event.target.value); setDuplicate(false); }} />
+              </label>
+              {duplicate && <p role="status" className="text-muted-foreground">This activity is already saved.</p>}
+              <button type="submit" disabled={!name.trim() || !address.trim()}
+                className="rounded-md bg-primary text-primary-foreground disabled:opacity-50">Save activity</button>
+            </form>
+          ) : (
+            <>
+              {live.loading && <p role="status" className="p-2 text-xs">Searching places…</p>}
+              {!live.loading && !suggestions.length && <p role="status" className="p-2 text-xs text-muted-foreground">
+                {live.error || (live.results.length ? 'These places are already saved.' : search || destination ? 'No matching places found.' : 'Search for a place by name.')}
+              </p>}
+              {suggestions.map(place => (
+                <div key={placeKey(place)} className="flex items-center">
+                  <button type="button" className="min-w-0 flex-1" onClick={() => previewPlace(place)}>
+                    <MapPin size={14} className="shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block font-medium">{place.name}</span>
+                      <span className="block text-xs text-muted-foreground">{place.category} · {place.detail}</span>
+                    </span>
+                  </button>
+                  <button type="button" aria-label={`Save ${place.name}`} title={`Save ${place.name}`} onClick={() => addPlace(place)}>
+                    <Plus size={14} />
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+        <button type="button" onClick={() => { setManual(value => !value); setDuplicate(false); }}
+          className="shrink-0 self-start text-left text-xs font-medium text-primary hover:underline">
+          {manual ? 'Back to results' : 'Add activity manually'}
+        </button>
+        {!manual && live.results.length > 0 && (
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer"
+            className="shrink-0 self-start text-[10px] text-muted-foreground hover:underline">© OpenStreetMap contributors</a>
+        )}
+      </div>
+      <div className="explorer-map">
+        <button onClick={onExpand} className="explorer-expand" aria-label="Expand Explorer"><Expand size={15} /></button>
+        <StaticMap location={preview || destination || 'World'} height="100%" zoom={12} className="h-full w-full border-0 rounded-none" />
+        {trip.locations.length > 0 && (
+          <div className="explorer-map-label">
+            <button onClick={onShowActivities} className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+              aria-label={hasSavedActivitiesWidget ? 'View saved activities' : 'Add saved activities widget'}>
+              <MapPin size={15} />
+              <span className="truncate">{hasSavedActivitiesWidget ? `${trip.locations.length} activit${trip.locations.length === 1 ? 'y' : 'ies'} saved` : 'View saved activities'}</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 function StickyNote({
   widget,
