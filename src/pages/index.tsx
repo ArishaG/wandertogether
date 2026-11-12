@@ -839,16 +839,26 @@ function Whiteboard({
       }
     }));
   };
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [viewportWidth, setViewportWidth] = useState(1180);
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const observer = new ResizeObserver(() => setViewportWidth(viewport.clientWidth));
+    observer.observe(viewport);
+    setViewportWidth(viewport.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+  const cellWidth = (Math.max(1180, viewportWidth) + 10) / 6;
   const overlaps = (candidate: Widget, other: Widget) => candidate.gridX < other.gridX + other.w && candidate.gridX + candidate.w > other.gridX && candidate.gridY < other.gridY + other.h && candidate.gridY + candidate.h > other.gridY;
-  const findOpenPosition = (widgets: Widget[], moving: Widget, preferredX: number, preferredY: number) => {
-    const maxColumns = 6;
+  const findOpenPosition = (widgets: Widget[], moving: Widget, preferredX: number, preferredY: number, expand = false) => {
     const candidates: {
       x: number;
       y: number;
     }[] = [];
     for (let radius = 0; radius < 30; radius += 1) {
       for (let y = Math.max(0, preferredY - radius); y <= preferredY + radius; y += 1) {
-        for (let x = Math.max(0, preferredX - radius); x <= Math.min(maxColumns - moving.w, preferredX + radius); x += 1) candidates.push({
+        for (let x = Math.max(0, preferredX - radius); x <= Math.min(expand ? Infinity : Math.max(6, moving.gridX + moving.w) - moving.w, preferredX + radius); x += 1) candidates.push({
           x,
           y
         });
@@ -864,16 +874,16 @@ function Whiteboard({
     }
     return {
       ...moving,
-      gridX: Math.max(0, Math.min(maxColumns - moving.w, preferredX)),
+      gridX: Math.max(0, preferredX),
       gridY: Math.max(0, preferredY)
     };
   };
   const moveWidget = (id: string, direction: 'left' | 'right' | 'up' | 'down') => setTrip(current => {
     const moving = current.widgets.find(widget => widget.id === id);
     if (!moving) return current;
-    const preferredX = Math.max(0, Math.min(6 - moving.w, moving.gridX + (direction === 'left' ? -1 : direction === 'right' ? 1 : 0)));
+    const preferredX = Math.max(0, moving.gridX + (direction === 'left' ? -1 : direction === 'right' ? 1 : 0));
     const preferredY = Math.max(0, moving.gridY + (direction === 'up' ? -1 : direction === 'down' ? 1 : 0));
-    const placed = findOpenPosition(current.widgets, moving, preferredX, preferredY);
+    const placed = findOpenPosition(current.widgets, moving, preferredX, preferredY, true);
     return {
       ...current,
       widgets: current.widgets.map(widget => widget.id === id ? placed : widget)
@@ -889,9 +899,9 @@ function Whiteboard({
     setTrip(current => {
       const moving = current.widgets.find(widget => widget.id === id);
       if (!moving) return current;
-      const preferredX = Math.max(0, Math.min(6 - moving.w, Math.round((moving.gridX * cellWidth + deltaX) / cellWidth)));
+      const preferredX = Math.max(0, Math.round((moving.gridX * cellWidth + deltaX) / cellWidth));
       const preferredY = Math.max(0, Math.round((moving.gridY * rowHeight + deltaY) / rowHeight));
-      const placed = findOpenPosition(current.widgets, moving, preferredX, preferredY);
+      const placed = findOpenPosition(current.widgets, moving, preferredX, preferredY, true);
       return {
         ...current,
         widgets: current.widgets.map(widget => widget.id === id ? placed : widget)
@@ -972,7 +982,7 @@ function Whiteboard({
     const rect = element?.getBoundingClientRect();
     if (!rect) { if (attempts > 0) window.setTimeout(() => focusWidget(widget, attempts - 1), 0); return; }
     if (rect.top >= 80 && rect.bottom <= window.innerHeight - 80 && rect.left >= 0 && rect.right <= window.innerWidth) return;
-    setBoardOffset({ x: -widget.gridX * (1180 / 6) * boardScale, y: -widget.gridY * 88 * boardScale });
+    setBoardOffset({ x: -widget.gridX * cellWidth * boardScale, y: -widget.gridY * 88 * boardScale });
   });
   const addActivitiesWidget = () => setTrip(current => {
     const existing = current.widgets.find(widget => widget.type === 'activities');
@@ -1010,7 +1020,7 @@ function Whiteboard({
         }))} placeholder="Untitled trip" className="min-w-0 max-w-[220px] bg-transparent text-sm font-semibold outline-none placeholder:text-muted-foreground" /><nav aria-label="Trip workspace" className="ml-2 hidden items-center gap-1 text-sm md:flex"><span className="rounded-lg bg-muted px-3 py-2 font-semibold">Whiteboard</span><button onClick={hasItinerary ? onOpenItinerary : onItinerary} className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground">Itinerary</button></nav></div><div className="flex items-center gap-2"><div className="relative group"><button className="flex h-10 items-center rounded-full border border-border bg-card pl-1.5 pr-2 text-primary transition hover:bg-[hsl(var(--green-50))]" title="Board members" aria-label={`${trip.members.length} board collaborators`}><span className="flex items-center">{trip.members.slice(0, 3).map((member, index) => <span style={avatarStyle(member.id || member.email)} key={member.id || member.email || index} className={`grid h-7 w-7 place-items-center rounded-full border-2 border-card bg-primary text-xs font-semibold text-primary-foreground ${index ? '-ml-2' : ''}`}>{member.image ? <img src={member.image} alt="" className="h-full w-full rounded-full object-cover" /> : memberInitial(member)}</span>)}{trip.members.length > 3 && <span className="-ml-2 grid h-7 min-w-7 place-items-center rounded-full border-2 border-card bg-muted px-1 text-[11px] font-semibold text-muted-foreground">+{trip.members.length - 3}</span>}</span><span className="ml-1.5 text-xs font-semibold text-foreground">{trip.members.length}</span></button><div className="pointer-events-none absolute right-0 top-full z-40 mt-2 hidden w-64 rounded-xl border border-border bg-card p-2 shadow-lg group-hover:block group-focus-within:block"><p className="px-2 py-1 text-xs font-semibold text-muted-foreground">Board members</p>{trip.members.length ? trip.members.map((member, index) => {
               const name = member.name || member.email || 'Guest';
               return <div key={member.id || member.email || index} className="flex items-center gap-2 rounded-lg px-2 py-2"><span style={avatarStyle(member.id || member.email)} className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{member.image ? <img src={member.image} alt="" className="h-full w-full rounded-full object-cover" /> : memberInitial(member)}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold">{name}</span><span className="block truncate text-xs text-muted-foreground">{member.role === 'owner' ? 'Board owner' : 'Joined the board'}</span></span></div>;
-            }) : <p className="px-2 py-2 text-sm text-muted-foreground">No members yet.</p>}</div></div><button onClick={() => setNotificationsOpen(!notificationsOpen)} className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground transition hover:bg-muted" aria-label="Notifications"><Bell size={18} />{unread > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />}</button><PrimaryButton onClick={() => onModal('invite')} className="h-10 rounded-full px-3 sm:px-4"><Users size={16} /><span className="hidden sm:inline">Board key</span><span className="sm:hidden">Key</span></PrimaryButton><ProfileMenu /></div></header><div className="whiteboard-canvas"><div className="whiteboard-viewport" onWheel={event => {
+            }) : <p className="px-2 py-2 text-sm text-muted-foreground">No members yet.</p>}</div></div><button onClick={() => setNotificationsOpen(!notificationsOpen)} className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground transition hover:bg-muted" aria-label="Notifications"><Bell size={18} />{unread > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />}</button><PrimaryButton onClick={() => onModal('invite')} className="h-10 rounded-full px-3 sm:px-4"><Users size={16} /><span className="hidden sm:inline">Board key</span><span className="sm:hidden">Key</span></PrimaryButton><ProfileMenu /></div></header><div className="whiteboard-canvas"><div ref={viewportRef} className="whiteboard-viewport" onWheel={event => {
         if (!event.ctrlKey && !event.metaKey) return;
         event.preventDefault();
         setBoardScale(scale => Math.max(0.6, Math.min(1.6, scale - event.deltaY * 0.001)));
@@ -1035,7 +1045,9 @@ function Whiteboard({
         endPointerDrag(event);
       }} onPointerCancel={endPointerDrag}><div className="whiteboard-grid" style={{
           transform: `translate(${boardOffset.x}px, ${boardOffset.y}px) scale(${boardScale})`,
-          transformOrigin: 'top left'
+          transformOrigin: 'top left',
+          gridTemplateColumns: `repeat(6, ${cellWidth - 10}px)`,
+          gridAutoColumns: `${cellWidth - 10}px`
         }}><WidgetLinks widgets={trip.widgets} dragOffset={dragOffset} links={trip.links ?? []} onDelete={id => setTrip(current => ({
             ...current,
             links: (current.links ?? []).filter(link => link.id !== id)
@@ -1218,7 +1230,7 @@ function WidgetCard({
     const onMovePointer = (moveEvent: PointerEvent) => {
       const minimumWidth = widget.type === 'note' || widget.type === 'activities' ? 1 : 2;
       const minimumHeight = widget.type === 'note' ? 1 : 2;
-      const nextW = Math.max(minimumWidth, Math.min(6 - widget.gridX, startW + Math.round((moveEvent.clientX - startX) / 120)));
+      const nextW = Math.max(minimumWidth, startW + Math.round((moveEvent.clientX - startX) / 120));
       const nextH = Math.max(minimumHeight, startH + Math.round((moveEvent.clientY - startY) / 96));
       setTrip(current => ({
         ...current,
