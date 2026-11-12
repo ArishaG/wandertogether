@@ -10,6 +10,7 @@ import StaticMap from '@/components/StaticMap';
 import { connectionRoute, type BoardRect } from '@/lib/connection-route';
 import { avatarStyle, coordinates, relativeTime } from '@/lib/planning';
 import { usePlaces, type PlaceResult } from '@/lib/use-places';
+import type { BoardNotification } from '@/lib/board-notifications';
 type Screen = 'landing' | 'profile' | 'onboarding' | 'whiteboard' | 'itinerary';
 type Modal = 'signup' | 'join' | 'activity' | 'invite' | 'widget' | null;
 type WidgetType = 'availability' | 'note' | 'vote' | 'map' | 'activities';
@@ -85,12 +86,7 @@ type Trip = {
     detail: string;
     dayIndex: number | null;
   }[];
-  notifications: {
-    actor: string;
-    action: string;
-    target: string;
-    timestamp: string;
-  }[];
+  notifications: BoardNotification[];
   itinerary: {
     dayIndex: number;
     date: string;
@@ -329,7 +325,6 @@ export default function HomePage() {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
       const current = tripRef.current;
-      const currentSignature = boardSignature(current);
       const save = fetch(`/api/trips/${current.id}`, {
         method: 'PUT',
         headers: {
@@ -340,9 +335,12 @@ export default function HomePage() {
           destination: current.destination,
           state: current
         })
-      }).then(response => {
+      }).then(async response => {
         if (!response.ok) throw new Error('Unable to save board changes.');
-        lastSavedSignatureRef.current = currentSignature;
+        const payload = await response.json() as { trip: Trip };
+        const notifications = payload.trip.notifications;
+        lastSavedSignatureRef.current = boardSignature({ ...current, notifications });
+        setTrip(latest => latest.id === current.id ? { ...latest, notifications } : latest);
       }).catch(() => undefined).finally(() => {
         editingRef.current = false;
         saveRequestRef.current = null;
@@ -449,28 +447,13 @@ export default function HomePage() {
       if (!response.ok || !payload.itinerary?.length) throw new Error(payload.error || 'Unable to create itinerary.');
       setTrip(current => ({
         ...current,
-        itinerary: payload.itinerary ?? [],
-        notifications: [...current.notifications, {
-          actor: 'Wander',
-          action: current.itinerary.length ? 'synced' : 'created',
-          target: 'your itinerary',
-          timestamp: new Date().toISOString()
-        }]
+        itinerary: payload.itinerary ?? []
       }));
       setItineraryBaseline(itinerarySignature);
       setItineraryStatus('idle');
     } catch (error) {
       setItineraryStatus('error');
       setItineraryError(error instanceof Error ? error.message : 'Unable to create itinerary.');
-      setTrip(current => ({
-        ...current,
-        notifications: [...current.notifications, {
-          actor: 'Wander',
-          action: 'could not create',
-          target: 'your itinerary',
-          timestamp: new Date().toISOString()
-        }]
-      }));
     }
   };
   const addInvite = () => {
@@ -1435,7 +1418,6 @@ function ExplorerWidget({
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [duplicate, setDuplicate] = useState(false);
-  const { user } = useSession();
   const destination = trip.destination || '';
   useEffect(() => {
     setPreview(null);
@@ -1469,12 +1451,6 @@ function ExplorerWidget({
       return {
         ...current,
         locations: [...current.locations, savedPlace],
-        notifications: [...current.notifications, {
-          actor: user?.name || user?.email || 'A collaborator',
-          action: 'saved',
-          target: idea.name,
-          timestamp: new Date().toISOString(),
-        }],
       };
     });
     return true;
@@ -1583,24 +1559,47 @@ function StickyNote({
       createdAt: widget.createdAt || new Date().toISOString()
     })} placeholder="Write a note…" aria-label="Note text" className="sticky-note-editor" /><footer className="sticky-note-footer"><span>From {widget.author || 'Unknown account'}</span><span>·</span><span>{relativeTime(widget.createdAt || '')}</span></footer></div>;
 }
-function NotificationsDrawer({
-  trip,
-  onClose
-}: {
-  trip: Trip;
-  onClose: () => void;
-}) {
+function NotificationsDrawer({ trip, onClose }: { trip: Trip; onClose: () => void }) {
   const [now, setNow] = useState(Date.now());
-  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(timer); }, []);
-  return <motion.aside className="notification-drawer" initial={{
-    x: 360
-  }} animate={{
-    x: 0
-  }} exit={{
-    x: 360
-  }} transition={{
-    duration: 0.2
-  }}><div className="flex items-center justify-between border-b border-border p-5"><h2 className="text-xl font-semibold">Notifications</h2><button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-muted" aria-label="Close notifications"><X size={18} /></button></div><div className="p-5">{trip.notifications.length ? <div className="grid gap-3">{[...trip.notifications].reverse().sort((a, b) => (Date.parse(b.timestamp) || 0) - (Date.parse(a.timestamp) || 0)).map((notification, index) => <div key={index} className="rounded-xl border border-border bg-background p-3 text-sm"><span className="font-semibold">{notification.actor}</span> {notification.action} {notification.target}<span className="mt-1 block text-[13px] text-muted-foreground">{relativeTime(notification.timestamp, now)}</span></div>)}</div> : <p className="text-[15px] leading-[22px] text-muted-foreground">Nothing new yet. Invite your group to start the conversation.</p>}</div></motion.aside>;
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+  const notifications = [...trip.notifications].reverse().sort((a, b) => (Date.parse(b.timestamp) || 0) - (Date.parse(a.timestamp) || 0));
+  return (
+    <motion.aside className="notification-drawer" initial={{ x: 360 }} animate={{ x: 0 }} exit={{ x: 360 }} transition={{ duration: 0.2 }}>
+      <div className="flex shrink-0 items-center justify-between border-b border-border p-5">
+        <h2 className="text-xl font-semibold">Notifications</h2>
+        <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg hover:bg-muted" aria-label="Close notifications"><X size={18} /></button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {notifications.length ? <div className="grid gap-3">{notifications.map((notification, index) => {
+          const description = <><span className="font-semibold">{notification.actor}</span> {notification.action} {notification.target}</>;
+          const validTime = Number.isFinite(Date.parse(notification.timestamp));
+          const time = <time dateTime={validTime ? notification.timestamp : undefined} title={validTime ? new Date(notification.timestamp).toLocaleString() : undefined} className="mt-1 block text-xs text-muted-foreground">{relativeTime(notification.timestamp, now)}</time>;
+          const expandable = Boolean(notification.changes?.length) || notification.target === 'the board' && (notification.action === 'updated' || notification.action.includes('change'));
+          const key = notification.id || notification.timestamp + ':' + index;
+          return expandable ? (
+            <details key={key} className="rounded-xl border border-border bg-background text-sm">
+              <summary className="cursor-pointer rounded-xl p-3 focus-visible:outline focus-visible:outline-primary">
+                {description}{time}
+                <span className="mt-2 block text-xs font-semibold text-primary">View changes{notification.changes?.length ? ' (' + notification.changes.length + ')' : ''}</span>
+              </summary>
+              <div className="grid gap-3 border-t border-border p-3">
+                {notification.changes?.length ? notification.changes.map(change => <section key={change.key}>
+                  <h3 className="text-sm font-semibold">{change.label}</h3>
+                  <dl className="mt-2 grid gap-2 text-xs">
+                    <div><dt className="font-medium text-muted-foreground">Before</dt><dd className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2">{change.before}</dd></div>
+                    <div><dt className="font-medium text-muted-foreground">After</dt><dd className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2">{change.after}</dd></div>
+                  </dl>
+                </section>) : <p className="text-xs text-muted-foreground">Specific change details were not recorded for this older notification.</p>}
+              </div>
+            </details>
+          ) : <article key={key} className="rounded-xl border border-border bg-background p-3 text-sm">{description}{time}</article>;
+        })}</div> : <p className="text-sm text-muted-foreground">Nothing new yet.</p>}
+      </div>
+    </motion.aside>
+  );
 }
 function Itinerary({
   trip,

@@ -12,6 +12,8 @@ const errors = [];
 page.on('pageerror', error => { errors.push(error.message); console.log('BROWSER ERROR', error.stack); });
 const user = { id: 'alice', name: 'Alice', email: 'alice@example.com', emailVerified: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
 let board = { id: 'fixture', name: 'Sydney trip', destination: 'Sydney, Australia', joinCode: 'ABC123', members: [{ ...user, role: 'owner', availability: ['2026-11-01'], hasSubmittedAvailability: true }], availability: { start: '2026-11-01', end: '2026-11-01', proposedDays: ['2026-11-01'], status: 'confirmed' }, widgets: [{ id: 'availability', type: 'availability', gridX: 0, gridY: 0, w: 3, h: 5 }, { id: 'explorer', type: 'map', gridX: 3, gridY: 0, w: 3, h: 4 }, { id: 'poll', type: 'vote', gridX: 3, gridY: 4, w: 3, h: 2, body: 'Where should we eat?', options: [{ label: 'Cafe', votes: 0 }, { label: 'Market', votes: 0 }] }], locations: [], notifications: [{ actor: 'Bob', action: 'created', target: 'the trip', timestamp: '2026-10-25T12:00:00Z' }, { actor: 'Alice', action: 'joined', target: 'the board', timestamp: '2026-10-26T12:00:00Z' }], itinerary: [], links: [{ id: 'link', fromId: 'availability', toId: 'poll' }] };
+board.notifications.push({ id: 'change-fixture', actor: 'Bob', action: 'updated', target: 'the board', timestamp: '2026-10-25T13:00:00Z', changes: [{ key: 'widget:packing:body', label: 'Packing text', before: 'Coat', after: 'Coat and umbrella' }] });
+board.notifications.push({ actor: 'Carol', action: 'updated', target: 'the board', timestamp: '2026-10-24T12:00:00Z' });
 await context.route('https://www.google.com/maps**', route => route.fulfill({ contentType: 'text/html', body: '<html><body style="background:#e8f4ee">Map preview (test fixture)</body></html>' }));
 await context.route('**/api/**', async route => {
   const url = new URL(route.request().url());
@@ -88,6 +90,11 @@ try {
   assert(after.height > before.height, 'poll expands when editing');
   await page.getByRole('button', { name: 'Notifications', exact: true }).click();
   assert(await page.locator('.notification-drawer').innerText().then(text => text.indexOf('Alice') < text.indexOf('Bob') && !text.includes('You created')), 'notifications use real actors and newest-first order');
+  await page.locator('.notification-drawer summary').filter({ hasText: 'Bob' }).click();
+  assert(await page.getByText('Coat', { exact: true }).isVisible() && await page.getByText('Coat and umbrella', { exact: true }).isVisible(), 'clicking a board update reveals the exact before and after change');
+  await page.locator('.notification-drawer').screenshot({ path: 'tmp/pdfs/notification-details.png' });
+  await page.locator('.notification-drawer summary').filter({ hasText: 'Carol' }).click();
+  assert(await page.getByText('Specific change details were not recorded for this older notification.').isVisible(), 'older generic notifications explain when details are unavailable');
   await page.screenshot({ path: 'tmp/pdfs/board-fixed.png', fullPage: true });
   await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
   const list = page.locator('[data-widget-id]').filter({ has: page.locator('.saved-activities-widget') });
