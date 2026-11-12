@@ -27,11 +27,28 @@ await context.route('**/api/**', async route => {
 });
 const assert = (condition, message) => { if (!condition) throw new Error(message); console.log('PASS', message); };
 try {
+  board.members[0].availability = [];
+  board.members[0].hasSubmittedAvailability = false;
   await page.goto('http://127.0.0.1:5173/trip/fixture');
   await page.getByRole('textbox', { name: 'Trip name' }).waitFor();
   await page.waitForFunction(() => document.querySelector('input[aria-label="Trip name"]')?.value === 'Sydney trip');
   assert(await page.getByRole('textbox', { name: 'Trip name' }).inputValue() === 'Sydney trip', 'direct board URL hydrates saved state');
   assert(await page.locator('.explorer-map iframe').getAttribute('src').then(src => src.includes('Sydney')), 'map initially shows the destination');
+  await page.getByRole('heading', { name: 'When are you free?', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.locator('[data-widget-id="availability"]').getByRole('button', { name: /people are free/ }).first().click();
+  await page.getByRole('heading', { name: 'When are you free?', exact: true }).waitFor();
+  assert(await page.getByRole('button', { name: 'Save availability', exact: true }).isDisabled(), 'dismissed availability can reopen from the widget');
+  await page.locator('.availability-calendar').last().getByRole('button', { name: /Mark yourself free/ }).first().click();
+  await page.locator('.availability-calendar').last().getByRole('button', { name: /Mark yourself free/ }).first().press('Enter');
+  await page.getByRole('button', { name: 'Save availability', exact: true }).click();
+  await page.getByRole('heading', { name: 'When are you free?', exact: true }).waitFor({ state: 'hidden' });
+  await page.waitForTimeout(500);
+  assert(board.members[0].availability.length === 2, 'availability saves with pointer and keyboard selection without refresh');
+  await page.getByRole('button', { name: 'Your availability', exact: true }).click();
+  await page.getByRole('heading', { name: 'When are you free?', exact: true }).waitFor();
+  assert(await page.locator('.availability-calendar').last().locator('.availability-selected').count() === 2, 'reopening availability restores saved selections');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   assert(await page.getByLabel('Trip end date').count() === 1, 'trip dates include an editable end date');
   await page.getByLabel('Trip start date').fill('2026-11-05');
   await page.getByLabel('Trip end date').fill('2026-11-05');
