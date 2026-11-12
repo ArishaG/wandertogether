@@ -803,6 +803,7 @@ function Whiteboard({
     startY: number;
     moved: boolean;
   } | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ id: string; x: number; y: number } | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [dateDrafts, setDateDrafts] = useState<Record<string, {
     start: string;
@@ -915,6 +916,7 @@ function Whiteboard({
     if (!active || active.pointerId !== event.pointerId) return;
     const card = document.querySelector<HTMLElement>(`[data-widget-id="${active.id}"]`);
     if (card) { card.style.transform = `translate(${(event.clientX - active.startX) / boardScale}px, ${(event.clientY - active.startY) / boardScale}px)`; card.style.zIndex = '20'; card.style.transition = 'none'; }
+    setDragOffset({ id: active.id, x: (event.clientX - active.startX) / boardScale, y: (event.clientY - active.startY) / boardScale });
     if (Math.abs(event.clientX - active.startX) + Math.abs(event.clientY - active.startY) > 4) active.moved = true;
   };
   const endPointerDrag = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -924,6 +926,7 @@ function Whiteboard({
     const card = document.querySelector<HTMLElement>(`[data-widget-id="${active.id}"]`);
     if (card) { card.style.transform = ''; card.style.zIndex = ''; card.style.transition = ''; }
     pointerDragRef.current = null;
+    setDragOffset(null);
   };
   const endPointerDragFromWindow = (event: PointerEvent) => {
     const active = pointerDragRef.current;
@@ -933,6 +936,7 @@ function Whiteboard({
     const card = document.querySelector<HTMLElement>(`[data-widget-id="${active.id}"]`);
     if (card) { card.style.transform = ''; card.style.zIndex = ''; card.style.transition = ''; }
     pointerDragRef.current = null;
+    setDragOffset(null);
   };
   useEffect(() => {
     window.addEventListener('pointerup', endPointerDragFromWindow);
@@ -1032,7 +1036,7 @@ function Whiteboard({
       }} onPointerCancel={endPointerDrag}><div className="whiteboard-grid" style={{
           transform: `translate(${boardOffset.x}px, ${boardOffset.y}px) scale(${boardScale})`,
           transformOrigin: 'top left'
-        }}><WidgetLinks widgets={trip.widgets} links={trip.links ?? []} onDelete={id => setTrip(current => ({
+        }}><WidgetLinks widgets={trip.widgets} dragOffset={dragOffset} links={trip.links ?? []} onDelete={id => setTrip(current => ({
             ...current,
             links: (current.links ?? []).filter(link => link.id !== id)
           }))} />{trip.widgets.map(widget => <WidgetCard key={widget.id} widget={widget} highlightAvailability={availabilityFocus && widget.type === 'availability'} trip={trip} setTrip={setTrip} onMove={moveWidget} onDelete={deleteWidget} onSaveAvailability={onSaveAvailability} dateDraft={dateDrafts[widget.id] || {
@@ -1252,10 +1256,12 @@ function WidgetCard({
 }
 function WidgetLinks({
   widgets,
+  dragOffset,
   links,
   onDelete
 }: {
   widgets: Widget[];
+  dragOffset: { id: string; x: number; y: number } | null;
   links: WidgetLink[];
   onDelete: (id: string) => void;
 }) {
@@ -1278,10 +1284,15 @@ function WidgetLinks({
     measure();
     return () => observer.disconnect();
   }, [widgets]);
+  const liveRects = { ...rects };
+  if (dragOffset && rects[dragOffset.id]) {
+    const rect = rects[dragOffset.id];
+    liveRects[dragOffset.id] = { left: rect.left + dragOffset.x, right: rect.right + dragOffset.x, top: rect.top + dragOffset.y, bottom: rect.bottom + dragOffset.y };
+  }
   return <svg ref={svgRef} className="widget-links" aria-label="Widget connections">{links.map(link => {
-    const from = rects[link.fromId], to = rects[link.toId];
+    const from = liveRects[link.fromId], to = liveRects[link.toId];
     if (!from || !to) return null;
-    const points = connectionRoute(from, to, Object.values(rects));
+    const points = connectionRoute(from, to, Object.values(liveRects));
     if (!points.length) return null;
     const d = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
     const midpoint = points[Math.floor(points.length / 2)];
