@@ -314,10 +314,12 @@
   .widget-card:has(.vote-widget) > .vote-widget { overflow: visible; }
   .explorer-results > div > button:last-child { width: 32px; flex: 0 0 32px; }
   .widget-drag-handle { display: grid; height: 26px; width: 22px; flex: 0 0 auto; place-items: center; cursor: grab; border-radius: 6px; color: hsl(var(--muted-foreground)); }
+  .widget-header:active { cursor: grabbing; }
+  .widget-header button { cursor: pointer; }
   .widget-drag-handle:active { cursor: grabbing; background: hsl(var(--muted)); }
   .widget-resize-handle { position: absolute; right: 5px; bottom: 4px; z-index: 5; display: grid; height: 22px; width: 22px; place-items: center; cursor: nwse-resize; border-radius: 5px; color: hsl(var(--muted-foreground)); font-size: 14px; line-height: 1; }
   .widget-resize-handle:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
-  .widget-header { display: flex; min-height: 42px; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid hsl(var(--border)); padding: 0 12px; font-size: 13px; }
+  .widget-header { cursor: grab; touch-action: none; user-select: none; display: flex; min-height: 42px; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid hsl(var(--border)); padding: 0 12px; font-size: 13px; }
   .widget-action { display: grid; height: 24px; width: 24px; place-items: center; border-radius: 6px; color: hsl(var(--muted-foreground)); }
   .widget-action:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
   .checklist-sidebar { position: fixed; right: 20px; top: 84px; z-index: 10; width: 320px; border: 1px solid hsl(var(--border)); border-radius: 16px; background: hsl(var(--card)); padding: 20px; box-shadow: var(--shadow-sm); }

@@ -899,7 +899,7 @@ function Whiteboard({
       };
     });
   };
-  const startPointerDrag = (event: React.PointerEvent<HTMLButtonElement>, id: string) => {
+  const startPointerDrag = (event: React.PointerEvent<HTMLElement>, id: string) => {
     if (event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1167,7 +1167,7 @@ function WidgetCard({
   linkSourceId: string | null;
   onStartLink: (id: string) => void;
   onCompleteLink: (id: string) => void;
-  onPointerDragStart: (event: React.PointerEvent<HTMLButtonElement>, id: string) => void;
+  onPointerDragStart: (event: React.PointerEvent<HTMLElement>, id: string) => void;
 }) {
   const { user } = useSession();
   const personalDays = trip.members.find(member => member.id === user?.id)?.availability ?? [];
@@ -1235,7 +1235,7 @@ function WidgetCard({
     window.addEventListener('pointermove', onMovePointer);
     window.addEventListener('pointerup', onUp);
   };
-  return <article data-widget-id={widget.id} draggable={false} data-resizing={resizing} onClick={() => linkSourceId && linkSourceId !== widget.id && onCompleteLink(widget.id)} style={gridStyle} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className={`widget-card ${highlightAvailability ? 'ring-4 ring-primary ring-offset-4 animate-pulse' : ''}`}><header className="widget-header"><button type="button" className="widget-drag-handle touch-none" onPointerDown={event => onPointerDragStart(event, widget.id)} aria-label={`Drag ${title} widget`} title="Drag to move"><GripVertical size={15} /></button><span className="flex min-w-0 items-center gap-2">{widget.type === 'availability' ? <CalendarDays size={15} className="text-primary" /> : widget.type === 'note' ? <MessageSquareText size={15} className="text-primary" /> : widget.type === 'vote' ? <Vote size={15} className="text-primary" /> : widget.type === 'activities' ? <Route size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}<span className="truncate font-semibold">{title}</span>{widget.createdBy && <span className="truncate text-[11px] font-normal text-muted-foreground">by {widget.createdBy}</span>}</span>{widget.type === 'availability' && <button type="button" onClick={event => { event.stopPropagation(); if (!editingAvailability) beginAvailability(); }} className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-muted">Your availability</button>}{hovered && <span className="flex items-center gap-1"><button onClick={event => {
+  return <article data-widget-id={widget.id} draggable={false} data-resizing={resizing} onClick={() => linkSourceId && linkSourceId !== widget.id && onCompleteLink(widget.id)} style={gridStyle} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className={`widget-card ${highlightAvailability ? 'ring-4 ring-primary ring-offset-4 animate-pulse' : ''}`}><header className="widget-header" onPointerDown={event => { if (!(event.target as HTMLElement).closest('button, a, input, textarea, select, [role="button"]')) onPointerDragStart(event, widget.id); }}><button type="button" className="widget-drag-handle touch-none" onPointerDown={event => onPointerDragStart(event, widget.id)} aria-label={`Drag ${title} widget`} title="Drag to move"><GripVertical size={15} /></button><span className="flex min-w-0 items-center gap-2">{widget.type === 'availability' ? <CalendarDays size={15} className="text-primary" /> : widget.type === 'note' ? <MessageSquareText size={15} className="text-primary" /> : widget.type === 'vote' ? <Vote size={15} className="text-primary" /> : widget.type === 'activities' ? <Route size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}<span className="truncate font-semibold">{title}</span>{widget.createdBy && <span className="truncate text-[11px] font-normal text-muted-foreground">by {widget.createdBy}</span>}</span>{widget.type === 'availability' && <button type="button" onClick={event => { event.stopPropagation(); if (!editingAvailability) beginAvailability(); }} className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-muted">Your availability</button>}{hovered && <span className="flex items-center gap-1"><button onClick={event => {
           event.stopPropagation();
           onStartLink(widget.id);
         }} className={`widget-action ${linkSourceId === widget.id ? 'widget-link-active' : ''}`} aria-label="Link this widget" title="Link this widget"><Route size={14} /></button><button onClick={() => onMove(widget.id, 'left')} className="widget-action" aria-label="Move left">←</button><button onClick={() => onMove(widget.id, 'right')} className="widget-action" aria-label="Move right">→</button>{widget.type !== 'availability' && <button onClick={() => onDelete(widget.id)} className="widget-action" aria-label="Delete widget"><Trash2 size={14} /></button>}</span>}</header>{widget.type === 'availability' && <div className="availability-widget-body p-4"><AvailabilityCalendar month={month} setMonth={setMonth}

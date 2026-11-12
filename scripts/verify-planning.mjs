@@ -112,12 +112,13 @@ try {
   await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
   const list = page.locator('[data-widget-id]').filter({ has: page.locator('.saved-activities-widget') });
   await list.getByRole('button', { name: 'Drag Saved activities widget', exact: true }).scrollIntoViewIfNeeded();
+  await list.locator('.widget-header').hover();
   const initial = await list.boundingBox();
-  const handle = await list.getByRole('button', { name: 'Drag Saved activities widget', exact: true }).boundingBox();
+  const handle = await list.locator('.widget-header .font-semibold').boundingBox();
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
-  await page.mouse.down(); await page.mouse.move(handle.x + 90, handle.y + 60, { steps: 5 });
+  await page.mouse.down(); await page.mouse.move(handle.x + handle.width / 2 + 90, handle.y + handle.height / 2 + 60, { steps: 5 });
   const moving = await list.boundingBox();
-  assert(moving.x > initial.x + 30 && moving.y > initial.y + 20, 'widget follows pointer before release');
+  assert(moving.x > initial.x + 30 && moving.y > initial.y + 20, 'widget follows pointer when dragging the header title');
   await page.mouse.up();
   const otherTab = await context.newPage();
   await otherTab.goto('http://127.0.0.1:5173/');
