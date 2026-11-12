@@ -46,8 +46,11 @@ try {
   await page.locator('.saved-activities-widget').waitFor();
   assert(await page.locator('.saved-activities-widget').innerText().then(text => text.includes('Opera')), 'saved activities button opens the list');
   await page.getByRole('textbox', { name: 'Search places or activities' }).fill('A place with no matches');
-  await page.getByRole('button', { name: 'Search activities', exact: true }).click();
   await page.getByText('No matching places found.').waitFor();
+  assert(await page.getByText('No matching places found.').isVisible(), 'activity search updates while typing without Enter');
+  await page.getByRole('textbox', { name: 'Search places or activities' }).fill('Royal');
+  await page.getByRole('button', { name: 'Save Royal Botanic Garden', exact: true }).waitFor();
+  assert(await page.getByRole('button', { name: 'Save Royal Botanic Garden', exact: true }).isVisible(), 'matching activities appear without submitting search');
   await page.getByRole('button', { name: 'Add activity manually', exact: true }).click();
   await page.getByLabel('Activity name', { exact: true }).fill('Picnic with friends');
   await page.getByLabel('Address', { exact: true }).fill('1 Mrs Macquaries Road, Sydney');

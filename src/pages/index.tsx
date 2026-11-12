@@ -1414,7 +1414,6 @@ function ExplorerWidget({
   onShowActivities: () => void;
 }) {
   const [query, setQuery] = useState('');
-  const [search, setSearch] = useState('');
   const [preview, setPreview] = useState<string | null>(null);
   const [manual, setManual] = useState(false);
   const [name, setName] = useState('');
@@ -1425,9 +1424,8 @@ function ExplorerWidget({
   useEffect(() => {
     setPreview(null);
     setQuery('');
-    setSearch('');
   }, [destination]);
-  const live = usePlaces(search || (destination ? 'attractions' : ''), destination, 'activities');
+  const live = usePlaces(query.trim() || (destination ? 'attractions' : ''), destination, 'activities');
   const placeKey = (place: Pick<PlaceResult, 'name' | 'detail'>) =>
     [place.name, place.detail].map(value => value.trim().toLowerCase()).join('|');
   const savedKeys = new Set(trip.locations.map(placeKey));
@@ -1471,7 +1469,6 @@ function ExplorerWidget({
       <div className="explorer-search">
         <form className="flex shrink-0 gap-1" onSubmit={event => {
           event.preventDefault();
-          setSearch(query.trim());
           setManual(false);
         }}>
           <input value={query} maxLength={160} onChange={event => setQuery(event.target.value)}
@@ -1506,7 +1503,7 @@ function ExplorerWidget({
             <>
               {live.loading && <p role="status" className="p-2 text-xs">Searching places…</p>}
               {!live.loading && !suggestions.length && <p role="status" className="p-2 text-xs text-muted-foreground">
-                {live.error || (live.results.length ? 'These places are already saved.' : search || destination ? 'No matching places found.' : 'Search for a place by name.')}
+                {live.error || (live.results.length ? 'These places are already saved.' : query.trim() || destination ? 'No matching places found.' : 'Search for a place by name.')}
               </p>}
               {suggestions.map(place => (
                 <div key={placeKey(place)} className="flex items-center">
