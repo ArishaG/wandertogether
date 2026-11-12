@@ -11,7 +11,7 @@ import { connectionRoute, type BoardRect } from '@/lib/connection-route';
 import { avatarStyle, coordinates, relativeTime } from '@/lib/planning';
 import { usePlaces, type PlaceResult } from '@/lib/use-places';
 type Screen = 'landing' | 'profile' | 'onboarding' | 'whiteboard' | 'itinerary';
-type Modal = 'signup' | 'join' | 'availability' | 'activity' | 'invite' | 'widget' | null;
+type Modal = 'signup' | 'join' | 'activity' | 'invite' | 'widget' | null;
 type WidgetType = 'availability' | 'note' | 'vote' | 'map' | 'activities';
 type NoteColor = 'yellow' | 'peach' | 'lilac' | 'sky' | 'mint';
 type VoteOption = {
@@ -241,9 +241,6 @@ export default function HomePage() {
   const [inviteInput, setInviteInput] = useState('');
   const [inviteError, setInviteError] = useState('');
   const [copied, setCopied] = useState(false);
-  const [availabilityStart, setAvailabilityStart] = useState('');
-  const [availabilityEnd, setAvailabilityEnd] = useState('');
-  const [availabilityOpened, setAvailabilityOpened] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [itineraryStatus, setItineraryStatus] = useState<'idle' | 'generating' | 'error'>('idle');
   const [itineraryError, setItineraryError] = useState('');
@@ -282,16 +279,6 @@ export default function HomePage() {
       canCreateItinerary: location && dates && activities
     };
   }, [trip]);
-  const hasSubmittedAvailability = Boolean(user?.id && trip.members.some(member => member.id === user.id && member.hasSubmittedAvailability));
-  useEffect(() => {
-    if (boardLoaded && screen === 'whiteboard' && !availabilityOpened && !hasSubmittedAvailability) {
-      const timer = window.setTimeout(() => {
-        setModal('availability');
-        setAvailabilityOpened(true);
-      }, 450);
-      return () => window.clearTimeout(timer);
-    }
-  }, [screen, availabilityOpened, hasSubmittedAvailability, boardLoaded]);
   const tripRef = useRef(trip);
   const editingRef = useRef(false);
   const saveTimerRef = useRef<number | null>(null);
@@ -517,12 +504,12 @@ export default function HomePage() {
     window.setTimeout(() => setCopied(false), 2000);
   };
   const saveAvailability = (days: string[]) => {
-    if (!days.length || !user?.id) return;
+    if (!user?.id) return;
     setTrip(current => {
       const members = current.members.map(member => member.id === user.id ? {
         ...member,
         availability: days,
-        hasSubmittedAvailability: true
+        hasSubmittedAvailability: days.length > 0
       } : member);
       return {
         ...current,
@@ -574,7 +561,7 @@ export default function HomePage() {
       dateModified: '2026-08-12'
     }]
   };
-  return <><Helmet><title>Wander — Collaborative trip planning</title><meta name="description" content="A calm shared space for planning trips together." /><link rel="canonical" href={`${site}/`} /><meta property="og:title" content="Wander — Collaborative trip planning" /><meta property="og:description" content="A calm shared space for planning trips together." /><meta property="og:type" content="website" /><meta property="og:url" content={`${site}/`} /><meta property="og:image" content={`${site}/og-image.png`} /><meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="Wander — Collaborative trip planning" /><meta name="twitter:description" content="A calm shared space for planning trips together." /><meta name="twitter:image" content={`${site}/og-image.png`} /><script type="application/ld+json">{JSON.stringify(jsonLd)}</script></Helmet><main className="wander-app">{screen === 'landing' && <Landing onStart={openOnboarding} onJoin={() => setModal('join')} />}{screen === 'profile' && <Profile onNewTrip={openOnboarding} />}{screen === 'onboarding' && <Onboarding step={step} setStep={setStep} trip={trip} setTrip={setTrip} locationQuery={locationQuery} setLocationQuery={setLocationQuery} inviteInput={inviteInput} setInviteInput={setInviteInput} inviteError={inviteError} setInviteError={setInviteError} addInvite={addInvite} copied={copied} copyInvite={copyInvite} onCreate={createTrip} onBackToProfile={() => setScreen('profile')} />}{screen === 'whiteboard' && (!boardLoaded ? <section className="min-h-screen grid place-items-center p-6"><p role="status">{boardError || 'Loading your board…'}</p></section> : <Whiteboard trip={trip} setTrip={setTrip} checklist={checklist} hasItinerary={hasItinerary} itineraryNeedsSync={itineraryNeedsSync} onModal={value => { if (value === 'availability') { const days = trip.members.find(member => member.id === user?.id)?.availability || []; setAvailabilityStart(days[0] || ''); setAvailabilityEnd(days.at(-1) || ''); } setModal(value); }} onItinerary={createItinerary} onOpenItinerary={() => setScreen('itinerary')} notificationsOpen={notificationsOpen} setNotificationsOpen={setNotificationsOpen} />)}{screen === 'itinerary' && <Itinerary trip={trip} setTrip={setTrip} checklist={checklist} status={itineraryStatus} error={itineraryError} onBack={() => setScreen('whiteboard')} onRetry={createItinerary} />}</main><AnimatePresence>{modal === 'signup' && <SignupModal email={userEmail} setEmail={setUserEmail} touched={signupTouched} setTouched={setSignupTouched} onClose={() => setModal(null)} onContinue={() => {
+  return <><Helmet><title>Wander — Collaborative trip planning</title><meta name="description" content="A calm shared space for planning trips together." /><link rel="canonical" href={`${site}/`} /><meta property="og:title" content="Wander — Collaborative trip planning" /><meta property="og:description" content="A calm shared space for planning trips together." /><meta property="og:type" content="website" /><meta property="og:url" content={`${site}/`} /><meta property="og:image" content={`${site}/og-image.png`} /><meta name="twitter:card" content="summary_large_image" /><meta name="twitter:title" content="Wander — Collaborative trip planning" /><meta name="twitter:description" content="A calm shared space for planning trips together." /><meta name="twitter:image" content={`${site}/og-image.png`} /><script type="application/ld+json">{JSON.stringify(jsonLd)}</script></Helmet><main className="wander-app">{screen === 'landing' && <Landing onStart={openOnboarding} onJoin={() => setModal('join')} />}{screen === 'profile' && <Profile onNewTrip={openOnboarding} />}{screen === 'onboarding' && <Onboarding step={step} setStep={setStep} trip={trip} setTrip={setTrip} locationQuery={locationQuery} setLocationQuery={setLocationQuery} inviteInput={inviteInput} setInviteInput={setInviteInput} inviteError={inviteError} setInviteError={setInviteError} addInvite={addInvite} copied={copied} copyInvite={copyInvite} onCreate={createTrip} onBackToProfile={() => setScreen('profile')} />}{screen === 'whiteboard' && (!boardLoaded ? <section className="min-h-screen grid place-items-center p-6"><p role="status">{boardError || 'Loading your board…'}</p></section> : <Whiteboard trip={trip} setTrip={setTrip} checklist={checklist} hasItinerary={hasItinerary} itineraryNeedsSync={itineraryNeedsSync} onModal={setModal} onSaveAvailability={saveAvailability} onItinerary={createItinerary} onOpenItinerary={() => setScreen('itinerary')} notificationsOpen={notificationsOpen} setNotificationsOpen={setNotificationsOpen} />)}{screen === 'itinerary' && <Itinerary trip={trip} setTrip={setTrip} checklist={checklist} status={itineraryStatus} error={itineraryError} onBack={() => setScreen('whiteboard')} onRetry={createItinerary} />}</main><AnimatePresence>{modal === 'signup' && <SignupModal email={userEmail} setEmail={setUserEmail} touched={signupTouched} setTouched={setSignupTouched} onClose={() => setModal(null)} onContinue={() => {
         setModal(null);
         navigate('/signup');
       }} />}{modal === 'join' && <JoinTripModal isAuthenticated={isAuthenticated} onClose={() => setModal(null)} onJoined={joinedTrip => {
@@ -587,7 +574,7 @@ export default function HomePage() {
             trip: joinedTrip
           }
         });
-      }} />}{modal === 'availability' && <AvailabilityModal initialDays={trip.members.find(member => member.id === user?.id)?.availability || []} start={availabilityStart} end={availabilityEnd} setStart={setAvailabilityStart} setEnd={setAvailabilityEnd} onClose={() => setModal(null)} onSave={saveAvailability} />}{modal === 'activity' && <ActivityModal trip={trip} setTrip={setTrip} onClose={() => setModal(null)} />}{modal === 'invite' && <InviteModal notice={inviteError} trip={trip} copied={copied} copyInvite={copyInvite} onClose={() => setModal(null)} />}{modal === 'widget' && <WidgetModal trip={trip} setTrip={setTrip} onClose={() => setModal(null)} />}</AnimatePresence></>;
+      }} />}{modal === 'activity' && <ActivityModal trip={trip} setTrip={setTrip} onClose={() => setModal(null)} />}{modal === 'invite' && <InviteModal notice={inviteError} trip={trip} copied={copied} copyInvite={copyInvite} onClose={() => setModal(null)} />}{modal === 'widget' && <WidgetModal trip={trip} setTrip={setTrip} onClose={() => setModal(null)} />}</AnimatePresence></>;
 }
 function PlanningMotionGraphic() {
   const prompts = [{
@@ -778,6 +765,7 @@ function Whiteboard({
   hasItinerary,
   itineraryNeedsSync,
   onModal,
+  onSaveAvailability,
   onItinerary,
   onOpenItinerary,
   notificationsOpen,
@@ -796,6 +784,7 @@ function Whiteboard({
   hasItinerary: boolean;
   itineraryNeedsSync: boolean;
   onModal: (modal: Modal) => void;
+  onSaveAvailability: (days: string[]) => void;
   onItinerary: () => void;
   onOpenItinerary: () => void;
   notificationsOpen: boolean;
@@ -1065,7 +1054,7 @@ function Whiteboard({
         }}><WidgetLinks widgets={trip.widgets} links={trip.links ?? []} onDelete={id => setTrip(current => ({
             ...current,
             links: (current.links ?? []).filter(link => link.id !== id)
-          }))} />{trip.widgets.map(widget => <WidgetCard key={widget.id} widget={widget} highlightAvailability={availabilityFocus && widget.type === 'availability'} trip={trip} setTrip={setTrip} onMove={moveWidget} onDelete={deleteWidget} onAvailability={() => onModal('availability')} dateDraft={dateDrafts[widget.id] || {
+          }))} />{trip.widgets.map(widget => <WidgetCard key={widget.id} widget={widget} highlightAvailability={availabilityFocus && widget.type === 'availability'} trip={trip} setTrip={setTrip} onMove={moveWidget} onDelete={deleteWidget} onSaveAvailability={onSaveAvailability} dateDraft={dateDrafts[widget.id] || {
             start: trip.availability.start || '',
             end: trip.availability.end || ''
           }} setDateDraft={draft => setDateDrafts(current => ({
@@ -1163,7 +1152,7 @@ function WidgetCard({
   setTrip,
   onMove,
   onDelete,
-  onAvailability,
+  onSaveAvailability,
   dateDraft,
   setDateDraft,
   onConfirmDates,
@@ -1180,7 +1169,7 @@ function WidgetCard({
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
   onMove: (id: string, direction: 'left' | 'right' | 'up' | 'down') => void;
   onDelete: (id: string) => void;
-  onAvailability: () => void;
+  onSaveAvailability: (days: string[]) => void;
   dateDraft: {
     start: string;
     end: string;
@@ -1197,6 +1186,24 @@ function WidgetCard({
   onCompleteLink: (id: string) => void;
   onPointerDragStart: (event: React.PointerEvent<HTMLButtonElement>, id: string) => void;
 }) {
+  const { user } = useSession();
+  const personalDays = trip.members.find(member => member.id === user?.id)?.availability ?? [];
+  const [editingAvailability, setEditingAvailability] = useState(widget.type === 'availability' && personalDays.length === 0);
+  const [availabilityDraft, setAvailabilityDraft] = useState<string[]>(personalDays);
+  const beginAvailability = (day?: Date) => {
+    const days = [...personalDays];
+    if (day) {
+      const value = format(day, 'yyyy-MM-dd');
+      setAvailabilityDraft(days.includes(value) ? days.filter(item => item !== value) : [...days, value]);
+    } else {
+      setAvailabilityDraft(days);
+    }
+    setEditingAvailability(true);
+  };
+  const toggleAvailability = (day: Date) => {
+    const value = format(day, 'yyyy-MM-dd');
+    setAvailabilityDraft(days => days.includes(value) ? days.filter(item => item !== value) : [...days, value]);
+  };
   const [hovered, setHovered] = useState(false);
   const [resizing, setResizing] = useState(false);
   const [month, setMonth] = useState(trip.availability.start ? new Date(`${trip.availability.start}T12:00:00`) : new Date());
@@ -1244,10 +1251,19 @@ function WidgetCard({
     window.addEventListener('pointermove', onMovePointer);
     window.addEventListener('pointerup', onUp);
   };
-  return <article data-widget-id={widget.id} draggable={false} data-resizing={resizing} onClick={() => linkSourceId && linkSourceId !== widget.id && onCompleteLink(widget.id)} style={gridStyle} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className={`widget-card ${highlightAvailability ? 'ring-4 ring-primary ring-offset-4 animate-pulse' : ''}`}><header className="widget-header"><button type="button" className="widget-drag-handle touch-none" onPointerDown={event => onPointerDragStart(event, widget.id)} aria-label={`Drag ${title} widget`} title="Drag to move"><GripVertical size={15} /></button><span className="flex min-w-0 items-center gap-2">{widget.type === 'availability' ? <CalendarDays size={15} className="text-primary" /> : widget.type === 'note' ? <MessageSquareText size={15} className="text-primary" /> : widget.type === 'vote' ? <Vote size={15} className="text-primary" /> : widget.type === 'activities' ? <Route size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}<span className="truncate font-semibold">{title}</span>{widget.createdBy && <span className="truncate text-[11px] font-normal text-muted-foreground">by {widget.createdBy}</span>}</span>{widget.type === 'availability' && <button type="button" onClick={event => { event.stopPropagation(); onAvailability(); }} className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-muted">Your availability</button>}{hovered && <span className="flex items-center gap-1"><button onClick={event => {
+  return <article data-widget-id={widget.id} draggable={false} data-resizing={resizing} onClick={() => linkSourceId && linkSourceId !== widget.id && onCompleteLink(widget.id)} style={gridStyle} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className={`widget-card ${highlightAvailability ? 'ring-4 ring-primary ring-offset-4 animate-pulse' : ''}`}><header className="widget-header"><button type="button" className="widget-drag-handle touch-none" onPointerDown={event => onPointerDragStart(event, widget.id)} aria-label={`Drag ${title} widget`} title="Drag to move"><GripVertical size={15} /></button><span className="flex min-w-0 items-center gap-2">{widget.type === 'availability' ? <CalendarDays size={15} className="text-primary" /> : widget.type === 'note' ? <MessageSquareText size={15} className="text-primary" /> : widget.type === 'vote' ? <Vote size={15} className="text-primary" /> : widget.type === 'activities' ? <Route size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}<span className="truncate font-semibold">{title}</span>{widget.createdBy && <span className="truncate text-[11px] font-normal text-muted-foreground">by {widget.createdBy}</span>}</span>{widget.type === 'availability' && <button type="button" onClick={event => { event.stopPropagation(); if (!editingAvailability) beginAvailability(); }} className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-muted">Your availability</button>}{hovered && <span className="flex items-center gap-1"><button onClick={event => {
           event.stopPropagation();
           onStartLink(widget.id);
-        }} className={`widget-action ${linkSourceId === widget.id ? 'widget-link-active' : ''}`} aria-label="Link this widget" title="Link this widget"><Route size={14} /></button><button onClick={() => onMove(widget.id, 'left')} className="widget-action" aria-label="Move left">←</button><button onClick={() => onMove(widget.id, 'right')} className="widget-action" aria-label="Move right">→</button>{widget.type !== 'availability' && <button onClick={() => onDelete(widget.id)} className="widget-action" aria-label="Delete widget"><Trash2 size={14} /></button>}</span>}</header>{widget.type === 'availability' && <div className="availability-widget-body p-4"><AvailabilityCalendar month={month} setMonth={setMonth} selectedDays={selectedDays} availabilityByDay={availabilityByDay} onToggle={() => onAvailability()} mode="group" totalPeople={totalPeople} /><div className="mt-4 border-t border-border pt-3"><p className="text-sm font-semibold">Confirm trip dates</p><p className="mt-1 text-[13px] text-muted-foreground">{trip.availability.status === 'confirmed' ? 'Change your trip dates below.' : 'Enter the dates your group plans to travel.'}</p><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-xs">Start<input aria-label="Trip start date" type="date" value={dateDraft.start} onChange={event => setDateDraft({ start: event.target.value, end: dateDraft.end })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-xs">End<input aria-label="Trip end date" type="date" min={dateDraft.start || undefined} value={dateDraft.end} onChange={event => setDateDraft({ ...dateDraft, end: event.target.value })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label></div><button disabled={!dateDraft.start || !dateDraft.end || dateDraft.end < dateDraft.start} onClick={onConfirmDates} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-45"><Check size={15} />{trip.availability.status === 'confirmed' ? 'Update dates' : 'Confirm dates'}</button><button onClick={onAvailability} className="mt-3 block text-[12px] font-semibold text-primary">{trip.availability.status === 'confirmed' ? 'Update availability' : 'Add availability'}</button></div></div>}{widget.type === 'note' && <StickyNote widget={widget} setTrip={setTrip} />}<button onPointerDown={resizeWidget} className="widget-resize-handle" aria-label={`Resize ${title} widget`} title="Drag to resize">↘</button>{widget.type === 'vote' && <VoteWidget widget={widget} setTrip={setTrip} />}{widget.type === 'map' && <ExplorerWidget trip={trip} setTrip={setTrip} onExpand={onExpandExplorer} onShowActivities={onShowActivities} />}{widget.type === 'activities' && <SavedActivitiesWidget locations={trip.locations} onDelete={id => setTrip(current => ({
+        }} className={`widget-action ${linkSourceId === widget.id ? 'widget-link-active' : ''}`} aria-label="Link this widget" title="Link this widget"><Route size={14} /></button><button onClick={() => onMove(widget.id, 'left')} className="widget-action" aria-label="Move left">←</button><button onClick={() => onMove(widget.id, 'right')} className="widget-action" aria-label="Move right">→</button>{widget.type !== 'availability' && <button onClick={() => onDelete(widget.id)} className="widget-action" aria-label="Delete widget"><Trash2 size={14} /></button>}</span>}</header>{widget.type === 'availability' && <div className="availability-widget-body p-4"><AvailabilityCalendar month={month} setMonth={setMonth}
+          selectedDays={editingAvailability ? availabilityDraft : selectedDays}
+          availabilityByDay={availabilityByDay}
+          onToggle={editingAvailability ? toggleAvailability : beginAvailability}
+          mode={editingAvailability ? 'personal' : 'group'} totalPeople={totalPeople} />
+        {editingAvailability && <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+          <p className="w-full text-xs text-muted-foreground">Select the days you are free.</p>
+          <button type="button" onClick={() => setEditingAvailability(false)} className="rounded-md px-2 py-1.5 text-xs font-semibold text-muted-foreground">Cancel</button>
+          <button type="button" onClick={() => { onSaveAvailability([...availabilityDraft].sort()); setEditingAvailability(false); }} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">Save availability</button>
+        </div>}{!editingAvailability && <div className="mt-4 border-t border-border pt-3"><p className="text-sm font-semibold">Confirm trip dates</p><p className="mt-1 text-[13px] text-muted-foreground">{trip.availability.status === 'confirmed' ? 'Change your trip dates below.' : 'Enter the dates your group plans to travel.'}</p><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-xs">Start<input aria-label="Trip start date" type="date" value={dateDraft.start} onChange={event => setDateDraft({ start: event.target.value, end: dateDraft.end })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-xs">End<input aria-label="Trip end date" type="date" min={dateDraft.start || undefined} value={dateDraft.end} onChange={event => setDateDraft({ ...dateDraft, end: event.target.value })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label></div><button disabled={!dateDraft.start || !dateDraft.end || dateDraft.end < dateDraft.start} onClick={onConfirmDates} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-45"><Check size={15} />{trip.availability.status === 'confirmed' ? 'Update dates' : 'Confirm dates'}</button><button onClick={() => beginAvailability()} className="mt-3 block text-[12px] font-semibold text-primary">{trip.availability.status === 'confirmed' ? 'Update availability' : 'Add availability'}</button></div>}</div>}{widget.type === 'note' && <StickyNote widget={widget} setTrip={setTrip} />}<button onPointerDown={resizeWidget} className="widget-resize-handle" aria-label={`Resize ${title} widget`} title="Drag to resize">↘</button>{widget.type === 'vote' && <VoteWidget widget={widget} setTrip={setTrip} />}{widget.type === 'map' && <ExplorerWidget trip={trip} setTrip={setTrip} onExpand={onExpandExplorer} onShowActivities={onShowActivities} />}{widget.type === 'activities' && <SavedActivitiesWidget locations={trip.locations} onDelete={id => setTrip(current => ({
       ...current,
       locations: current.locations.filter(place => place.id !== id)
     }))} />}</article>;
@@ -1792,38 +1808,6 @@ function JoinTripModal({
         setCode(event.target.value.toUpperCase());
         setError('');
       }} placeholder="ABC123" className="mt-2 h-11 w-full rounded-lg border border-border bg-background px-3 text-sm uppercase outline-none focus:border-primary" /></label>{error && <p className="mt-3 text-sm text-destructive">{error}</p>}<PrimaryButton disabled={!code.trim()} onClick={join} className="mt-6 w-full">{isAuthenticated ? 'Join trip' : 'Sign in to join'}</PrimaryButton></ModalShell>;
-}
-function AvailabilityModal({
-  initialDays,
-  start,
-  end,
-  setStart,
-  setEnd,
-  onClose,
-  onSave
-}: {
-  initialDays: string[];
-  start: string;
-  end: string;
-  setStart: (value: string) => void;
-  setEnd: (value: string) => void;
-  onClose: () => void;
-  onSave: (days: string[]) => void;
-}) {
-  const [month, setMonth] = useState(start ? new Date(`${start}T12:00:00`) : new Date());
-  const [selectedDays, setSelectedDays] = useState<string[]>(initialDays);
-  const toggleDay = (day: Date) => {
-    const value = format(day, 'yyyy-MM-dd');
-    setSelectedDays(current => current.includes(value) ? current.filter(item => item !== value) : [...current, value]);
-  };
-  const save = () => {
-    const ordered = [...selectedDays].sort();
-    if (!ordered.length) return;
-    setStart(ordered[0]);
-    setEnd(ordered[ordered.length - 1]);
-    onSave(ordered);
-  };
-  return <ModalShell onClose={onClose}><IconTile solid><CalendarDays size={19} /></IconTile><h2 className="mt-5 text-xl font-semibold">When are you free?</h2><p className="mt-2 text-[15px] leading-[22px] text-muted-foreground">Select each day that works for you. Your availability helps the group choose dates later.</p><AvailabilityCalendar month={month} setMonth={setMonth} selectedDays={selectedDays} availabilityByDay={{}} onToggle={toggleDay} mode="personal" totalPeople={1} /><p className="mt-3 text-center text-[13px] text-muted-foreground">Click individual days, or drag across days to select a range.</p><div className="mt-5 flex items-center justify-end gap-4"><button onClick={onClose} className="text-sm font-semibold text-muted-foreground hover:text-foreground">Cancel</button><PrimaryButton disabled={!selectedDays.length} onClick={save}>Save availability</PrimaryButton></div></ModalShell>;
 }
 function AvailabilityCalendar({
   month,
