@@ -2,6 +2,7 @@ import { RouteObject } from "react-router";
 
 import HomePage from './pages/index';
 import ProfilePage from './pages/ProfilePage';
+import AccountPage from './pages/AccountPage';
 import PublicProfilePage from './pages/PublicProfilePage';
 import AuthPage from './pages/auth/AuthPage';
 import InvitePage from './pages/InvitePage';
@@ -26,6 +27,12 @@ export const routes: RouteObject[] = [{
 }, {
   path: '/profile',
   element: <ProfilePage />
+}, {
+  path: '/trips',
+  element: <ProfilePage />
+}, {
+  path: '/account',
+  element: <AccountPage />
 }, {
   path: '/new-trip',
   element: <HomePage />

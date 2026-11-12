@@ -47,7 +47,7 @@ export default function AccountSettings() {
     catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save changes.'); }
     finally { setBusy(false); }
   };
-  return <details className="mt-8 rounded-2xl border border-border bg-card p-5"><summary className="cursor-pointer text-lg font-semibold">Account settings</summary><div className="mt-5 grid gap-5 sm:grid-cols-2">
+  return <section aria-label="Account settings" className="mt-8 rounded-2xl border border-border bg-card p-5"><h2 className="text-lg font-semibold">Profile and settings</h2><div className="mt-5 grid gap-5 sm:grid-cols-2">
     <form onSubmit={event => { event.preventDefault(); void perform(() => authClient.updateUser({ name: name.trim(), image: image || null }), 'Profile updated.'); }} className="grid content-start gap-3">
       <span style={avatarStyle(user?.id || '')} className="grid h-14 w-14 place-items-center overflow-hidden rounded-full text-xl">{image ? <img src={image} alt="Profile preview" className="h-full w-full object-cover" /> : (name || user?.email || '?')[0].toUpperCase()}</span>
       <label className="text-sm">Name<input required value={name} onChange={e => setName(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2" /></label>
@@ -74,5 +74,5 @@ export default function AccountSettings() {
       <label className="text-sm">Blocked accounts<textarea value={blocked} onChange={event => setBlocked(event.target.value)} placeholder="One email address per line" className="mt-1 min-h-20 w-full rounded-lg border border-border bg-background p-2" /></label><p className="text-xs text-muted-foreground">Blocked accounts cannot invite you or join a board with you. Existing shared boards remain accessible to their members.</p>
       <button disabled={busy || !preferencesLoaded} className="rounded-lg bg-primary p-2 text-primary-foreground disabled:opacity-50">Save preferences</button>
     </form>
-  </div>{message && <p role="status" className="mt-4 text-sm">{message}</p>}</details>;
+  </div>{message && <p role="status" className="mt-4 text-sm">{message}</p>}</section>;
 }
