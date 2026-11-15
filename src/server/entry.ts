@@ -10,6 +10,8 @@ import preferences_get from "./api/preferences/GET";
 import preferences_put from "./api/preferences/PUT";
 import profile_get from "./api/profiles/GET";
 import places_get from "./api/places/GET";
+import trip_leave_get from "./api/trips/[id]/leave/GET";
+import trip_leave_post from "./api/trips/[id]/leave/POST";
 // <api-imports>
 import ai_provider_check_post_0 from "./api/ai-provider-check/POST";
 import auth_action_get_1 from "./api/auth/[action]/GET";
@@ -107,6 +109,8 @@ app.use(express.urlencoded({ extended: true }));
 
 app.get("/api/places", places_get);
 app.post("/api/trips/:id/invite", invite_post);
+app.get("/api/trips/:id/leave", trip_leave_get);
+app.post("/api/trips/:id/leave", trip_leave_post);
 app.get("/api/invitations/:token", invitation_get);
 app.post("/api/invitations/:token/accept", invitation_accept_post);
 app.get("/api/preferences", preferences_get);

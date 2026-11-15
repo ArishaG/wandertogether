@@ -2,7 +2,7 @@
   "title": "Your trips",
   "description": "Plans you created and trips you joined.",
   "newTrip": "New trip",
-  "createdByYou": "Created by you",
+  "createdByYou": "Owned by you",
   "joinedTrip": "Joined trip",
   "destinationFallback": "Destination to be decided",
   "tripCode": "Trip code:",
