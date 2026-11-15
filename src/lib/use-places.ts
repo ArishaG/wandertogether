@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 export type PlaceResult = { name: string; detail: string; category: string; latitude?: number; longitude?: number };
-export function usePlaces(query: string, destination = '', mode?: 'activities') {
+export function usePlaces(query: string, destination = '', mode?: 'activities' | 'destination') {
   const [state, setState] = useState<{ results: PlaceResult[]; loading: boolean; error: string }>({ results: [], loading: false, error: '' });
   useEffect(() => {
     if (!query.trim()) { setState({ results: [], loading: false, error: '' }); return; }

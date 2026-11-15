@@ -49,3 +49,38 @@ it('returns named activities and street addresses from Photon without a Google k
   expect(searchUrl.searchParams.getAll('include')).toEqual([expect.stringContaining('osm.tourism.attraction,osm.tourism.museum')]);
   expect(searchUrl.searchParams.has('bbox')).toBe(true);
 });
+it('searches destinations through the keyless geocoder', async () => {
+  vi.stubEnv('GOOGLE_MAPS_API_KEY', ''); vi.stubEnv('GOOGLE_PLACES_API_KEY', '');
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ features: [
+    { geometry: { coordinates: [-122.15, 47.53] }, properties: { name: 'Newcastle', osm_key: 'place', osm_value: 'city', county: 'King County', state: 'Washington', country: 'United States' } },
+    { geometry: { coordinates: [-122.15, 47.53] }, properties: { name: 'Newcastle', osm_key: 'place', osm_value: 'town', state: 'Washington', country: 'United States' } },
+    { geometry: { coordinates: [-71.5, 43.7] }, properties: { name: 'New Hampshire', osm_key: 'place', osm_value: 'state', country: 'United States' } },
+  ] }) });
+  vi.stubGlobal('fetch', fetchMock);
+  const result = await request({ q: 'newcastle', mode: 'destination' });
+  const url = new URL(fetchMock.mock.calls[0][0]);
+  expect(url.searchParams.get('q')).toBe('newcastle');
+  expect(url.searchParams.getAll('osm_tag')).toContain('!place:house');
+  expect(result.status).toBe(200);
+  expect(result.payload.results).toEqual([
+    { name: 'Newcastle, Washington, United States', detail: 'City · King County', category: 'City', latitude: 47.53, longitude: -122.15 },
+    { name: 'New Hampshire, United States', detail: 'State or region · United States', category: 'State or region', latitude: 43.7, longitude: -71.5 },
+  ]);
+});
+it('reports destination search outages instead of falling back to a fixed list', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+  const result = await request({ q: 'outage test', mode: 'destination' });
+  expect(result.status).toBe(502);
+  expect(result.payload.error).toContain('unavailable');
+});
+it('retries a throttled destination search once and caches the answer', async () => {
+  const fetchMock = vi.fn()
+    .mockResolvedValueOnce({ ok: false, status: 503 })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ features: [{ properties: { name: 'Kyoto', osm_value: 'city', country: 'Japan' } }] }) });
+  vi.stubGlobal('fetch', fetchMock);
+  const first = await request({ q: 'kyoto', mode: 'destination' });
+  const second = await request({ q: '  Kyoto ', mode: 'destination' });
+  expect(first.payload.results.map((place: any) => place.name)).toEqual(['Kyoto, Japan']);
+  expect(second.payload).toEqual(first.payload);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});

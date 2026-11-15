@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { coordinates } from '../../../lib/planning';
 import { getAuth } from '../../../lib/auth/auth';
 import { searchActivities } from '../../activity-search';
+import { searchDestinations } from '../../destination-search';
 
 export default async function handler(req: Request, res: Response) {
   const query = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 160) : '';
@@ -17,6 +18,15 @@ export default async function handler(req: Request, res: Response) {
       return res.json({ results: await searchActivities(query, destination) });
     } catch {
       return res.status(502).json({ error: 'Activity search is temporarily unavailable.' });
+    }
+  }
+  if (req.query.mode === 'destination') {
+    const session = await getAuth().api.getSession({ headers: req.headers as unknown as Headers });
+    if (!session?.user) return res.status(401).json({ error: 'Sign in to search destinations.' });
+    try {
+      return res.json({ results: await searchDestinations(query) });
+    } catch {
+      return res.status(502).json({ error: 'Destination search is unavailable right now. Please try again, or enter latitude, longitude.' });
     }
   }
   const key = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY;

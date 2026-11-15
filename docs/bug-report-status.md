@@ -49,10 +49,11 @@ API rejects invalid/reversed or excessively long date ranges.
    through `scripts/migrate-production.mjs`. The migration adds one table and
    preserves existing records. It uses the production `DATABASE_URL` and stops
    the build if the account preferences table cannot be verified.
-2. Set `GOOGLE_PLACES_API_KEY` (or the existing `GOOGLE_MAPS_API_KEY`) on the
-   server, with Places API (New) enabled. The key stays server-side for searches.
-   Coordinates and the limited catalog fallback work without it. Maps still use
-   the existing Google Maps iframe embed.
+2. Destination search ("Where are you headed?" and the board's destination
+   picker) and Explorer activity search use the public Photon geocoder
+   (OpenStreetMap data) and need no key. Set `PHOTON_BASE_URL` to a
+   self-hosted Photon instance if the public server's fair-use limits become
+   a problem. Maps still use the existing Google Maps iframe embed.
 3. Email invitations need `RESEND_API_KEY`, `INVITATION_FROM_EMAIL` (a sender
    verified with the provider), and `BETTER_AUTH_URL` (the actual application
    origin). Missing configuration produces an explicit error; link/key sharing
