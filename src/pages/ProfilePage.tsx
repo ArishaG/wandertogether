@@ -23,6 +23,7 @@ type SavedTrip = {
   state: {
     members?: TripMember[];
   };
+  leavePreview?: LeavePreview;
 };
 type LeavePreview =
   | { outcome: 'delete'; pendingInvitations: number }
@@ -76,12 +77,18 @@ export default function ProfilePage() {
     loadTrips();
   }, [isAuthenticated]);
   const startLeave = async (trip: SavedTrip) => {
-    setConfirmation({ kind: 'leave', trip, loading: true });
+    // The trips list already says what leaving will do, so the dialog opens
+    // with the right message; a background re-check covers changes since load.
+    const known = trip.leavePreview;
+    setConfirmation({ kind: 'leave', trip, preview: known, loading: !known });
     const response = await fetch(`/api/trips/${trip.id}/leave`, { headers: { Accept: 'application/json' } }).catch(() => null);
     const payload = (await response?.json().catch(() => null)) as (LeavePreview & { error?: string }) | null;
-    setConfirmation(current => !current || current.trip.id !== trip.id ? current : response?.ok && payload
-      ? { ...current, preview: payload, loading: false }
-      : { ...current, loading: false, error: payload?.error || 'Unable to check this board. Please try again.' });
+    setConfirmation(current => {
+      if (!current || current.kind !== 'leave' || current.trip.id !== trip.id || current.working) return current;
+      if (response?.ok && payload) return { ...current, preview: payload, loading: false };
+      // Keep the message we already showed; the server re-decides when they confirm anyway.
+      return known ? current : { ...current, loading: false, error: payload?.error || 'Unable to check this board. Please try again.' };
+    });
   };
   const confirmAction = async () => {
     if (!confirmation || confirmation.working) return;

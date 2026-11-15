@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNotNull } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull } from 'drizzle-orm';
 import type { BoardNotification } from '../lib/board-notifications';
 import { db } from './db/client';
 import { tripInvitations, tripMembers, trips, user } from './db/schema';
@@ -52,6 +52,28 @@ export async function previewLeave(tripId: string, userId: string) {
   const inputs = await loadPlanInputs(db, tripId);
   if (!inputs.members.some(member => member.userId === userId)) throw new NotAMemberError('You are not a member of this board.');
   return { tripName: trip.name, ...planLeave({ userId, ownerId: trip.ownerId, ...inputs }) };
+}
+
+/**
+ * Leave previews for every board on a user's My trips page, in two queries,
+ * so the confirmation dialog can open with the right message immediately.
+ */
+export async function previewLeaveForTrips(tripsToCheck: { id: string; ownerId: string }[], userId: string) {
+  const previews = new Map<string, LeavePlan>();
+  if (!tripsToCheck.length) return previews;
+  const ids = tripsToCheck.map(trip => trip.id);
+  const memberRows = await db
+    .select({ tripId: tripMembers.tripId, userId: tripMembers.userId, name: user.name, email: user.email, joinedAt: tripMembers.createdAt })
+    .from(tripMembers).innerJoin(user, eq(tripMembers.userId, user.id))
+    .where(and(inArray(tripMembers.tripId, ids), isNotNull(tripMembers.userId)));
+  const pendingRows = await db.select({ tripId: tripInvitations.tripId }).from(tripInvitations)
+    .where(and(inArray(tripInvitations.tripId, ids), eq(tripInvitations.status, 'pending'), gt(tripInvitations.expiresAt, new Date())));
+  for (const trip of tripsToCheck) {
+    const members = memberRows.filter(row => row.tripId === trip.id).map(row => ({ userId: row.userId!, name: row.name || row.email, joinedAt: row.joinedAt }));
+    const pendingInvitations = pendingRows.filter(row => row.tripId === trip.id).length;
+    previews.set(trip.id, planLeave({ userId, ownerId: trip.ownerId, members, pendingInvitations }));
+  }
+  return previews;
 }
 
 type TripState = {
