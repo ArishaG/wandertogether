@@ -28,6 +28,27 @@ await context.route('**/api/**', async route => {
   return route.fulfill({ json: { trips: [] } });
 });
 const assert = (condition, message) => { if (!condition) throw new Error(message); console.log('PASS', message); };
+async function focusWidget(locator) {
+  const viewport = page.locator('.whiteboard-viewport');
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const card = await locator.boundingBox(); const rect = await viewport.boundingBox();
+    const dx = Math.max(-350, Math.min(350, rect.x + 20 - card.x));
+    const dy = Math.max(-250, Math.min(250, rect.y + 20 - card.y));
+    if (Math.abs(dx) < 2 && Math.abs(dy) < 2) return;
+    const point = await page.evaluate(({dx,dy}) => {
+      const viewport = document.querySelector('.whiteboard-viewport'); const r = viewport.getBoundingClientRect(); let best=null;
+      for(let y=r.top+10;y<r.bottom-20;y+=40) for(let x=r.left+10;x<r.right-20;x+=40){
+        const e=document.elementFromPoint(x,y); if(!e||!viewport.contains(e)||e.closest('[data-widget-id],button,input,textarea,select,a,.widget-link-group'))continue;
+        const mx=Math.max(r.left+5-x,Math.min(r.right-5-x,dx));const my=Math.max(r.top+5-y,Math.min(r.bottom-5-y,dy));const score=Math.abs(mx)+Math.abs(my);
+        if(!best||score>best.score)best={x,y,mx,my,score};
+      }return best;
+    },{dx,dy});
+    if(!point)throw new Error('No canvas space available for panning');
+    await page.mouse.move(point.x,point.y); await page.mouse.down({ button: 'middle' });
+    await page.mouse.move(point.x+point.mx,point.y+point.my,{steps:3}); await page.mouse.up({ button: 'middle' });
+  }
+  throw new Error('Unable to pan to widget');
+}
 try {
   board.members[0].availability = [];
   board.members[0].hasSubmittedAvailability = false;
@@ -36,6 +57,8 @@ try {
   await page.waitForFunction(() => document.querySelector('input[aria-label="Trip name"]')?.value === 'Sydney trip');
   assert(await page.getByRole('textbox', { name: 'Trip name' }).inputValue() === 'Sydney trip', 'direct board URL hydrates saved state');
   assert(await page.locator('.explorer-map iframe').getAttribute('src').then(src => src.includes('Sydney')), 'map initially shows the destination');
+  const decline = page.getByRole('button', { name: 'Decline', exact: true });
+  await decline.waitFor({ state: 'visible' }); await decline.click();
   const availability = page.locator('[data-widget-id="availability"]');
   assert(await page.getByRole('heading', { name: 'When are you free?', exact: true }).count() === 0, 'availability edits stay inside the widget');
   await availability.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -66,6 +89,7 @@ try {
   await page.getByRole('button', { name: 'Add saved activities widget', exact: true }).click();
   await page.locator('.saved-activities-widget').waitFor();
   assert(await page.locator('.saved-activities-widget').innerText().then(text => text.includes('Opera')), 'saved activities button opens the list');
+  await focusWidget(page.locator('[data-widget-id="explorer"]'));
   await page.getByRole('textbox', { name: 'Search places or activities' }).fill('A place with no matches');
   await page.getByText('No matching places found.').waitFor();
   assert(await page.getByText('No matching places found.').isVisible(), 'activity search updates while typing without Enter');
@@ -80,11 +104,14 @@ try {
   assert(await page.locator('.explorer-map iframe').getAttribute('src').then(src => src.includes('Macquaries')), 'manually added activity previews its address');
   await page.waitForTimeout(500);
   assert(board.locations.some(place => place.name === 'Picnic with friends' && place.detail === '1 Mrs Macquaries Road, Sydney'), 'manual activity name and address persist');
+  await focusWidget(page.locator('[data-widget-id="explorer"]'));
   await page.getByRole('button', { name: /^Save activities/ }).click();
   await page.locator('.explorer-modal-content').getByRole('button', { name: 'View saved activities', exact: true }).click();
   await page.locator('.explorer-modal-content').waitFor({ state: 'hidden' });
   assert(await page.locator('.saved-activities-widget').isVisible(), 'saved activities works from expanded Explorer');
   const poll = page.locator('[data-widget-id="poll"]');
+  await focusWidget(poll);
+  await poll.getByRole('button', { name: 'Widget settings', exact: true }).click();
   const fitsPoll = () => poll.evaluate(card => card.scrollHeight <= card.clientHeight + 1 && [...card.querySelectorAll('.vote-widget *')].every(el => getComputedStyle(el).overflowY !== 'auto'));
   assert(await fitsPoll(), 'compact poll shows all options without scrolling');
   const before = await poll.boundingBox();
@@ -134,7 +161,7 @@ try {
   await page.screenshot({ path: 'tmp/pdfs/board-fixed.png', fullPage: true });
   await page.getByRole('button', { name: 'Close notifications', exact: true }).click();
   const list = page.locator('[data-widget-id]').filter({ has: page.locator('.saved-activities-widget') });
-  await list.getByRole('button', { name: 'Drag Saved activities widget', exact: true }).scrollIntoViewIfNeeded();
+  await focusWidget(list);
   await list.locator('.widget-header').hover();
   const initial = await list.boundingBox();
   const handle = await list.locator('.widget-header .font-semibold').boundingBox();

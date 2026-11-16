@@ -1,11 +1,11 @@
 import PlanningWidgets from '@/components/PlanningWidgets';
-import type { PlanningWidgetFields } from '@/lib/planning-widgets';
+import { splitChecklistWidgets, combineChecklistWidgets, type PlanningWidgetFields } from '@/lib/planning-widgets';
 import ProfileMenu from '@/components/ProfileMenu';
 import { ExpenseTrackerWidget, SavedLinksWidget } from '@/components/trip/CollaborativeWidgets';
 import type { TripExpense, TripSettlement, TripSavedLink } from '@/lib/trip-finances';
 import { Helmet } from '@dr.pogodin/react-helmet';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowDown, ArrowUp, Bell, CalendarDays, Check, ChevronRight, Compass, Copy, Expand, GripVertical, MapPin, MessageSquareText, Minus, Pencil, Plane, ListChecks, Table2, Plus, Wallet, Bookmark, Route, Search, Send, Sparkles, Trash2, Users, Vote, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Bell, CalendarDays, Check, ChevronRight, Compass, Copy, Expand, GripVertical, MapPin, MessageSquareText, Minus, Pencil, Plane, ListChecks, Table2, Plus, Wallet, Bookmark, Route, Search, Send, Sparkles, Settings2, Trash2, Users, Vote, X } from 'lucide-react';
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from "react-router";
 import { useSession } from '@/lib/auth/auth-client';
@@ -858,6 +858,26 @@ function Whiteboard({
     return () => observer.disconnect();
   }, []);
   const cellWidth = (Math.max(1180, viewportWidth) + 10) / 6;
+  const zoomBoard = (requested: number, anchor?: { x: number; y: number }) => {
+    const scale = Math.max(0.6, Math.min(1.6, requested));
+    const rect = viewportRef.current?.getBoundingClientRect();
+    const point = anchor || { x: (rect?.width || viewportWidth) / 2, y: (rect?.height || 600) / 2 };
+    setBoardOffset(offset => ({ x: point.x - (point.x - offset.x) * scale / boardScale, y: point.y - (point.y - offset.y) * scale / boardScale }));
+    setBoardScale(scale);
+  };
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const wheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const rect = viewport.getBoundingClientRect();
+      zoomBoard(boardScale - event.deltaY * 0.001, { x: event.clientX - rect.left, y: event.clientY - rect.top });
+    };
+    viewport.addEventListener('wheel', wheel, { passive: false });
+    return () => viewport.removeEventListener('wheel', wheel);
+  }, [boardScale, boardOffset.x, boardOffset.y, viewportWidth]);
+
   const overlaps = (candidate: Widget, other: Widget) => candidate.gridX < other.gridX + other.w && candidate.gridX + candidate.w > other.gridX && candidate.gridY < other.gridY + other.h && candidate.gridY + candidate.h > other.gridY;
   const findOpenPosition = (widgets: Widget[], moving: Widget, preferredX: number, preferredY: number, expand = false) => {
     const candidates: {
@@ -918,9 +938,9 @@ function Whiteboard({
   };
   const startPointerDrag = (event: React.PointerEvent<HTMLElement>, id: string) => {
     if (event.button !== 0) return;
-    event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    const captureTarget = (event.target as Element).closest('.widget-title') || event.currentTarget;
+    captureTarget.setPointerCapture(event.pointerId);
     pointerDragRef.current = {
       id,
       pointerId: event.pointerId,
@@ -985,42 +1005,48 @@ function Whiteboard({
     setLinkSourceId(null);
   };
   const widgetCreator = user?.name || user?.email || 'You';
-  const focusWidget = (widget: Widget, attempts = 3) => requestAnimationFrame(() => {
+  const focusWidget = (widget: Pick<Widget, 'id'>, attempts = 3) => requestAnimationFrame(() => {
     const element = document.querySelector<HTMLElement>(`[data-widget-id="${widget.id}"]`);
     const rect = element?.getBoundingClientRect();
-    if (!rect) { if (attempts > 0) window.setTimeout(() => focusWidget(widget, attempts - 1), 0); return; }
-    if (rect.top >= 80 && rect.bottom <= window.innerHeight - 80 && rect.left >= 0 && rect.right <= window.innerWidth) return;
-    setBoardOffset({ x: -widget.gridX * cellWidth * boardScale, y: -widget.gridY * 88 * boardScale });
+    const viewport = viewportRef.current?.getBoundingClientRect();
+    if (!rect || !viewport) { if (attempts > 0) window.setTimeout(() => focusWidget(widget, attempts - 1), 0); return; }
+    if (rect.top >= viewport.top && rect.bottom <= viewport.bottom && rect.left >= viewport.left && rect.right <= viewport.right) return;
+    setBoardOffset({ x: 20 - element!.offsetLeft * boardScale, y: 20 - element!.offsetTop * boardScale });
   });
-  const addActivitiesWidget = () => setTrip(current => {
-    const existing = current.widgets.find(widget => widget.type === 'activities');
-    if (existing) {
-      focusWidget(existing);
-      return current;
-    }
-    const explorer = current.widgets.find(widget => widget.type === 'map');
-    const widget = {
-      id: crypto.randomUUID(),
-      type: 'activities' as const,
-      gridX: explorer ? Math.min(6 - 3, explorer.gridX + explorer.w) : 0,
-      gridY: explorer?.gridY ?? Math.max(0, ...current.widgets.map(item => item.gridY + item.h)),
-      w: 3,
-      h: 3,
-      title: 'Saved activities',
-      createdBy: widgetCreator
-    };
-    const placed = findOpenPosition(current.widgets, widget, widget.gridX, widget.gridY);
-    focusWidget(placed);
-    return {
-      ...current,
-      widgets: [...current.widgets, placed],
-      links: (current.links ?? []).filter(link => {
-        const from = current.widgets.find(item => item.id === link.fromId);
-        const to = current.widgets.find(item => item.id === link.toId);
+  const addBoardWidget = (type: Exclude<WidgetType, 'availability' | 'activities' | 'map'>) => {
+    setAddMenuOpen(false);
+    const id = crypto.randomUUID();
+    setTrip(current => {
+      const widget: Widget = {
+        id, type, gridX: 0, gridY: Math.max(0, ...current.widgets.map(item => item.gridY + item.h)),
+        w: type === 'table' ? 4 : type === 'checklist' || type === 'note' || type === 'vote' ? 2 : 3,
+        h: type === 'note' ? 1 : type === 'vote' ? 2 : type === 'checklist' ? 4 : 5,
+        createdBy: user?.name || user?.email || 'You',
+        ...(type === 'note' ? { body: '', author: user?.name || user?.email || 'You', createdAt: new Date().toISOString(), noteColor: 'mint' as const } :
+          type === 'vote' ? { body: '', options: [{ label: 'Option 1', votes: 0 }, { label: 'Option 2', votes: 0 }], multiSelect: false } :
+          type === 'flights' ? { flights: [] } : type === 'checklist' ? { tasks: [], checklists: [{ id: crypto.randomUUID(), title: 'Checklist' }], checklistLayoutVersion: 2 } :
+          type === 'table' ? { table: { columns: [{ id: crypto.randomUUID(), name: 'Name', type: 'text' as const }, { id: crypto.randomUUID(), name: 'Notes', type: 'text' as const }], rows: [{ id: crypto.randomUUID(), cells: {} }] } } : {})
+      };
+      return { ...current, widgets: [...current.widgets, widget] };
+    });
+    focusWidget({ id });
+  };
+  const addActivitiesWidget = () => {
+    const existing = trip.widgets.find(widget => widget.type === 'activities');
+    if (existing) { focusWidget(existing); return; }
+    const id = crypto.randomUUID();
+    setTrip(current => {
+      if (current.widgets.some(widget => widget.type === 'activities')) return current;
+      const explorer = current.widgets.find(widget => widget.type === 'map');
+      const widget: Widget = { id, type: 'activities', gridX: explorer ? Math.min(3, explorer.gridX + explorer.w) : 0, gridY: explorer?.gridY ?? Math.max(0, ...current.widgets.map(item => item.gridY + item.h)), w: 3, h: 3, title: 'Saved activities', createdBy: widgetCreator };
+      const placed = findOpenPosition(current.widgets, widget, widget.gridX, widget.gridY);
+      return { ...current, widgets: [...current.widgets, placed], links: (current.links || []).filter(link => {
+        const from = current.widgets.find(item => item.id === link.fromId); const to = current.widgets.find(item => item.id === link.toId);
         return !(from?.type === 'map' && to?.type === 'activities' || from?.type === 'activities' && to?.type === 'map');
-      })
-    };
-  });
+      }) };
+    });
+    focusWidget({ id });
+  };
   trip = safeTrip;
   return <section className="whiteboard-shell"><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-card px-4 sm:px-5"><div className="flex min-w-0 items-center gap-3"><Brand homeLink /><span className="hidden h-6 w-px bg-border sm:block" /><div className="hidden items-center gap-2 text-xs text-muted-foreground lg:flex">{trip.destination ? <><MapPin size={14} className="text-primary" /><span>{trip.destination}</span></> : <><span className="text-amber-600">⚠</span><span>Location needed</span></>}{trip.availability.status === 'confirmed' ? <><span className="h-3 w-px bg-border" /><CalendarDays size={14} className="text-primary" /><span>{trip.availability.start} – {trip.availability.end}</span></> : <><span className="h-3 w-px bg-border" /><span className="text-amber-600">⚠</span><span>Dates needed</span></>}</div><input aria-label="Trip name" value={trip.name} onChange={event => setTrip(current => ({
           ...current,
@@ -1028,12 +1054,10 @@ function Whiteboard({
         }))} placeholder="Untitled trip" className="min-w-0 max-w-[220px] bg-transparent text-sm font-semibold outline-none placeholder:text-muted-foreground" /><nav aria-label="Trip workspace" className="ml-2 hidden items-center gap-1 text-sm md:flex"><span className="rounded-lg bg-muted px-3 py-2 font-semibold">Whiteboard</span><button onClick={hasItinerary ? onOpenItinerary : onItinerary} className="rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground">Itinerary</button></nav></div><div className="flex items-center gap-2"><div className="relative group"><button className="flex h-10 items-center rounded-full border border-border bg-card pl-1.5 pr-2 text-primary transition hover:bg-[hsl(var(--green-50))]" title="Board members" aria-label={`${trip.members.length} board collaborators`}><span className="flex items-center">{trip.members.slice(0, 3).map((member, index) => <span style={avatarStyle(member.id || member.email)} key={member.id || member.email || index} className={`grid h-7 w-7 place-items-center rounded-full border-2 border-card bg-primary text-xs font-semibold text-primary-foreground ${index ? '-ml-2' : ''}`}>{member.image ? <img src={member.image} alt="" className="h-full w-full rounded-full object-cover" /> : memberInitial(member)}</span>)}{trip.members.length > 3 && <span className="-ml-2 grid h-7 min-w-7 place-items-center rounded-full border-2 border-card bg-muted px-1 text-[11px] font-semibold text-muted-foreground">+{trip.members.length - 3}</span>}</span><span className="ml-1.5 text-xs font-semibold text-foreground">{trip.members.length}</span></button><div className="pointer-events-none absolute right-0 top-full z-40 mt-2 hidden w-64 rounded-xl border border-border bg-card p-2 shadow-lg group-hover:block group-focus-within:block"><p className="px-2 py-1 text-xs font-semibold text-muted-foreground">Board members</p>{trip.members.length ? trip.members.map((member, index) => {
               const name = member.name || member.email || 'Guest';
               return <div key={member.id || member.email || index} className="flex items-center gap-2 rounded-lg px-2 py-2"><span style={avatarStyle(member.id || member.email)} className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{member.image ? <img src={member.image} alt="" className="h-full w-full rounded-full object-cover" /> : memberInitial(member)}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold">{name}</span><span className="block truncate text-xs text-muted-foreground">{member.role === 'owner' ? 'Board owner' : 'Joined the board'}</span></span></div>;
-            }) : <p className="px-2 py-2 text-sm text-muted-foreground">No members yet.</p>}</div></div><button onClick={() => setNotificationsOpen(!notificationsOpen)} className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground transition hover:bg-muted" aria-label="Notifications"><Bell size={18} />{unread > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />}</button><PrimaryButton onClick={() => onModal('invite')} className="h-10 rounded-full px-3 sm:px-4"><Users size={16} /><span className="hidden sm:inline">Board key</span><span className="sm:hidden">Key</span></PrimaryButton><ProfileMenu /></div></header><div className="whiteboard-canvas"><div ref={viewportRef} className="whiteboard-viewport" onWheel={event => {
-        if (!event.ctrlKey && !event.metaKey) return;
-        event.preventDefault();
-        setBoardScale(scale => Math.max(0.6, Math.min(1.6, scale - event.deltaY * 0.001)));
-      }} onPointerDown={event => {
-        if (event.button === 1 || event.shiftKey) {
+            }) : <p className="px-2 py-2 text-sm text-muted-foreground">No members yet.</p>}</div></div><button onClick={() => setNotificationsOpen(!notificationsOpen)} className="relative grid h-10 w-10 place-items-center rounded-full border border-border bg-card text-foreground transition hover:bg-muted" aria-label="Notifications"><Bell size={18} />{unread > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive" />}</button><PrimaryButton onClick={() => onModal('invite')} className="h-10 rounded-full px-3 sm:px-4"><Users size={16} /><span className="hidden sm:inline">Board key</span><span className="sm:hidden">Key</span></PrimaryButton><ProfileMenu /></div></header><div className="whiteboard-canvas"><div ref={viewportRef} className="whiteboard-viewport" data-panning={Boolean(panning)} onPointerDown={event => {
+        if (!event.currentTarget.contains(event.target as Node)) return;
+        if (event.button === 1 || (event.button === 0 && !(event.target as Element).closest('[data-widget-id], button, input, textarea, select, a, [role=button], .widget-link-group'))) {
+          event.preventDefault();
           event.currentTarget.setPointerCapture(event.pointerId);
           setPanning({
             x: event.clientX,
@@ -1051,7 +1075,7 @@ function Whiteboard({
       }} onPointerUp={event => {
         setPanning(null);
         endPointerDrag(event);
-      }} onPointerCancel={endPointerDrag}><div className="whiteboard-grid" style={{
+      }} onPointerCancel={event => { setPanning(null); endPointerDrag(event); }}><div className="whiteboard-grid" style={{
           transform: `translate(${boardOffset.x}px, ${boardOffset.y}px) scale(${boardScale})`,
           transformOrigin: 'top left',
           gridTemplateColumns: `repeat(6, ${cellWidth - 10}px)`,
@@ -1065,7 +1089,7 @@ function Whiteboard({
           }} setDateDraft={draft => setDateDrafts(current => ({
             ...current,
             [widget.id]: draft
-          }))} onConfirmDates={() => confirmDatesInWidget(widget.id)} onExpandExplorer={() => setExplorerOpen(true)} onShowActivities={addActivitiesWidget} linkSourceId={linkSourceId} onStartLink={startLink} onCompleteLink={completeLink} onPointerDragStart={startPointerDrag} />)}</div></div><div className="whiteboard-zoom-controls" role="group" aria-label="Whiteboard zoom"><button onClick={() => setBoardScale(scale => Math.min(1.6, scale + 0.1))} aria-label="Zoom in"><Plus size={16} /></button><span>{Math.round(boardScale * 100)}%</span><button onClick={() => setBoardScale(scale => Math.max(0.6, scale - 0.1))} aria-label="Zoom out"><Minus size={16} /></button></div>{hasItinerary ? <aside className="itinerary-sync-control"><button onClick={onOpenItinerary} className="flex min-w-0 items-center gap-2 text-left"><CalendarDays size={16} className="shrink-0 text-primary" /><span className="min-w-0"><span className="block text-sm font-semibold">Itinerary</span><span className="block truncate text-xs text-muted-foreground">Open your plan</span></span></button><button disabled={!itineraryNeedsSync} onClick={onItinerary} className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-card">Sync</button></aside> : <aside className="checklist-sidebar"><div className="flex items-center justify-between"><h2 className="text-xl font-semibold">{home.whiteboard.checklistTitle}</h2><span className="rounded-full bg-muted px-2.5 py-1 text-[13px] font-medium text-muted-foreground">{items.filter(Boolean).length}/3</span></div><div className="mt-4 grid gap-2">{home.whiteboard.checklist.map((item, index) => <button key={item.label} onClick={() => {
+          }))} onConfirmDates={() => confirmDatesInWidget(widget.id)} onExpandExplorer={() => setExplorerOpen(true)} onShowActivities={addActivitiesWidget} linkSourceId={linkSourceId} onStartLink={startLink} onCompleteLink={completeLink} onPointerDragStart={startPointerDrag} />)}</div></div><div className="whiteboard-zoom-controls" role="group" aria-label="Whiteboard zoom"><button onClick={() => zoomBoard(boardScale + 0.1)} aria-label="Zoom in"><Plus size={16} /></button><span>{Math.round(boardScale * 100)}%</span><button onClick={() => zoomBoard(boardScale - 0.1)} aria-label="Zoom out"><Minus size={16} /></button></div>{hasItinerary ? <aside className="itinerary-sync-control"><button onClick={onOpenItinerary} className="flex min-w-0 items-center gap-2 text-left"><CalendarDays size={16} className="shrink-0 text-primary" /><span className="min-w-0"><span className="block text-sm font-semibold">Itinerary</span><span className="block truncate text-xs text-muted-foreground">Open your plan</span></span></button><button disabled={!itineraryNeedsSync} onClick={onItinerary} className="rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-semibold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground disabled:hover:bg-card">Sync</button></aside> : <aside className="checklist-sidebar"><div className="flex items-center justify-between"><h2 className="text-xl font-semibold">{home.whiteboard.checklistTitle}</h2><span className="rounded-full bg-muted px-2.5 py-1 text-[13px] font-medium text-muted-foreground">{items.filter(Boolean).length}/3</span></div><div className="mt-4 grid gap-2">{home.whiteboard.checklist.map((item, index) => <button key={item.label} onClick={() => {
             if (index === 0) setDestinationSearchOpen(true);else if (index === 1) {
               setAvailabilityFocus(true);
               window.setTimeout(() => setAvailabilityFocus(false), 2200);
@@ -1079,74 +1103,9 @@ function Whiteboard({
           }} exit={{
             opacity: 0,
             y: 8
-          }} className="whiteboard-add-menu"><button onClick={() => {
-              setAddMenuOpen(false);
-              onModal('activity');
-            }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted"><MapPin size={16} className="text-primary" />Map</button><button onClick={() => {
-              setAddMenuOpen(false);
-              setTrip(current => ({
-                ...current,
-                widgets: [...current.widgets, {
-                  id: crypto.randomUUID(),
-                  type: 'note',
-                  gridX: 0,
-                  gridY: Math.max(0, ...current.widgets.map(item => item.gridY + item.h)),
-                  w: 2,
-                  h: 1,
-                  body: '',
-                  author: user?.name || user?.email || 'You',
-                  createdBy: user?.name || user?.email || 'You',
-                  createdAt: new Date().toISOString(),
-                  noteColor: 'mint'
-                }]
-              }));
-            }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted"><MessageSquareText size={16} className="text-primary" />Note</button><button onClick={() => {
-              setAddMenuOpen(false);
-              setTrip(current => ({
-                ...current,
-                widgets: [...current.widgets, {
-                  id: crypto.randomUUID(),
-                  type: 'vote',
-                  gridX: 3,
-                  gridY: Math.max(0, ...current.widgets.map(item => item.gridY + item.h)),
-                  w: 2,
-                  h: 2,
-                  title: 'Vote',
-                  body: '',
-                  createdBy: user?.name || user?.email || 'You',
-                  options: [{
-                    label: 'Option 1',
-                    votes: 0
-                  }, {
-                    label: 'Option 2',
-                    votes: 0
-                  }],
-                  multiSelect: false,
-                  selectedVotes: []
-                }]
-              }));
-            }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted"><Vote size={16} className="text-primary" />Vote</button>{(['flights', 'checklist', 'table'] as const).map(type => <button key={type} onClick={() => {
-              setAddMenuOpen(false);
-              setTrip(current => ({ ...current, widgets: [...current.widgets, {
-                id: crypto.randomUUID(), type, gridX: 0, gridY: Math.max(0, ...current.widgets.map(item => item.gridY + item.h)), w: type === 'table' ? 4 : 3, h: 5,
-                title: type === 'flights' ? 'Flights' : type === 'checklist' ? 'Shared checklist' : 'Table', createdBy: user?.name || user?.email || 'You',
-                ...(type === 'flights' ? { flights: [] } : type === 'checklist' ? { tasks: [] } : { table: { columns: [{ id: crypto.randomUUID(), name: 'Item', type: 'text' as const }, { id: crypto.randomUUID(), name: 'Notes', type: 'text' as const }], rows: [] } })
-              }] }));
-            }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted"><Plus size={16} className="text-primary" />{type === 'flights' ? 'Flights' : type === 'checklist' ? 'Shared checklist' : 'Table'}</button>)}<button onClick={() => {
-              setAddMenuOpen(false);
-              setTrip(current => ({ ...current, widgets: [...current.widgets, {
-                id: crypto.randomUUID(), type: 'expenses', gridX: 0,
-                gridY: Math.max(0, ...current.widgets.map(item => item.gridY + item.h)),
-                w: 3, h: 4, createdBy: user?.name || user?.email || 'You'
-              }] }));
-            }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted"><Wallet size={16} className="text-primary" />Trip Expenses</button><button onClick={() => {
-              setAddMenuOpen(false);
-              setTrip(current => ({ ...current, widgets: [...current.widgets, {
-                id: crypto.randomUUID(), type: 'saved-links', gridX: 3,
-                gridY: Math.max(0, ...current.widgets.map(item => item.gridY + item.h)),
-                w: 3, h: 4, createdBy: user?.name || user?.email || 'You'
-              }] }));
-            }} className="flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-muted"><Bookmark size={16} className="text-primary" />Saved Links</button></motion.div>}</AnimatePresence><button onClick={() => setAddMenuOpen(true)} aria-expanded={addMenuOpen} className="whiteboard-fab" aria-label="Add to whiteboard" title="Add to whiteboard"><Plus size={20} /></button></div><p className="whiteboard-hint"><GripVertical size={15} />Drag widgets between grid cells · nothing here is a required step</p></div><AnimatePresence>{notificationsOpen && <NotificationsDrawer trip={trip} onClose={() => setNotificationsOpen(false)} />}{explorerOpen && <ExplorerModal trip={trip} setTrip={setTrip} onShowActivities={addActivitiesWidget} onClose={() => setExplorerOpen(false)} />}</AnimatePresence><AnimatePresence>{destinationSearchOpen && <DestinationSearchModal query={destinationQuery} setQuery={setDestinationQuery} onClose={() => setDestinationSearchOpen(false)} onSelect={destination => {
+          }} className="whiteboard-add-menu"><button onClick={() => { setAddMenuOpen(false); onModal('activity'); }} className="widget-menu-item"><MapPin size={16} />Map</button>{([
+  ['note', 'Note', MessageSquareText], ['vote', 'Vote', Vote], ['flights', 'Flights', Plane], ['checklist', 'Shared checklist', ListChecks], ['table', 'Table', Table2], ['expenses', 'Trip Expenses', Wallet], ['saved-links', 'Saved Links', Bookmark]
+] as const).map(([type, name, Icon]) => <button key={type} onClick={() => addBoardWidget(type)} className="widget-menu-item"><Icon size={16} />{name}</button>)}</motion.div>}</AnimatePresence><button onClick={() => setAddMenuOpen(true)} aria-expanded={addMenuOpen} className="whiteboard-fab" aria-label="Add to whiteboard" title="Add to whiteboard"><Plus size={20} /></button></div><p className="whiteboard-hint"><GripVertical size={15} />Drag empty canvas to pan · Ctrl/⌘ + scroll to zoom</p></div><AnimatePresence>{notificationsOpen && <NotificationsDrawer trip={trip} onClose={() => setNotificationsOpen(false)} />}{explorerOpen && <ExplorerModal trip={trip} setTrip={setTrip} onShowActivities={addActivitiesWidget} onClose={() => setExplorerOpen(false)} />}</AnimatePresence><AnimatePresence>{destinationSearchOpen && <DestinationSearchModal query={destinationQuery} setQuery={setDestinationQuery} onClose={() => setDestinationSearchOpen(false)} onSelect={destination => {
         setTrip(current => ({
           ...current,
           destination
@@ -1229,7 +1188,28 @@ function WidgetCard({
     const value = format(day, 'yyyy-MM-dd');
     setAvailabilityDraft(days => days.includes(value) ? days.filter(item => item !== value) : [...days, value]);
   };
-  const [hovered, setHovered] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  useEffect(() => {
+    if (widget.type !== 'checklist' || widget.checklistLayoutVersion === 2) return;
+    setTrip(current => ({ ...current, widgets: current.widgets.map(item => item.id === widget.id ? { ...item, w: 2, checklistLayoutVersion: 2 } : item) }));
+  }, [widget.id, widget.type, widget.checklistLayoutVersion, setTrip]);
+  useEffect(() => {
+    if (widget.type !== 'checklist') return;
+    const card = document.querySelector<HTMLElement>(`[data-widget-id="${widget.id}"]`);
+    const content = card?.querySelector<HTMLElement>('.clean-checklist');
+    const body = card?.querySelector<HTMLElement>('.planning-widget-body');
+    if (!card || !content || !body) return;
+    const fit = () => {
+      const style = getComputedStyle(body);
+      const pixels = content.offsetHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) + (card.querySelector<HTMLElement>('.widget-header')?.offsetHeight || 42) + 2;
+      const h = Math.max(2, Math.ceil((pixels + 10) / 88));
+      setTrip(current => current.widgets.find(item => item.id === widget.id)?.h === h ? current : { ...current, widgets: current.widgets.map(item => item.id === widget.id ? { ...item, h } : item) });
+    };
+    const observer = new ResizeObserver(fit); observer.observe(content); fit();
+    return () => observer.disconnect();
+  }, [widget.id, widget.type, setTrip]);
   const [resizing, setResizing] = useState(false);
   const [month, setMonth] = useState(trip.availability.start ? new Date(`${trip.availability.start}T12:00:00`) : new Date());
   const gridStyle = {
@@ -1237,7 +1217,7 @@ function WidgetCard({
     gridRow: `${widget.gridY + 1} / span ${widget.h}`,
     ...(widget.type === 'vote' ? { height: 'fit-content', alignSelf: 'start' } : {})
   };
-  const title = widget.type === 'availability' ? 'Availability' : widget.type === 'note' ? widget.title || 'Note' : widget.type === 'vote' ? widget.title || 'Vote' : widget.type === 'activities' ? 'Saved activities' : widget.type === 'flights' ? widget.title || 'Flights' : widget.type === 'checklist' ? widget.title || 'Shared checklist' : widget.type === 'table' ? widget.title || 'Table' : widget.type === 'expenses' ? 'Trip Expenses' : widget.type === 'saved-links' ? 'Saved Links' : 'Explorer';
+  const title = widget.title?.trim() || (widget.type === 'availability' ? 'Availability' : widget.type === 'note' ? widget.title || 'Note' : widget.type === 'vote' ? widget.title || 'Vote' : widget.type === 'activities' ? 'Saved activities' : widget.type === 'flights' ? widget.title || 'Flights' : widget.type === 'checklist' ? widget.title || 'Shared checklist' : widget.type === 'table' ? widget.title || 'Table' : widget.type === 'expenses' ? 'Trip Expenses' : widget.type === 'saved-links' ? 'Saved Links' : 'Explorer');
   const availabilityByDay = (trip.members ?? []).reduce<Record<string, number>>((counts, member) => {
     const days = member.availability ?? [];
     days.forEach(day => {
@@ -1277,7 +1257,7 @@ function WidgetCard({
     window.addEventListener('pointermove', onMovePointer);
     window.addEventListener('pointerup', onUp);
   };
-  return <article data-widget-type={widget.type} data-widget-id={widget.id} draggable={false} data-resizing={resizing} onClick={() => linkSourceId && linkSourceId !== widget.id && onCompleteLink(widget.id)} style={gridStyle} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} className={`widget-card ${highlightAvailability ? 'ring-4 ring-primary ring-offset-4 animate-pulse' : ''}`}><header className="widget-header" onPointerDown={event => { if (!(event.target as HTMLElement).closest('button, a, input, textarea, select, [role="button"]')) onPointerDragStart(event, widget.id); }}><button type="button" className="widget-drag-handle touch-none" onPointerDown={event => onPointerDragStart(event, widget.id)} aria-label={`Drag ${title} widget`} title="Drag to move"><GripVertical size={15} /></button><span className="flex min-w-0 items-center gap-2">{widget.type === 'availability' ? <CalendarDays size={15} className="text-primary" /> : widget.type === 'note' ? <MessageSquareText size={15} className="text-primary" /> : widget.type === 'vote' ? <Vote size={15} className="text-primary" /> : widget.type === 'activities' ? <Route size={15} className="text-primary" /> : widget.type === 'flights' ? <Plane size={15} className="text-primary" /> : widget.type === 'checklist' ? <ListChecks size={15} className="text-primary" /> : widget.type === 'table' ? <Table2 size={15} className="text-primary" /> : widget.type === 'expenses' ? <Wallet size={15} className="text-primary" /> : widget.type === 'saved-links' ? <Bookmark size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}<span className="truncate font-semibold">{title}</span>{widget.createdBy && <span className="truncate text-[11px] font-normal text-muted-foreground">by {widget.createdBy}</span>}</span>{widget.type === 'availability' && <button type="button" onClick={event => { event.stopPropagation(); if (!editingAvailability) beginAvailability(); }} className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-muted">Your availability</button>}{hovered && <span className="flex items-center gap-1"><button onClick={event => {
+  return <article data-widget-type={widget.type} data-widget-id={widget.id} draggable={false} data-resizing={resizing} onClick={() => linkSourceId && linkSourceId !== widget.id && onCompleteLink(widget.id)} style={gridStyle} className={`widget-card ${highlightAvailability ? 'ring-4 ring-primary ring-offset-4 animate-pulse' : ''}`}><header className="widget-header" onPointerDown={event => { if (!(event.target as HTMLElement).closest('button, a, input, textarea, select, [role="button"]')) onPointerDragStart(event, widget.id); }}><button type="button" className="widget-drag-handle touch-none" onPointerDown={event => onPointerDragStart(event, widget.id)} aria-label={`Drag ${title} widget`} title="Drag to move"><GripVertical size={15} /></button><span className="flex min-w-0 items-center gap-2">{widget.type === 'availability' ? <CalendarDays size={15} className="text-primary" /> : widget.type === 'note' ? <MessageSquareText size={15} className="text-primary" /> : widget.type === 'vote' ? <Vote size={15} className="text-primary" /> : widget.type === 'activities' ? <Route size={15} className="text-primary" /> : widget.type === 'flights' ? <Plane size={15} className="text-primary" /> : widget.type === 'checklist' ? <ListChecks size={15} className="text-primary" /> : widget.type === 'table' ? <Table2 size={15} className="text-primary" /> : widget.type === 'expenses' ? <Wallet size={15} className="text-primary" /> : widget.type === 'saved-links' ? <Bookmark size={15} className="text-primary" /> : <MapPin size={15} className="text-primary" />}{renaming ? <input autoFocus aria-label="Widget title" className="widget-title-input" value={titleDraft} onChange={event => setTitleDraft(event.target.value)} onBlur={() => { const value = titleDraft.trim(); if (value) setTrip(current => ({ ...current, widgets: current.widgets.map(item => item.id === widget.id ? { ...item, title: value } : item) })); setRenaming(false); }} onKeyDown={event => { event.stopPropagation(); if (event.key === 'Enter') event.currentTarget.blur(); if (event.key === 'Escape') setRenaming(false); }} /> : <span className="widget-title truncate font-semibold" tabIndex={0} title="Double-click to rename" onDoubleClick={event => { event.stopPropagation(); setTitleDraft(title); setRenaming(true); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === 'F2') { event.preventDefault(); setTitleDraft(title); setRenaming(true); } }}>{title}</span>}{widget.createdBy && <span className="truncate text-[11px] font-normal text-muted-foreground">by {widget.createdBy}</span>}</span>{widget.type === 'availability' && <button type="button" onClick={event => { event.stopPropagation(); if (!editingAvailability) beginAvailability(); }} className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-primary hover:bg-muted">Your availability</button>}<button type="button" className={`widget-action widget-settings-toggle ${settingsOpen ? 'bg-muted text-primary' : ''}`} aria-label="Widget settings" aria-expanded={settingsOpen} title="Settings" onClick={() => setSettingsOpen(open => !open)}><Settings2 size={15} /></button>{settingsOpen && <span className="flex items-center gap-1"><button onClick={event => {
           event.stopPropagation();
           onStartLink(widget.id);
         }} className={`widget-action ${linkSourceId === widget.id ? 'widget-link-active' : ''}`} aria-label="Link this widget" title="Link this widget"><Route size={14} /></button><button onClick={() => onMove(widget.id, 'left')} className="widget-action" aria-label="Move left">←</button><button onClick={() => onMove(widget.id, 'right')} className="widget-action" aria-label="Move right">→</button>{widget.type !== 'availability' && <button onClick={() => onDelete(widget.id)} className="widget-action" aria-label="Delete widget"><Trash2 size={14} /></button>}</span>}</header>{widget.type === 'availability' && <div className="availability-widget-body p-4"><AvailabilityCalendar month={month} setMonth={setMonth}
@@ -1289,7 +1269,7 @@ function WidgetCard({
           <p className="w-full text-xs text-muted-foreground">Select the days you are free.</p>
           <button type="button" onClick={() => setEditingAvailability(false)} className="rounded-md px-2 py-1.5 text-xs font-semibold text-muted-foreground">Cancel</button>
           <button type="button" onClick={() => { onSaveAvailability([...availabilityDraft].sort()); setEditingAvailability(false); }} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">Save availability</button>
-        </div>}{!editingAvailability && <div className="mt-4 border-t border-border pt-3"><p className="text-sm font-semibold">Confirm trip dates</p><p className="mt-1 text-[13px] text-muted-foreground">{trip.availability.status === 'confirmed' ? 'Change your trip dates below.' : 'Enter the dates your group plans to travel.'}</p><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-xs">Start<input aria-label="Trip start date" type="date" value={dateDraft.start} onChange={event => setDateDraft({ start: event.target.value, end: dateDraft.end })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-xs">End<input aria-label="Trip end date" type="date" min={dateDraft.start || undefined} value={dateDraft.end} onChange={event => setDateDraft({ ...dateDraft, end: event.target.value })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label></div><button disabled={!dateDraft.start || !dateDraft.end || dateDraft.end < dateDraft.start} onClick={onConfirmDates} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-45"><Check size={15} />{trip.availability.status === 'confirmed' ? 'Update dates' : 'Confirm dates'}</button><button onClick={() => beginAvailability()} className="mt-3 block text-[12px] font-semibold text-primary">{trip.availability.status === 'confirmed' ? 'Update availability' : 'Add availability'}</button></div>}</div>}{widget.type === 'expenses' && <ExpenseTrackerWidget trip={trip} setTrip={setTrip} />}{widget.type === 'saved-links' && <SavedLinksWidget trip={trip} setTrip={setTrip} />}{widget.type === 'note' && <StickyNote widget={widget} setTrip={setTrip} />}<button onPointerDown={resizeWidget} className="widget-resize-handle" aria-label={`Resize ${title} widget`} title="Drag to resize">↘</button>{(widget.type === 'flights' || widget.type === 'checklist' || widget.type === 'table') && <PlanningWidgets type={widget.type} data={widget} members={trip.members} startDate={trip.availability.start} destination={trip.destination} onChange={patch => setTrip(current => ({ ...current, widgets: current.widgets.map(item => item.id === widget.id ? { ...item, ...patch } : item) }))} />}{widget.type === 'vote' && <VoteWidget widget={widget} setTrip={setTrip} />}{widget.type === 'map' && <ExplorerWidget trip={trip} setTrip={setTrip} onExpand={onExpandExplorer} onShowActivities={onShowActivities} />}{widget.type === 'activities' && <SavedActivitiesWidget locations={trip.locations} onDelete={id => setTrip(current => ({
+        </div>}{!editingAvailability && <div className="mt-4 border-t border-border pt-3"><p className="text-sm font-semibold">Confirm trip dates</p><p className="mt-1 text-[13px] text-muted-foreground">{trip.availability.status === 'confirmed' ? 'Change your trip dates below.' : 'Enter the dates your group plans to travel.'}</p><div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2"><label className="text-xs">Start<input aria-label="Trip start date" type="date" value={dateDraft.start} onChange={event => setDateDraft({ start: event.target.value, end: dateDraft.end })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label><label className="text-xs">End<input aria-label="Trip end date" type="date" min={dateDraft.start || undefined} value={dateDraft.end} onChange={event => setDateDraft({ ...dateDraft, end: event.target.value })} className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-xs" /></label></div><button disabled={!dateDraft.start || !dateDraft.end || dateDraft.end < dateDraft.start} onClick={onConfirmDates} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-45"><Check size={15} />{trip.availability.status === 'confirmed' ? 'Update dates' : 'Confirm dates'}</button><button onClick={() => beginAvailability()} className="mt-3 block text-[12px] font-semibold text-primary">{trip.availability.status === 'confirmed' ? 'Update availability' : 'Add availability'}</button></div>}</div>}{widget.type === 'expenses' && <ExpenseTrackerWidget trip={trip} setTrip={setTrip} settingsOpen={settingsOpen} budget={widget.expenseBudget} onBudgetChange={expenseBudget => setTrip(current => ({ ...current, widgets: current.widgets.map(item => item.id === widget.id ? { ...item, expenseBudget } : item) }))} />}{widget.type === 'saved-links' && <SavedLinksWidget trip={trip} setTrip={setTrip} settingsOpen={settingsOpen} />}{widget.type === 'note' && <StickyNote widget={widget} setTrip={setTrip} />}<button onPointerDown={resizeWidget} className="widget-resize-handle" aria-label={`Resize ${title} widget`} title="Drag to resize">↘</button>{(widget.type === 'flights' || widget.type === 'checklist' || widget.type === 'table') && <PlanningWidgets settingsOpen={settingsOpen} onSplit={() => setTrip(current => ({ ...current, widgets: splitChecklistWidgets(current.widgets, widget.id) }))} onCombine={() => setTrip(current => { const combined = combineChecklistWidgets(current.widgets, widget.id); const links = (current.links || []).map(link => ({ ...link, fromId: combined.mergedIds.includes(link.fromId) ? combined.targetId : link.fromId, toId: combined.mergedIds.includes(link.toId) ? combined.targetId : link.toId })).filter(link => link.fromId !== link.toId); return { ...current, widgets: combined.widgets, links: links.filter((link, index) => links.findIndex(other => other.fromId === link.fromId && other.toId === link.toId) === index) }; })} type={widget.type} data={widget} members={trip.members} startDate={trip.availability.start} destination={trip.destination} onChange={patch => setTrip(current => ({ ...current, widgets: current.widgets.map(item => item.id === widget.id ? { ...item, ...patch } : item) }))} />}{widget.type === 'vote' && <VoteWidget widget={widget} setTrip={setTrip} settingsOpen={settingsOpen} />}{widget.type === 'map' && <ExplorerWidget trip={trip} setTrip={setTrip} onExpand={onExpandExplorer} onShowActivities={onShowActivities} />}{widget.type === 'activities' && <SavedActivitiesWidget locations={trip.locations} onDelete={id => setTrip(current => ({
       ...current,
       locations: current.locations.filter(place => place.id !== id)
     }))} />}</article>;
@@ -1353,9 +1333,11 @@ function SavedActivitiesWidget({
 }
 function VoteWidget({
   widget,
-  setTrip
+  setTrip,
+  settingsOpen
 }: {
   widget: Widget;
+  settingsOpen: boolean;
   setTrip: React.Dispatch<React.SetStateAction<Trip>>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -1398,6 +1380,7 @@ function VoteWidget({
     fitContent();
     return () => observer.disconnect();
   }, [widget.id, setTrip]);
+  useEffect(() => { if (!settingsOpen) setEditing(false); }, [settingsOpen]);
   const openEditor = () => setEditing(true);
   const closeEditor = () => setEditing(false);
   const updateOption = (index: number, label: string) => update({
@@ -1441,7 +1424,7 @@ function VoteWidget({
       votes: 0
     }))
   });
-  return <div ref={contentRef} className="vote-widget p-4" draggable={false} onDragStart={event => event.preventDefault()}><div className="flex items-start justify-between gap-3"><p className={`text-sm font-semibold ${widget.body ? 'text-foreground' : 'text-muted-foreground'}`}>{widget.body || 'Add your question'}</p><button type="button" draggable={false} onDragStart={event => event.preventDefault()} onClick={() => editing ? closeEditor() : openEditor()} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label={editing ? "Done editing vote" : "Edit vote"} title={editing ? "Done editing" : "Edit vote"}>{editing ? <Check size={14} /> : <Pencil size={14} />}</button></div>{editing && <div className="mt-2 grid gap-2 rounded-lg bg-muted p-2"><input value={widget.body || ''} onChange={event => update({
+  return <div ref={contentRef} className="vote-widget p-4" draggable={false} onDragStart={event => event.preventDefault()}><div className="flex items-start justify-between gap-3"><p className={`text-sm font-semibold ${widget.body ? 'text-foreground' : 'text-muted-foreground'}`}>{widget.body || 'Add your question'}</p>{settingsOpen && <button type="button" draggable={false} onDragStart={event => event.preventDefault()} onClick={() => editing ? closeEditor() : openEditor()} className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label={editing ? "Done editing vote" : "Edit vote"} title={editing ? "Done editing" : "Edit vote"}>{editing ? <Check size={14} /> : <Pencil size={14} />}</button>}</div>{editing && <div className="mt-2 grid gap-2 rounded-lg bg-muted p-2"><input value={widget.body || ''} onChange={event => update({
         body: event.target.value
       })} aria-label="Vote question" placeholder="Add your question" className="w-full border-b border-border bg-transparent pb-2 text-sm font-semibold outline-none placeholder:text-muted-foreground focus:border-primary" /><button type="button" onClick={toggleMulti} className="inline-flex items-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground" aria-pressed={Boolean(widget.multiSelect)}><span className={`grid h-4 w-4 place-items-center border ${widget.multiSelect ? 'rounded-sm border-primary bg-primary text-primary-foreground' : 'rounded-full border-border'}`}>{widget.multiSelect && <Check size={12} />}</span>Allow multiple choices</button>{widget.options?.map((option, index) => <div key={`${widget.id}-edit-${index}`} className="flex gap-2"><input value={option.label} onChange={event => updateOption(index, event.target.value)} aria-label={`Option ${index + 1}`} placeholder={`Option ${index + 1}`} className="min-w-0 flex-1 border-b border-border bg-transparent py-1 text-sm outline-none focus:border-primary" />{(widget.options?.length || 0) > 2 && <button type="button" onClick={() => update({
           options: widget.options?.filter((_, optionIndex) => optionIndex !== index)

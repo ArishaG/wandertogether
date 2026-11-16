@@ -18,6 +18,12 @@ describe('trip expense calculations', () => {
     { fromId: 'taylor', toId: 'alex', amountCents: 3000 }
   ]));
   it('returns nothing after full settlement', () => expect(calculateDebts([expense(9000)], [settlement('sam', 'alex', 3000), settlement('taylor', 'alex', 3000)])).toEqual([]));
+  it('reduces outstanding debt after a partial payment', () => expect(calculateDebts([expense(9000)], [settlement('sam', 'alex', 1000)])).toEqual([
+    { fromId: 'sam', toId: 'alex', amountCents: 2000 }, { fromId: 'taylor', toId: 'alex', amountCents: 3000 }
+  ]));
+  it('keeps overpayments as credit rather than silently discarding them', () => expect(calculateDebts([expense(9000, 'alex', ['alex', 'sam'])], [settlement('sam', 'alex', 5000)])).toEqual([
+    { fromId: 'alex', toId: 'sam', amountCents: 500 }
+  ]));
   it('supports expenses paid for by a non-participant', () => expect(calculateDebts([expense(2000, 'alex', ['sam'])], [])).toEqual([{ fromId: 'sam', toId: 'alex', amountCents: 2000 }]));
 });
 

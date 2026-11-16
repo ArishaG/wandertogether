@@ -1,4 +1,5 @@
 import { planningDetails, type PlanningWidgetFields } from './planning-widgets';
+import { formatMoney, type TripExpense, type TripSettlement } from './trip-finances';
 export type BoardChange = {
   key: string;
   label: string;
@@ -24,6 +25,8 @@ type TrackedWidget = PlanningWidgetFields & {
 type SavedPlace = { id: string; name?: string; detail?: string; category?: string; dayIndex?: number | null };
 type ItineraryDay = { date: string; entries: { title: string; time?: string; cost?: string | null; status?: string; duration?: number }[] };
 export type BoardSnapshot = {
+  expenses?: TripExpense[];
+  settlements?: TripSettlement[];
   name?: string;
   destination?: string | null;
   availability?: { start?: string | null; end?: string | null; status?: string; proposedDays?: string[] };
@@ -75,6 +78,12 @@ export function describeBoardChanges(before: BoardSnapshot, after: BoardSnapshot
     add(`widget:${id}:position`, `Moved ${name}`, `Column ${(previous.gridX || 0) + 1}, row ${(previous.gridY || 0) + 1}`, `Column ${(widget.gridX || 0) + 1}, row ${(widget.gridY || 0) + 1}`);
     add(`widget:${id}:size`, `Resized ${name}`, `${previous.w} × ${previous.h}`, `${widget.w} × ${widget.h}`);
     if (['flights', 'checklist', 'table'].includes(widget.type || '')) add(`widget:${id}:details`, `${name} details`, planningDetails(previous), planningDetails(widget));
+    if (widget.type === 'expenses') {
+      add(`widget:${id}:budget-enabled`, `${name} budget display`, previous.expenseBudget?.enabled ? 'Shown' : 'Hidden', widget.expenseBudget?.enabled ? 'Shown' : 'Hidden');
+      add(`widget:${id}:budget`, `${name} budget`, formatMoney(previous.expenseBudget?.amountCents || 0), formatMoney(widget.expenseBudget?.amountCents || 0));
+    }
+    if (widget.type === 'table') add(`widget:${id}:totals`, `${name} totals`, previous.tableOptions?.showTotals ? 'Shown' : 'Hidden', widget.tableOptions?.showTotals ? 'Shown' : 'Hidden');
+    if (widget.type === 'checklist') add(`widget:${id}:completed`, `${name} completed items`, previous.checklistOptions?.hideCompleted ? 'Hidden' : 'Shown', widget.checklistOptions?.hideCompleted ? 'Hidden' : 'Shown');
     if (widget.type === 'vote') {
       add(`widget:${id}:options`, `${name} poll options`, (previous.options || []).map(option => option.label).join('\n'), (widget.options || []).map(option => option.label).join('\n'));
       add(`widget:${id}:multiple`, `${name} multiple choices`, previous.multiSelect ? 'Allowed' : 'Not allowed', widget.multiSelect ? 'Allowed' : 'Not allowed');
@@ -90,6 +99,12 @@ export function describeBoardChanges(before: BoardSnapshot, after: BoardSnapshot
     }
   }
   for (const [id, widget] of oldWidgets) if (!newWidgets.has(id)) add(`widget:${id}`, `Removed ${widgetName(widget)}`, widgetText(widget), '');
+
+  const memberName = (id: string) => after.members?.find(member => member.id === id || member.email === id)?.name || before.members?.find(member => member.id === id || member.email === id)?.name || 'Member';
+  const expensesText = (expenses: TripExpense[] = []) => expenses.map(expense => `${expense.title}: ${formatMoney(expense.amountCents)} · paid by ${memberName(expense.paidBy)} · shared by ${expense.participantIds.map(memberName).join(', ')}`).join('\n');
+  const paymentsText = (payments: TripSettlement[] = []) => payments.map(payment => `${memberName(payment.fromId)} paid ${memberName(payment.toId)} ${formatMoney(payment.amountCents)}`).join('\n');
+  add('expenses', 'Trip expenses', expensesText(before.expenses), expensesText(after.expenses));
+  add('payments', 'Recorded payments', paymentsText(before.settlements), paymentsText(after.settlements));
 
   const oldPlaces = new Map((before.locations || []).map(place => [place.id, place]));
   const newPlaces = new Map((after.locations || []).map(place => [place.id, place]));
