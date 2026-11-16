@@ -64,21 +64,56 @@ export function buildInvitationEmail(input: { to: string; inviter: string; tripN
   return { subject, text, html };
 }
 
+const NOT_CONFIGURED = 'Email invitations are not configured yet. Share the invite link instead.';
+const SEND_FAILED = 'The invitation email could not be sent. Try again or share the invite link.';
+
+/** Gmail SMTP (GMAIL_USER + GMAIL_APP_PASSWORD) takes priority; otherwise Resend. */
+function getGmailConfig() {
+  const user = process.env.GMAIL_USER?.trim();
+  // Google displays app passwords in groups of four; accept them with or without spaces.
+  const pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '');
+  return user && pass ? { user, pass } : null;
+}
+
 export function isEmailConfigured() {
-  return Boolean(process.env.RESEND_API_KEY && process.env.INVITATION_FROM_EMAIL && getAppOrigin());
+  if (!getAppOrigin()) return false;
+  return Boolean(getGmailConfig() || (process.env.RESEND_API_KEY && process.env.INVITATION_FROM_EMAIL));
 }
 
 export async function sendEmail(to: string, content: { subject: string; text: string; html: string }) {
+  const gmail = getGmailConfig();
+  if (gmail) {
+    const { createTransport } = await import('nodemailer');
+    const transport = createTransport({
+      service: 'gmail',
+      auth: gmail,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
+    });
+    try {
+      // Gmail rewrites any other From address to the account itself, so always send as it.
+      await transport.sendMail({ from: { name: process.env.INVITATION_FROM_NAME?.trim() || 'Wander', address: gmail.user }, to, ...content });
+    } catch (error) {
+      console.error('Gmail send failed', error);
+      throw new Error(SEND_FAILED);
+    }
+    return;
+  }
+
   const key = process.env.RESEND_API_KEY;
   const from = process.env.INVITATION_FROM_EMAIL;
-  if (!key || !from) throw new Error('Email invitations are not configured yet. Share the invite link instead.');
+  if (!key || !from) throw new Error(NOT_CONFIGURED);
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ from, to: [to], ...content }),
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error('The invitation email could not be sent. Try again or share the invite link.');
+  if (!response.ok) {
+    console.error('Resend send failed', response.status, await response.text().catch(() => ''));
+    throw new Error(SEND_FAILED);
+  }
 }
 
 export class JoinBlockedError extends Error {}
