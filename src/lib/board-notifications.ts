@@ -1,3 +1,4 @@
+import { planningDetails, type PlanningWidgetFields } from './planning-widgets';
 export type BoardChange = {
   key: string;
   label: string;
@@ -16,7 +17,7 @@ export type BoardNotification = {
 };
 
 type PollOption = { label?: string; votes?: number; voterIds?: string[]; voters?: { name: string }[] };
-type TrackedWidget = {
+type TrackedWidget = PlanningWidgetFields & {
   id: string; type?: string; title?: string; body?: string; noteColor?: string;
   gridX?: number; gridY?: number; w?: number; h?: number; multiSelect?: boolean; options?: PollOption[];
 };
@@ -38,7 +39,7 @@ const text = (value: unknown) => value === null || value === undefined || value 
 const dates = (days: string[] = []) => [...new Set(days)].sort().join(', ') || 'None';
 const widgetName = (widget: TrackedWidget) => widget.title || (widget.type === 'vote' ? widget.body : '') || widget.type || 'Widget';
 const placeText = (place: SavedPlace) => [place.name, place.detail, place.category, place.dayIndex == null ? '' : `Day ${place.dayIndex + 1}`].filter(Boolean).join('\n');
-const widgetText = (widget: TrackedWidget) => [widget.title, widget.body, ...(widget.options || []).map(option => option.label)].filter(Boolean).join('\n') || widgetName(widget);
+const widgetText = (widget: TrackedWidget) => [widget.title, widget.body, planningDetails(widget), ...(widget.options || []).map(option => option.label)].filter(Boolean).join('\n') || widgetName(widget);
 const itineraryText = (days: ItineraryDay[] = []) => days.map(day => [
   day.date,
   ...day.entries.map(entry => [entry.time, entry.title, entry.cost, entry.status, entry.duration ? `${entry.duration} hours` : ''].filter(Boolean).join(' · ')),
@@ -73,6 +74,7 @@ export function describeBoardChanges(before: BoardSnapshot, after: BoardSnapshot
     add(`widget:${id}:color`, `${name} color`, previous.noteColor, widget.noteColor);
     add(`widget:${id}:position`, `Moved ${name}`, `Column ${(previous.gridX || 0) + 1}, row ${(previous.gridY || 0) + 1}`, `Column ${(widget.gridX || 0) + 1}, row ${(widget.gridY || 0) + 1}`);
     add(`widget:${id}:size`, `Resized ${name}`, `${previous.w} × ${previous.h}`, `${widget.w} × ${widget.h}`);
+    if (['flights', 'checklist', 'table'].includes(widget.type || '')) add(`widget:${id}:details`, `${name} details`, planningDetails(previous), planningDetails(widget));
     if (widget.type === 'vote') {
       add(`widget:${id}:options`, `${name} poll options`, (previous.options || []).map(option => option.label).join('\n'), (widget.options || []).map(option => option.label).join('\n'));
       add(`widget:${id}:multiple`, `${name} multiple choices`, previous.multiSelect ? 'Allowed' : 'Not allowed', widget.multiSelect ? 'Allowed' : 'Not allowed');

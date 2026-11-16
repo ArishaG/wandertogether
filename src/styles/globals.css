@@ -383,3 +383,5 @@
 html {
   scroll-behavior: smooth;
 }
+
+.planning-widget-body { height: calc(100% - 42px); overflow: auto; padding: 14px 14px 24px; overscroll-behavior: contain; }
