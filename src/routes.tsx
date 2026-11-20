@@ -6,6 +6,7 @@ import AccountPage from './pages/AccountPage';
 import PublicProfilePage from './pages/PublicProfilePage';
 import AuthPage from './pages/auth/AuthPage';
 import InvitePage from './pages/InvitePage';
+import TripSocialPage from './pages/TripSocialPage';
 // Eager import so renderToString doesn't hit a Suspense boundary on 404 routes
 // and abort to client rendering. The prod 404 page is tiny; the dev-tools
 // variant stays lazy because it pulls in dev-only code we don't want in
@@ -39,6 +40,9 @@ export const routes: RouteObject[] = [{
 }, {
   path: '/invite/:token',
   element: <InvitePage />
+}, {
+  path: '/trip/:id/social',
+  element: <TripSocialPage />
 }, {
   path: '/trip/:id',
   element: <HomePage />

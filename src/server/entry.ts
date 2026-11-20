@@ -1,3 +1,5 @@
+import { MAX_PHOTO_BYTES } from '../lib/trip-social';
+import { getTripPhotoFeed, getTripPhoto, putTripPhoto, deleteTripPhoto } from './trip-social';
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import { fileURLToPath } from "node:url";
 import { dirname, extname, join } from "node:path";
@@ -104,9 +106,13 @@ const app = express();
 // the sitemap origin in robots.txt.
 app.set("trust proxy", true);
 
+app.put('/api/trips/:id/social/:day', express.raw({ type: 'image/jpeg', limit: MAX_PHOTO_BYTES, inflate: false }), putTripPhoto);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get('/api/trips/:id/social', getTripPhotoFeed);
+app.get('/api/trips/:id/social/:day/:authorId', getTripPhoto);
+app.delete('/api/trips/:id/social/:day', deleteTripPhoto);
 app.get("/api/places", places_get);
 app.post("/api/trips/:id/invite", invite_post);
 app.get("/api/trips/:id/leave", trip_leave_get);
@@ -141,6 +147,10 @@ app.use('/api', (_req, res) => {
 // Error middleware must be registered AFTER the routes it protects; Express
 // only passes errors to middleware defined later in the stack.
 app.use("/api", (err: unknown, req: Request, res: Response, _next: NextFunction) => {
+  if (req.path.includes('/social/') && err && typeof err === 'object' && 'type' in err && err.type === 'entity.too.large') {
+    res.status(413).json({ error: 'This photo is too large to upload.' });
+    return;
+  }
 	// Always respond JSON on /api so clients parsing response.json() don't
 	// receive Express's default HTML error page for non-Error throws.
 	console.error("ssr.api.error", {

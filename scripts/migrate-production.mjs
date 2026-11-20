@@ -23,6 +23,11 @@ const migrations = [
     table: 'trip_invitations',
     verify: tx => tx`select id, trip_id, email, token_hash, status, expires_at, accepted_by from trip_invitations limit 0`,
   },
+  {
+    file: '0003_trip_photos.sql',
+    table: 'trip_photos',
+    verify: tx => tx`select trip_id, day, user_id, jpeg from trip_photos limit 0`,
+  },
 ];
 
 let sql;

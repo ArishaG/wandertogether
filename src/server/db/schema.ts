@@ -1,4 +1,4 @@
-import { boolean, index, json, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { boolean, date, index, json, pgTable, primaryKey, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 export const user = pgTable('user', {
   id: varchar('id', { length: 36 }).primaryKey(),
@@ -85,3 +85,10 @@ export const tripInvitations = pgTable('trip_invitations', {
   acceptedAt: timestamp('accepted_at'),
   createdAt: timestamp('created_at').defaultNow(),
 }, table => [index('trip_invitations_trip_email_idx').on(table.tripId, table.email)]);
+
+export const tripPhotos = pgTable('trip_photos', {
+  tripId: varchar('trip_id', { length: 36 }).notNull().references(() => trips.id, { onDelete: 'cascade' }),
+  day: date('day').notNull(),
+  userId: varchar('user_id', { length: 36 }).notNull().references(() => user.id, { onDelete: 'cascade' }),
+  jpeg: text('jpeg').notNull(),
+}, table => [primaryKey({ columns: [table.tripId, table.day, table.userId] })]);
